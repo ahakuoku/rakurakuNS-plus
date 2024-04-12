@@ -1,15 +1,12 @@
+# -*- coding: utf-8 -*- 
+
 import subprocess
 import psutil
-
-# 各種設定
-server_folder_path = ''
-server_name = 'sim-WinGDI64-OTRP.exe'
-port_number = '13353'
-autosave_backup = 80
+import config
 
 # 変数定義
-server_path = server_folder_path + '/' + server_name
-server_save = '' + port_number
+server_path = config.server_folder_path + '/' + config.server_name
+server_save = '' + config.port_number
 
 # 関数定義
 def get_pid(process_name):
@@ -19,8 +16,8 @@ def get_pid(process_name):
     return None
 
 # PIDがNoneなら起動する
-server_pid = get_pid(server_name)
+server_pid = get_pid(config.server_name)
 print(f'PID: {server_pid}')
 print(f'server_path: {server_path}')
 if server_pid is None:
-    subprocess.Popen(['start', server_path, '-server', port_number, '-fps', '30'], shell=True)
+    subprocess.Popen(['start', server_path, '-server', config.port_number, '-fps', '30'], shell=True)

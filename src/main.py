@@ -14,6 +14,7 @@ client = discord.Client()
 
 # 関数定義
 def get_nettool_pw():
+    # simuconf.tabを開き、「server_admin_pw」から始まる行を検索
     simuconf_path = config.server_folder_path + '/config/simuconf.tab'
     f = open(simuconf_path, 'r', encoding='utf-8')
     line = f.readline()
@@ -23,7 +24,8 @@ def get_nettool_pw():
             print(line)
             nettool_password_tmp = line
     f.close()
-    nettool_password = re.sub('^server_admin_pw( = |= | =|=)', '', nettool_password_tmp)
+    # 行頭の「server_admin_pw = 」を削除し返す
+    nettool_password = re.sub('^server_admin_pw( *= *)', '', nettool_password_tmp)
     print(nettool_password)
     return nettool_password
 

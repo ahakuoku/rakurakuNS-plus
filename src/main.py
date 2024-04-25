@@ -10,7 +10,9 @@ import re
 # 変数定義
 server_path = config.server_folder_path + '/' + config.server_name
 server_save = '' + config.port_number
-client = discord.Client()
+intents = discord.Intents.default()
+intents.message_content = True
+client = discord.Client(intents=intents)
 
 # 関数定義
 def get_nettool_pw():
@@ -44,7 +46,14 @@ def restart(crash):
     # 鯖が落ちてたら再起動
     if server_pid is None:
         subprocess.Popen(['start', server_path, '-server', config.port_number, '-fps', '30'], shell=True)
-    return None
+        if config.use_discord_bot != 0:
+            @client.event
+            async def on_ready():
+                # Discordに鯖落ち通知を送信
+                channel = client.get_channel(config.discord_channel)
+                await channel.send(embed=discord.Embed(title='サーバーダウンを検出しました。', description='現在復旧中です。しばらくお待ちください。', color=0xff0000))
+                return None
 
-
+def start():
+    client.run(config.discord_token)
 # PIDがNoneなら起動する

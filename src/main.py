@@ -30,15 +30,18 @@ def get_nettool_pw():
     return nettool_password
 
 def get_pid(process_name):
+    # pidを取得する
     for proc in psutil.process_iter(['pid', 'name']):
         if proc.info['name'] == process_name:
             return proc.info['pid']
     return None
 
 def restart(crash):
+    # pidを取得する
     server_pid = get_pid(config.server_name)
-    print(f'PID: {server_pid}')
-    print(f'server_path: {server_path}')
+    # print(f'PID: {server_pid}')
+    # print(f'server_path: {server_path}')
+    # 鯖が落ちてたら再起動
     if server_pid is None:
         subprocess.Popen(['start', server_path, '-server', config.port_number, '-fps', '30'], shell=True)
     return None

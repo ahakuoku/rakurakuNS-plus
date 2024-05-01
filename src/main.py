@@ -6,6 +6,7 @@ import config
 import time
 # import discord
 import re
+import datetime
 
 # 変数定義
 if config.server_folder_path.endswith('/') is True:
@@ -26,6 +27,8 @@ def check_nettool():
         keywait = input(f'nettoolの認識に失敗しました。nettoolを実行ファイルと同じフォルダに置いてからやり直してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
     except subprocess.CalledProcessError:
         keywait = input(f'nettoolの認識に失敗しました。nettoolを実行ファイルと同じフォルダに置いてからやり直してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+    date_time_now = date_time_get()
+    print(date_time_now.strftime('[%Y/%m/%d %H:%M:%S] nettoolの認識に成功しました。'))
     return None
 
 def get_nettool_pw():
@@ -40,7 +43,13 @@ def get_nettool_pw():
     f.close()
     # 行頭の「server_admin_pw = 」を削除し返す
     nettool_password = re.sub('^server_admin_pw( *= *)', '', nettool_password_tmp)
+    date_time_now = date_time_get()
+    print(date_time_now.strftime('[%Y/%m/%d %H:%M:%S] nettoolのパスワード取得に成功しました。'))
     return nettool_password
+
+def date_time_get():
+    date_time = datetime.datetime.now()
+    return date_time
 
 def get_pid(process_name):
     # pidを取得する
@@ -55,13 +64,15 @@ def restart(crash):
     # PIDがNoneなら起動する
     if server_pid is None:
         subprocess.Popen(['start', server_path, '-server', config.port_number, '-fps', '30', '-nomidi', '-nosound'], shell=True)
-        swm_discord_post('サーバーダウンを検出しました。', '現在復旧中です。しばらくお待ちください。', '16711680')
-        # @client.event
-        # async def on_ready():
-            # Discordに鯖落ち通知を送信
-            # channel = client.get_channel(config.discord_channel)
-            # await channel.send(embed=discord.Embed(title='サーバーダウンを検出しました。', description='現在復旧中です。しばらくお待ちください。', color=0xff0000))
-            # return None
+        if crash == 1:
+            date_time_now = date_time_get()
+            print(date_time_now.strftime('[%Y/%m/%d %H:%M:%S] サーバーダウンを検出しました。再起動します。'))
+            swm_discord_post('サーバーダウンを検出しました。', '現在復旧中です。しばらくお待ちください。', '16711680')
+            # @client.event
+            # async def on_ready():
+                # Discordに鯖落ち通知を送信
+                # channel = client.get_channel(config.discord_channel)
+                # await channel.send(embed=discord.Embed(title='サーバーダウンを検出しました。', description='現在復旧中です。しばらくお待ちください。', color=0xff0000))
     return None
 
 def swm_discord_post(title, description, color):
@@ -85,7 +96,7 @@ def nettool_say(content):
     return None
 
 def start():
-    restart('test')
+    restart(1)
     # client.run(config.discord_token)
 
 start()

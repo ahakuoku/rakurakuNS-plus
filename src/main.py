@@ -54,7 +54,7 @@ def restart(crash):
     server_pid = get_pid(config.server_name)
     # PIDがNoneなら起動する
     if server_pid is None:
-        subprocess.Popen(['start', server_path, '-server', config.port_number, '-fps', '30'], shell=True)
+        subprocess.Popen(['start', server_path, '-server', config.port_number, '-fps', '30', '-nomidi', '-nosound'], shell=True)
         swm_discord_post('サーバーダウンを検出しました。', '現在復旧中です。しばらくお待ちください。', '16711680')
         # @client.event
         # async def on_ready():

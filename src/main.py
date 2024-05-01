@@ -79,6 +79,7 @@ def swm_discord_post(title, description, color):
         f.write('{"description":"' + description + '","fields":null,"title":"' + title + '","color":' + color + ',"footer":null}')
 
 def nettool_say(content):
+    # contentにはASCII文字以外を入れないこと
     nettool_pw = get_nettool_pw()
     subprocess.run(['nettool', '-p', nettool_pw, '-s', '127.0.0.1:' + config.port_number, 'say', content])
     return None

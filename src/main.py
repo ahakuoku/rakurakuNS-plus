@@ -78,6 +78,11 @@ def swm_discord_post(title, description, color):
         f = open(discord_io_file_embed, 'w')
         f.write('{"description":"' + description + '","fields":null,"title":"' + title + '","color":' + color + ',"footer":null}')
 
+def nettool_say(content):
+    nettool_pw = get_nettool_pw()
+    subprocess.run(['nettool', '-p', nettool_pw, '-s', '127.0.0.1:' + config.port_number, 'say', content])
+    return None
+
 def start():
     restart('test')
     # client.run(config.discord_token)

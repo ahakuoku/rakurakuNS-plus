@@ -13,7 +13,7 @@
 # 「discord_token」「discord_channel」は現在使用していません。
 # 
 # 設定方法
-# server_folder_path: サーバーフォルダのパスを指定します。「'」で囲む必要があります。フォルダの区切りは「\」ではなく「/」を指定してください。
+# server_folder_path: サーバーフォルダのパスを指定します。「'」で囲み、囲みの前に「r」が存在する必要があります。
 # server_name       : サーバーのファイル名を指定します。「'」で囲む必要があります。
 # port_number       : ポート番号を指定します。「'」で囲む必要があります。
 # autosave_backup   : オートセーブのバックアップ数を指定します。
@@ -24,7 +24,7 @@
 # discord_channel   : Discordのbotが書き込むチャンネルを指定します。
 ##################################################
 
-server_folder_path = 'C:/Users/XXX/Simutrans'
+server_folder_path = r'C:/Users/XXX/Simutrans'
 server_name        = 'sim-WinGDI64-OTRP.exe'
 port_number        = '13353'
 autosave_backup    = 80

@@ -7,6 +7,8 @@ import time
 # import discord
 import re
 import datetime
+import platform
+import sys
 
 # 変数定義
 if config.server_folder_path.endswith('/') is True:
@@ -27,9 +29,16 @@ def check_nettool():
         keywait = input(f'nettoolの認識に失敗しました。nettoolを実行ファイルと同じフォルダに置いてからやり直してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
     except subprocess.CalledProcessError:
         keywait = input(f'nettoolの認識に失敗しました。nettoolを実行ファイルと同じフォルダに置いてからやり直してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
-    date_time_now = date_time_get()
-    print(date_time_now.strftime('[%Y/%m/%d %H:%M:%S] nettoolの認識に成功しました。'))
+    print_with_date('nettoolの認識に成功しました。')
     return None
+
+def check_os():
+    os_system = platform.system()
+    if os_system == 'Windows' or os_system == 'Linux' or os_system == 'Darwin':
+        print_with_date('動作可能OSであることを確認しました。')
+    else:
+        keywait = input(f'らくらくNS+はお使いのOSには対応していません。らくらくNS+はWindows、Mac、Linuxに対応しています。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+        sys.exit()
 
 def get_nettool_pw():
     # simuconf.tabを開き、「server_admin_pw」から始まる行を検索
@@ -43,13 +52,13 @@ def get_nettool_pw():
     f.close()
     # 行頭の「server_admin_pw = 」を削除し返す
     nettool_password = re.sub('^server_admin_pw( *= *)', '', nettool_password_tmp)
-    date_time_now = date_time_get()
-    print(date_time_now.strftime('[%Y/%m/%d %H:%M:%S] nettoolのパスワード取得に成功しました。'))
+    print_with_date('nettoolのパスワード取得に成功しました。')
     return nettool_password
 
-def date_time_get():
+def print_with_date(content):
     date_time = datetime.datetime.now()
-    return date_time
+    print(date_time.strftime('[%Y/%m/%d %H:%M:%S] ' + content))
+    return None
 
 def get_pid(process_name):
     # pidを取得する
@@ -58,22 +67,32 @@ def get_pid(process_name):
             return proc.info['pid']
     return None
 
-def restart(crash):
+def restart():
     # pidを取得する
     server_pid = get_pid(config.server_name)
+    first_start = 0
     # PIDがNoneなら起動する
     if server_pid is None:
-        subprocess.Popen(['start', server_path, '-server', config.port_number, '-fps', '30', '-nomidi', '-nosound'], shell=True)
-        if crash == 1:
-            date_time_now = date_time_get()
-            print(date_time_now.strftime('[%Y/%m/%d %H:%M:%S] サーバーダウンを検出しました。再起動します。'))
+        app_process = app_start()
+        if first_start == 0:
+            print_with_date('サーバーを起動します。')
+        elif first_start == 1:
+            print_with_date('サーバーダウンを検出しました。再起動します。')
             swm_discord_post('サーバーダウンを検出しました。', '現在復旧中です。しばらくお待ちください。', '16711680')
             # @client.event
             # async def on_ready():
                 # Discordに鯖落ち通知を送信
                 # channel = client.get_channel(config.discord_channel)
                 # await channel.send(embed=discord.Embed(title='サーバーダウンを検出しました。', description='現在復旧中です。しばらくお待ちください。', color=0xff0000))
+        first_start = 1
     return None
+
+def app_start():
+    os_system = platform.system()
+    if os_system == 'Windows':
+        return subprocess.Popen([server_path, '-server', config.port_number, '-fps', '30', '-nomidi', '-nosound'], creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
+    elif os_system == 'Linux' or os_system == 'Darwin':
+        return subprocess.Popen([server_path, '-server', config.port_number, '-fps', '30', '-nomidi', '-nosound'], start_new_session=True)
 
 def swm_discord_post(title, description, color):
     # Simutrans World Monitorを利用してDiscordに書き込み
@@ -95,8 +114,19 @@ def nettool_say(content):
     subprocess.run(['nettool', '-p', nettool_pw, '-s', '127.0.0.1:' + config.port_number, 'say', content])
     return None
 
+def wait_simutrans_responce():
+    nettool_pw = get_nettool_pw()
+    print_with_date('Simutransの応答を待っています。しばらくお待ちください。')
+    while True:
+        result = subprocess.run(['nettool', '-p', nettool_pw, '-s', '127.0.0.1:' + config.port_number, 'clients'], encoding='utf-8', stdout=subprocess.PIPE, text=True)
+        if result.returncode == 0:
+            print_with_date('Simutransが応答しました。処理を再開します。')
+            break
+
 def start():
-    restart(1)
+    check_os()
+    check_nettool()
+    restart()
     # client.run(config.discord_token)
 
 start()

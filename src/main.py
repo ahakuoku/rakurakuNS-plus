@@ -81,13 +81,25 @@ def restart():
             # 初回起動時とそれ以外で表示メッセージを変える
             if first_start == 0:
                 print_with_date('サーバーを起動します。')
+                wait_simutrans_responce()
+                set_company_pw()
             elif first_start == 1:
                 print_with_date('サーバーダウンを検出しました。再起動します。')
                 swm_discord_post('サーバーダウンを検出しました。', '現在復旧中です。しばらくお待ちください。', '16711680')
-            wait_simutrans_responce()
+                wait_simutrans_responce()
+                set_company_pw()
         first_start = 1
         time.sleep(1)
     return None
+
+def set_company_pw():
+    nettool_pw = get_nettool_pw()
+    for i in range(14):
+        company_id = f'{i}'
+        result = subprocess.run(['nettool', '-p', nettool_pw, '-s', '127.0.0.1:' + config.port_number, 'info-company', company_id], capture_output=True, text=True)
+        if result.stdout == 'Nothing received.':
+            exec_command = "subprocess.run(['nettool', '-p', nettool_pw, '-s', '127.0.0.1:' + config.port_number, 'lock-company', '" + str(i) + "', config.player_" + str(i) + "_pw], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, text=True)"
+            result = exec(exec_command)
 
 def app_start():
     # Simutransを起動する

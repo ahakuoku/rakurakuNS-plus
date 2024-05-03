@@ -7,6 +7,10 @@
 # この設定ファイルは将来的に廃止され、別の手段による設定に置換される予定です。
 # 各設定項目を削除したり、設定値を削除した状態で起動すると思わぬ動作の原因になることがあります。
 # 
+# 開発版特有の注意
+# 現在、開発の初期段階のため一部設定が使用されていません。
+# 使用されていないのは「autosave_backup」「autosave_interval」です。
+# 
 # Discordへの書き込みについて
 # 現在暫定的にSimutrans World Monitorとの連携を使用しています。
 # このため、Discord関連の設定方法は下記の「設定方法」と異なります。
@@ -46,7 +50,6 @@ player_11_pw       = ''
 player_12_pw       = ''
 player_13_pw       = ''
 player_14_pw       = ''
-restart_time       = 5
 use_discord_bot    = 1
 discord_token      = r'aiueo'
 discord_channel    = 1234567890

@@ -2,7 +2,10 @@
 
 import subprocess
 import psutil
-import config
+try:
+    import config
+except ModuleNotFoundError:
+    keywait = input(f'config.template.pyをコピーし、config.pyにリネームして設定を行ってください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
 import time
 # import discord
 import re

@@ -77,16 +77,10 @@ def restart():
             app_process = app_start()
             if first_start == 0:
                 print_with_date('サーバーを起動します。')
-                wait_simutrans_responce()
             elif first_start == 1:
                 print_with_date('サーバーダウンを検出しました。再起動します。')
                 swm_discord_post('サーバーダウンを検出しました。', '現在復旧中です。しばらくお待ちください。', '16711680')
-                wait_simutrans_responce()
-                # @client.event
-                # async def on_ready():
-                    # Discordに鯖落ち通知を送信
-                    # channel = client.get_channel(config.discord_channel)
-                    # await channel.send(embed=discord.Embed(title='サーバーダウンを検出しました。', description='現在復旧中です。しばらくお待ちください。', color=0xff0000))
+            wait_simutrans_responce()
         first_start = 1
         time.sleep(1)
     return None

@@ -94,9 +94,9 @@ def app_start():
     os_system = platform.system()
     # WindowsとUNIX系OSでコマンドが違うのでその対策
     if os_system == 'Windows':
-        return subprocess.Popen(['start', server_path, '-server', config.port_number, '-fps', '30', '-nomidi', '-nosound', '-load', server_save], shell=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        return subprocess.Popen(['start', server_path, '-server', config.port_number, '-fps', '30', '-nomidi', '-nosound', '-load', server_save], shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     elif os_system == 'Linux' or os_system == 'Darwin':
-        return subprocess.Popen([server_path, '-server', config.port_number, '-fps', '30', '-nomidi', '-nosound', '-load', server_save], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, start_new_session=True)
+        return subprocess.Popen([server_path, '-server', config.port_number, '-fps', '30', '-nomidi', '-nosound', '-load', server_save], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
 
 def swm_discord_post(title, description, color):
     # Simutrans World Monitorを利用してDiscordに書き込み

@@ -127,6 +127,7 @@ def wait_simutrans_responce():
         if result.returncode == 0:
             print_with_date('Simutransが応答しました。処理を再開します。')
             break
+        time.sleep(1)
 
 def start():
     check_os()

@@ -24,6 +24,7 @@ first_start = 0
 
 # 関数定義
 def check_nettool():
+    # nettoolの存在確認
     try:
         subprocess.run(['nettool'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except FileNotFoundError:
@@ -34,6 +35,7 @@ def check_nettool():
     return None
 
 def check_os():
+    # 実行OSがWindows、Mac、Linuxのいずれかであることを確認する
     os_system = platform.system()
     if os_system == 'Windows' or os_system == 'Linux' or os_system == 'Darwin':
         print_with_date('動作可能OSであることを確認しました。')
@@ -57,6 +59,7 @@ def get_nettool_pw():
     return nettool_password
 
 def print_with_date(content):
+    # 日時とcontentを表示する
     date_time = datetime.datetime.now()
     print(date_time.strftime('[%Y/%m/%d %H:%M:%S] ' + content))
     return None
@@ -75,6 +78,7 @@ def restart():
         server_pid = get_pid(config.server_name)
         if server_pid is None:
             app_process = app_start()
+            # 初回起動時とそれ以外で表示メッセージを変える
             if first_start == 0:
                 print_with_date('サーバーを起動します。')
             elif first_start == 1:
@@ -85,14 +89,10 @@ def restart():
         time.sleep(1)
     return None
 
-def set_company_pw():
-    for i in range(14):
-        exec_command = 'print(str_' + str(i) + ')'
-        exec(exec_command)
-    return None
-
 def app_start():
+    # Simutransを起動する
     os_system = platform.system()
+    # WindowsとUNIX系OSでコマンドが違うのでその対策
     if os_system == 'Windows':
         return subprocess.Popen(['start', server_path, '-server', config.port_number, '-fps', '30', '-nomidi', '-nosound', '-load', server_save], shell=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     elif os_system == 'Linux' or os_system == 'Darwin':
@@ -119,6 +119,7 @@ def nettool_say(content):
     return None
 
 def wait_simutrans_responce():
+    # Simutransの応答を待つ
     nettool_pw = get_nettool_pw()
     print_with_date('Simutransの応答を待っています。しばらくお待ちください。')
     while True:

@@ -16,7 +16,8 @@ if config.server_folder_path.endswith('/') is True:
 else:
     server_folder_path = config.server_folder_path
 server_path = server_folder_path + '/' + config.server_name
-server_save = '' + config.port_number
+server_save = 'server' + config.port_number + '-network.sve'
+first_start = 0
 # intents = discord.Intents.default()
 # intents.message_content = True
 # client = discord.Client(intents=intents)
@@ -24,7 +25,7 @@ server_save = '' + config.port_number
 # 関数定義
 def check_nettool():
     try:
-        subprocess.run(['nettool'])
+        subprocess.run(['nettool'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except FileNotFoundError:
         keywait = input(f'nettoolの認識に失敗しました。nettoolを実行ファイルと同じフォルダに置いてからやり直してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
     except subprocess.CalledProcessError:
@@ -68,31 +69,34 @@ def get_pid(process_name):
     return None
 
 def restart():
-    # pidを取得する
-    server_pid = get_pid(config.server_name)
     first_start = 0
-    # PIDがNoneなら起動する
-    if server_pid is None:
-        app_process = app_start()
-        if first_start == 0:
-            print_with_date('サーバーを起動します。')
-        elif first_start == 1:
-            print_with_date('サーバーダウンを検出しました。再起動します。')
-            swm_discord_post('サーバーダウンを検出しました。', '現在復旧中です。しばらくお待ちください。', '16711680')
-            # @client.event
-            # async def on_ready():
-                # Discordに鯖落ち通知を送信
-                # channel = client.get_channel(config.discord_channel)
-                # await channel.send(embed=discord.Embed(title='サーバーダウンを検出しました。', description='現在復旧中です。しばらくお待ちください。', color=0xff0000))
+    while True:
+        # PIDを取得し、Noneなら起動する
+        server_pid = get_pid(config.server_name)
+        if server_pid is None:
+            app_process = app_start()
+            if first_start == 0:
+                print_with_date('サーバーを起動します。')
+                wait_simutrans_responce()
+            elif first_start == 1:
+                print_with_date('サーバーダウンを検出しました。再起動します。')
+                swm_discord_post('サーバーダウンを検出しました。', '現在復旧中です。しばらくお待ちください。', '16711680')
+                wait_simutrans_responce()
+                # @client.event
+                # async def on_ready():
+                    # Discordに鯖落ち通知を送信
+                    # channel = client.get_channel(config.discord_channel)
+                    # await channel.send(embed=discord.Embed(title='サーバーダウンを検出しました。', description='現在復旧中です。しばらくお待ちください。', color=0xff0000))
         first_start = 1
+        time.sleep(1)
     return None
 
 def app_start():
     os_system = platform.system()
     if os_system == 'Windows':
-        return subprocess.Popen([server_path, '-server', config.port_number, '-fps', '30', '-nomidi', '-nosound'], creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
+        return subprocess.Popen([server_path, '-server', config.port_number, '-fps', '30', '-nomidi', '-nosound', '-load', server_save], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
     elif os_system == 'Linux' or os_system == 'Darwin':
-        return subprocess.Popen([server_path, '-server', config.port_number, '-fps', '30', '-nomidi', '-nosound'], start_new_session=True)
+        return subprocess.Popen([server_path, '-server', config.port_number, '-fps', '30', '-nomidi', '-nosound', '-load', server_save], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, start_new_session=True)
 
 def swm_discord_post(title, description, color):
     # Simutrans World Monitorを利用してDiscordに書き込み
@@ -111,14 +115,14 @@ def swm_discord_post(title, description, color):
 def nettool_say(content):
     # contentにはASCII文字以外を入れないこと（文字化け対策）
     nettool_pw = get_nettool_pw()
-    subprocess.run(['nettool', '-p', nettool_pw, '-s', '127.0.0.1:' + config.port_number, 'say', content])
+    subprocess.run(['nettool', '-p', nettool_pw, '-s', '127.0.0.1:' + config.port_number, 'say', content], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return None
 
 def wait_simutrans_responce():
     nettool_pw = get_nettool_pw()
     print_with_date('Simutransの応答を待っています。しばらくお待ちください。')
     while True:
-        result = subprocess.run(['nettool', '-p', nettool_pw, '-s', '127.0.0.1:' + config.port_number, 'clients'], encoding='utf-8', stdout=subprocess.PIPE, text=True)
+        result = subprocess.run(['nettool', '-p', nettool_pw, '-s', '127.0.0.1:' + config.port_number, 'clients'], encoding='utf-8', stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
         if result.returncode == 0:
             print_with_date('Simutransが応答しました。処理を再開します。')
             break

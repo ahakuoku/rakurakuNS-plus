@@ -88,6 +88,7 @@ def restart():
                 swm_discord_post('サーバーダウンを検出しました。', '現在復旧中です。しばらくお待ちください。', '16711680')
                 wait_simutrans_responce()
                 set_company_pw()
+                swm_discord_post('サーバーが復旧しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', '65280')
         first_start = 1
         time.sleep(1)
     return None
@@ -105,7 +106,7 @@ def set_company_pw():
         if result.stdout != 'Nothing received.\n' and company_pw != '':
             subprocess.run(['nettool', '-p', nettool_pw, '-s', '127.0.0.1:' + config.port_number, 'lock-company', company_id, company_pw], capture_output=True, text=True)
         i += 1
-    print_with_date('パスワードを設定しました。')
+    print_with_date('会社にパスワードを設定しました。')
 
 def app_start():
     # Simutransを起動する
@@ -121,13 +122,13 @@ def swm_discord_post(title, description, color):
     discord_io_file_plain = server_folder_path + '/file_io/out.txt'
     discord_io_file_embed = server_folder_path + '/file_io/out_embed.json'
     if config.use_discord_bot == 1:
-        f = open(discord_io_file_plain, 'w')
+        f = open(discord_io_file_plain, 'w', encoding='utf-8')
         f.write('# ' + title + '\n' + description + '\n')
         f.close()
     elif config.use_discord_bot == 2:
         title = title.replace('\n', '\\n')
         description = description.replace('\n', '\\n')
-        f = open(discord_io_file_embed, 'w')
+        f = open(discord_io_file_embed, 'w', encoding='utf-8')
         f.write('{"description":"' + description + '","fields":null,"title":"' + title + '","color":' + color + ',"footer":null}')
 
 def nettool_say(content):

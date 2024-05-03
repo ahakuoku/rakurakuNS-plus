@@ -85,10 +85,16 @@ def restart():
         time.sleep(1)
     return None
 
+def set_company_pw():
+    for i in range(14):
+        exec_command = 'print(str_' + str(i) + ')'
+        exec(exec_command)
+    return None
+
 def app_start():
     os_system = platform.system()
     if os_system == 'Windows':
-        return subprocess.Popen([server_path, '-server', config.port_number, '-fps', '30', '-nomidi', '-nosound', '-load', server_save], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
+        return subprocess.Popen(['start', server_path, '-server', config.port_number, '-fps', '30', '-nomidi', '-nosound', '-load', server_save], shell=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     elif os_system == 'Linux' or os_system == 'Darwin':
         return subprocess.Popen([server_path, '-server', config.port_number, '-fps', '30', '-nomidi', '-nosound', '-load', server_save], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, start_new_session=True)
 

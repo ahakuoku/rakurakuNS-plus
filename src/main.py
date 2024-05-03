@@ -93,13 +93,19 @@ def restart():
     return None
 
 def set_company_pw():
+    # パスワードを設定する
     nettool_pw = get_nettool_pw()
-    for i in range(14):
-        company_id = f'{i}'
+    company_pws = [config.player_0_pw, config.player_1_pw, config.player_2_pw, config.player_3_pw, config.player_4_pw, config.player_5_pw, config.player_6_pw, config.player_7_pw, config.player_8_pw, config.player_9_pw, config.player_10_pw, config.player_11_pw, config.player_12_pw, config.player_13_pw, config.player_14_pw]
+    i = 0
+    for company_pw in company_pws:
+        # クラッシュ対策（存在しない会社にパスワードをかけるとクラッシュする）
+        company_id = str(i)
         result = subprocess.run(['nettool', '-p', nettool_pw, '-s', '127.0.0.1:' + config.port_number, 'info-company', company_id], capture_output=True, text=True)
-        if result.stdout == 'Nothing received.':
-            exec_command = "subprocess.run(['nettool', '-p', nettool_pw, '-s', '127.0.0.1:' + config.port_number, 'lock-company', '" + str(i) + "', config.player_" + str(i) + "_pw], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, text=True)"
-            result = exec(exec_command)
+        # Nothing received.の後は改行が必要
+        if result.stdout != 'Nothing received.\n' and company_pw != '':
+            subprocess.run(['nettool', '-p', nettool_pw, '-s', '127.0.0.1:' + config.port_number, 'lock-company', company_id, company_pw], capture_output=True, text=True)
+        i += 1
+    print_with_date('パスワードを設定しました。')
 
 def app_start():
     # Simutransを起動する

@@ -91,6 +91,7 @@ def restart():
                 swm_discord_post('サーバーダウンを検出しました。', '現在復旧中です。しばらくお待ちください。', '16711680')
                 wait_simutrans_responce()
                 set_company_pw()
+                print_with_date('サーバーを再起動しました。')
                 swm_discord_post('サーバーが復旧しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', '65280')
         start_code = 1
         time.sleep(1)

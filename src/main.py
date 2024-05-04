@@ -12,6 +12,9 @@ import re
 import datetime
 import platform
 import sys
+import os
+import shutil
+import threading
 
 # 変数定義
 if config.server_folder_path.endswith('/') is True:
@@ -19,6 +22,7 @@ if config.server_folder_path.endswith('/') is True:
 else:
     server_folder_path = config.server_folder_path
 server_path = server_folder_path + '/' + config.server_name
+server_path = server_path.replace('\\', '/')
 server_save = 'server' + config.port_number + '-network.sve'
 start_code = 0
 # intents = discord.Intents.default()
@@ -72,29 +76,6 @@ def get_pid(process_name):
     for proc in psutil.process_iter(['pid', 'name']):
         if proc.info['name'] == process_name:
             return proc.info['pid']
-    return None
-
-def restart():
-    global start_code
-    while True:
-        # PIDを取得し、Noneなら起動する
-        server_pid = get_pid(config.server_name)
-        if server_pid is None:
-            app_process = app_start()
-            # 初回起動時とそれ以外で表示メッセージを変える
-            if start_code == 0:
-                print_with_date('サーバーを起動します。')
-                wait_simutrans_responce()
-                set_company_pw()
-            elif start_code == 1:
-                print_with_date('サーバーダウンを検出しました。再起動します。')
-                swm_discord_post('サーバーダウンを検出しました。', '現在復旧中です。しばらくお待ちください。', '16711680')
-                wait_simutrans_responce()
-                set_company_pw()
-                print_with_date('サーバーを再起動しました。')
-                swm_discord_post('サーバーが復旧しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', '65280')
-        start_code = 1
-        time.sleep(1)
     return None
 
 def set_company_pw():
@@ -152,10 +133,95 @@ def wait_simutrans_responce():
             break
         time.sleep(1)
 
+def nettool_forcesync():
+    # ロード処理
+    nettool_pw = get_nettool_pw()
+    subprocess.run(['nettool', '-p', nettool_pw, '-s', '127.0.0.1:' + config.port_number, 'force-sync'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    wait_simutrans_responce()
+    save_backup()
+
+def save_backup():
+    # バックアップ
+    print_with_date('セーブデータのバックアップを行います。')
+    # autosaveフォルダがないなら作る
+    path = server_folder_path + '/autosave'
+    if not os.path.isdir(path):
+        print_with_date('autosaveフォルダが存在しません。作成します。')
+        os.mkdir(path)
+    # バックアップ上限を超えたファイルがあるなら削除
+    path = server_folder_path + '/autosave/autosave_' + str(config.autosave_backup) + '.sve'
+    is_file = os.path.isfile(path)
+    if is_file:
+        os.remove(path)
+    # 変数定義
+    run_for = config.autosave_backup - 1
+    backup_after_number = config.autosave_backup
+    # バックアップ済みのファイルの名称変更
+    for i in range(run_for):
+        backup_before_number = backup_after_number - 1
+        path = server_folder_path + '/autosave/autosave_' + str(backup_before_number) + '.sve'
+        before_filename = server_folder_path + '/autosave/autosave_' + str(backup_before_number) + '.sve'
+        after_filename = server_folder_path + '/autosave/autosave_' + str(backup_after_number) + '.sve'
+        is_file = os.path.isfile(path)
+        if is_file:
+            os.rename(before_filename, after_filename)
+        backup_after_number -= 1
+    # ファイルをコピー
+    shutil.copy(server_folder_path + '/' +  server_save, server_folder_path + '/autosave/autosave_1.sve')
+    print_with_date('バックアップ処理が終了しました。')
+    return None
+
+def restart():
+    global start_code
+    while True:
+        # PIDを取得し、Noneなら起動する
+        server_pid = get_pid(config.server_name)
+        if server_pid is None:
+            app_process = app_start()
+            # 初回起動時とそれ以外で表示メッセージを変える
+            if start_code == 0:
+                print_with_date('サーバーを起動します。')
+                wait_simutrans_responce()
+                set_company_pw()
+            elif start_code == 1:
+                print_with_date('サーバーダウンを検出しました。再起動します。')
+                swm_discord_post('サーバーダウンを検出しました。', '現在復旧中です。しばらくお待ちください。', '16711680')
+                wait_simutrans_responce()
+                set_company_pw()
+                print_with_date('サーバーを再起動しました。')
+                swm_discord_post('サーバーが復旧しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', '65280')
+        start_code = 1
+        time.sleep(1)
+    return None
+
+def autosave():
+    autosave_interval = config.autosave_interval - 30
+    time.sleep(autosave_interval)
+    while True:
+        nettool_say('Autosave soon.')
+        print_with_date('オートセーブ予告メッセージを送信しました。')
+        time.sleep(30)
+        start_time = time.time()
+        print_with_date('オートセーブ中です。')
+        nettool_forcesync()
+        set_company_pw()
+        print_with_date('オートセーブ処理が完了しました。')
+        end_time = time.time()
+        time_diff = end_time - start_time
+        autosave_interval = autosave_interval - time_diff
+        time.sleep(autosave_interval)
+    return None
+
 def start():
     check_os()
     check_nettool()
-    restart()
+    thread_1 = threading.Thread(target=restart)
+    thread_2 = threading.Thread(target=autosave)
+    thread_1.start()
+    thread_2.start()
+    thread_1.join()
+    thread_2.join()
     # client.run(config.discord_token)
+    keywait = input(f'何らかの理由により、らくらくNS+を実行するために必要な処理が終了しました。\n（らくらくNS+を終了します。Enterキーを押してください。）')
 
 start()

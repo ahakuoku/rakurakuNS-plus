@@ -9,7 +9,7 @@
 # 
 # 開発版特有の注意
 # 現在、開発の初期段階のため一部設定が使用されていません。
-# 使用されていないのは「autosave_backup」「autosave_interval」です。
+# 使用されていないのは「restart_time」です。
 # 
 # Discordへの書き込みについて
 # 現在暫定的にSimutrans World Monitorとの連携を使用しています。

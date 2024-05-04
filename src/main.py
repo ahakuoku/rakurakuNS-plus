@@ -195,6 +195,7 @@ def restart():
     return None
 
 def autosave():
+    # オートセーブ処理
     autosave_interval = config.autosave_interval - 30
     time.sleep(autosave_interval)
     while True:

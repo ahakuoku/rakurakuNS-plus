@@ -20,7 +20,7 @@ else:
     server_folder_path = config.server_folder_path
 server_path = server_folder_path + '/' + config.server_name
 server_save = 'server' + config.port_number + '-network.sve'
-first_start = 0
+start_code = 0
 # intents = discord.Intents.default()
 # intents.message_content = True
 # client = discord.Client(intents=intents)
@@ -75,24 +75,24 @@ def get_pid(process_name):
     return None
 
 def restart():
-    first_start = 0
+    global start_code
     while True:
         # PIDを取得し、Noneなら起動する
         server_pid = get_pid(config.server_name)
         if server_pid is None:
             app_process = app_start()
             # 初回起動時とそれ以外で表示メッセージを変える
-            if first_start == 0:
+            if start_code == 0:
                 print_with_date('サーバーを起動します。')
                 wait_simutrans_responce()
                 set_company_pw()
-            elif first_start == 1:
+            elif start_code == 1:
                 print_with_date('サーバーダウンを検出しました。再起動します。')
                 swm_discord_post('サーバーダウンを検出しました。', '現在復旧中です。しばらくお待ちください。', '16711680')
                 wait_simutrans_responce()
                 set_company_pw()
                 swm_discord_post('サーバーが復旧しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', '65280')
-        first_start = 1
+        start_code = 1
         time.sleep(1)
     return None
 

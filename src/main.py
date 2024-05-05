@@ -51,6 +51,29 @@ def check_os():
         keywait = input(f'らくらくNS+はお使いのOSには対応していません。らくらくNS+はWindows、Mac、Linuxに対応しています。\n（らくらくNS+を終了します。Enterキーを押してください。）')
         sys.exit()
 
+def check_config():
+    # 設定チェック
+    try:
+        hour = int(config.restart_time)
+        if hour == -1 or 0 <= hour <= 24:
+            pass
+        else:
+            keywait = input(f'設定「restart_time」に不正な値が入力されています。-1、0～24のいずれかの整数を入力してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+            sys.exit()
+    except ValueError:
+        keywait = input(f'設定「restart_time」に不正な値が入力されています。-1、0～24のいずれかの整数を入力してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+    print_with_date('設定に正常な値が入力されていることを確認しました。')
+    return None
+
+def convert_to_time(hour):
+    if hour == -1:
+        pass
+    elif 0 <= hour <= 24:
+        if hour == 24:
+            return time(0, 0)
+        return time(hour, 0)
+    return time(0, 0)
+
 def get_nettool_pw():
     # simuconf.tabを開き、「server_admin_pw」から始まる行を検索
     simuconf_path = server_folder_path + '/config/simuconf.tab'
@@ -219,6 +242,7 @@ def autosave():
 
 def start():
     check_os()
+    check_config()
     check_nettool()
     thread_1 = threading.Thread(target=restart)
     thread_2 = threading.Thread(target=autosave)

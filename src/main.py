@@ -25,6 +25,7 @@ server_path = server_folder_path + '/' + config.server_name
 server_path = server_path.replace('\\', '/')
 server_save = 'server' + config.port_number + '-network.sve'
 start_code = 0
+nettool_pw = 0
 # intents = discord.Intents.default()
 # intents.message_content = True
 # client = discord.Client(intents=intents)
@@ -80,7 +81,7 @@ def get_pid(process_name):
 
 def set_company_pw():
     # パスワードを設定する
-    nettool_pw = get_nettool_pw()
+    global nettool_pw
     company_pws = [config.player_0_pw, config.player_1_pw, config.player_2_pw, config.player_3_pw, config.player_4_pw, config.player_5_pw, config.player_6_pw, config.player_7_pw, config.player_8_pw, config.player_9_pw, config.player_10_pw, config.player_11_pw, config.player_12_pw, config.player_13_pw, config.player_14_pw]
     i = 0
     for company_pw in company_pws:
@@ -118,13 +119,13 @@ def swm_discord_post(title, description, color):
 
 def nettool_say(content):
     # contentにはASCII文字以外を入れないこと（文字化け対策）
-    nettool_pw = get_nettool_pw()
+    global nettool_pw
     subprocess.run(['nettool', '-p', nettool_pw, '-s', '127.0.0.1:' + config.port_number, 'say', content], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return None
 
 def wait_simutrans_responce():
     # Simutransの応答を待つ
-    nettool_pw = get_nettool_pw()
+    global nettool_pw
     print_with_date('Simutransの応答を待っています。しばらくお待ちください。')
     while True:
         result = subprocess.run(['nettool', '-p', nettool_pw, '-s', '127.0.0.1:' + config.port_number, 'clients'], encoding='utf-8', stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
@@ -135,7 +136,7 @@ def wait_simutrans_responce():
 
 def nettool_forcesync():
     # ロード処理
-    nettool_pw = get_nettool_pw()
+    global nettool_pw
     subprocess.run(['nettool', '-p', nettool_pw, '-s', '127.0.0.1:' + config.port_number, 'force-sync'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     wait_simutrans_responce()
     save_backup()
@@ -173,6 +174,7 @@ def save_backup():
 
 def restart():
     global start_code
+    global nettool_pw
     while True:
         # PIDを取得し、Noneなら起動する
         server_pid = get_pid(config.server_name)
@@ -181,11 +183,13 @@ def restart():
             # 初回起動時とそれ以外で表示メッセージを変える
             if start_code == 0:
                 print_with_date('サーバーを起動します。')
+                nettool_pw = get_nettool_pw()
                 wait_simutrans_responce()
                 set_company_pw()
             elif start_code == 1:
                 print_with_date('サーバーダウンを検出しました。再起動します。')
                 swm_discord_post('サーバーダウンを検出しました。', '現在復旧中です。しばらくお待ちください。', '16711680')
+                nettool_pw = get_nettool_pw()
                 wait_simutrans_responce()
                 set_company_pw()
                 print_with_date('サーバーを再起動しました。')

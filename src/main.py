@@ -220,8 +220,9 @@ def server_stop(set_code):
         swm_discord_post('まもなく再起動を行います。', 'これからのログインはおやめください。', '16760576')
     time.sleep(30)
     nettool_forcesync()
-    nettool_say('Server is restarting.')
-    print_with_date('再起動中告知メッセージを送信しました。')
+    if set_code == 2:
+        nettool_say('Server is restarting.')
+        print_with_date('再起動中告知メッセージを送信しました。')
     start_code = set_code
     subprocess.run(['nettool', '-p', nettool_pw, '-s', '127.0.0.1:' + config.port_number, 'shutdown'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return None
@@ -233,6 +234,7 @@ def auto_restart():
     if config.restart_time != -1:
         while True:
             schedule_event(config.restart_time, server_stop(2))
+            scheduler.run()
     return None
 
 def monitoring():
@@ -289,9 +291,11 @@ def autosave():
     return None
 
 def start():
+    global nettool_pw
     check_os()
     check_config()
     check_nettool()
+    nettool_pw = get_nettool_pw()
     thread_1 = threading.Thread(target=monitoring)
     thread_2 = threading.Thread(target=autosave)
     thread_3 = threading.Thread(target=auto_restart)

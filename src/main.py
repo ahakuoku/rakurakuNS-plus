@@ -19,7 +19,6 @@ import os
 import shutil
 import threading
 import sched
-from datetime import timedelta
 
 # 変数定義
 if config.server_folder_path.endswith('/') is True:
@@ -32,6 +31,7 @@ server_save = 'server' + config.port_number + '-network.sve'
 start_code = 0
 nettool_pw = 0
 scheduler = sched.scheduler(time.time, time.sleep)
+scheduler_running = False
 # intents = discord.Intents.default()
 # intents.message_content = True
 # client = discord.Client(intents=intents)
@@ -80,14 +80,19 @@ def convert_to_time(hour):
         return time(hour, 0, 0)
     return time(0, 0, 0)
 
-def schedule_event(hour, func):
+def schedule_event(hour, minute, second, action):
     # 関数を予約する
     now = datetime.datetime.now()
-    run_time = now.replace(hour=hour, minute=0, second=0, microsecond=0)
-    if run_time < now:
-        run_time += timedelta(days=1)
+    run_time = now.replace(hour=hour, minute=minute, second=second, microsecond=0)
+    if run_time <= now:
+        run_time += datetime.timedelta(days=1)
     delay = (run_time - now).total_seconds()
-    scheduler.enter(delay, 1, func)
+    scheduler.enter(delay, 1, action)
+    if not scheduler.empty():
+        scheduler.run()
+
+def run_scheduler():
+    scheduler.run()
 
 def get_nettool_pw():
     # simuconf.tabを開き、「server_admin_pw」から始まる行を検索
@@ -225,6 +230,11 @@ def server_stop(set_code):
         print_with_date('再起動中告知メッセージを送信しました。')
     start_code = set_code
     subprocess.run(['nettool', '-p', nettool_pw, '-s', '127.0.0.1:' + config.port_number, 'shutdown'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if config.restart_time == 0:
+        restart_time = 23
+    else:
+        restart_time = config.restart_time - 1
+    schedule_event(restart_time, 59, 30, lambda: server_stop(2))
     return None
 
 def auto_restart():
@@ -232,9 +242,11 @@ def auto_restart():
     global nettool_pw
     global start_code
     if config.restart_time != -1:
-        while True:
-            schedule_event(config.restart_time, server_stop(2))
-            scheduler.run()
+        if config.restart_time == 0:
+            restart_time = 23
+        else:
+            restart_time = config.restart_time - 1
+        schedule_event(restart_time, 59, 30, lambda: server_stop(2))
     return None
 
 def monitoring():

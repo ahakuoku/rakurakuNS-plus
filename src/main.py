@@ -19,7 +19,7 @@ import os
 import shutil
 import threading
 import sched
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 # 変数定義
 if config.server_folder_path.endswith('/') is True:
@@ -82,7 +82,7 @@ def convert_to_time(hour):
 
 def schedule_event(hour, func):
     # 関数を予約する
-    now = datetime.now()
+    now = datetime.datetime.now()
     run_time = now.replace(hour=hour, minute=0, second=0, microsecond=0)
     if run_time < now:
         run_time += timedelta(days=1)

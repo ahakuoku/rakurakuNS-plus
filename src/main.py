@@ -18,6 +18,8 @@ import sys
 import os
 import shutil
 import threading
+import sched
+from datetime import datetime, timedelta
 
 # 変数定義
 if config.server_folder_path.endswith('/') is True:
@@ -29,6 +31,7 @@ server_path = server_path.replace('\\', '/')
 server_save = 'server' + config.port_number + '-network.sve'
 start_code = 0
 nettool_pw = 0
+scheduler = sched.scheduler(time.time, time.sleep)
 # intents = discord.Intents.default()
 # intents.message_content = True
 # client = discord.Client(intents=intents)
@@ -73,9 +76,18 @@ def convert_to_time(hour):
         pass
     elif 0 <= hour <= 24:
         if hour == 24:
-            return time(0, 0)
-        return time(hour, 0)
-    return time(0, 0)
+            return time(0, 0, 0)
+        return time(hour, 0, 0)
+    return time(0, 0, 0)
+
+def schedule_event(hour, func):
+    # 関数を予約する
+    now = datetime.now()
+    run_time = now.replace(hour=hour, minute=0, second=0, microsecond=0)
+    if run_time < now:
+        run_time += timedelta(days=1)
+    delay = (run_time - now).total_seconds()
+    scheduler.enter(delay, 1, func)
 
 def get_nettool_pw():
     # simuconf.tabを開き、「server_admin_pw」から始まる行を検索
@@ -198,6 +210,32 @@ def save_backup():
     print_with_date('バックアップ処理が終了しました。')
     return None
 
+def server_stop(set_code):
+    # サーバーを止める機能
+    global nettool_pw
+    global start_code
+    if set_code == 2:
+        nettool_say('Server restart soon.')
+        print_with_date('再起動予告メッセージを送信しました。')
+        swm_discord_post('まもなく再起動を行います。', 'これからのログインはおやめください。', '16760576')
+    time.sleep(30)
+    nettool_forcesync()
+    wait_simutrans_responce()
+    nettool_say('Server is restarting.')
+    print_with_date('再起動中告知メッセージを送信しました。')
+    start_code = set_code
+    subprocess.run(['nettool', '-p', nettool_pw, '-s', '127.0.0.1:' + config.port_number, 'shutdown'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return None
+
+def auto_restart():
+    # サーバー定時再起動
+    global nettool_pw
+    global start_code
+    if config.restart_time != -1:
+        while True:
+            schedule_event(config.restart_time, server_stop(2))
+    return None
+
 def monitoring():
     global start_code
     global nettool_pw
@@ -212,6 +250,7 @@ def monitoring():
                 nettool_pw = get_nettool_pw()
                 wait_simutrans_responce()
                 set_company_pw()
+                start_code = 1
             elif start_code == 1:
                 print_with_date('サーバーダウンを検出しました。再起動します。')
                 swm_discord_post('サーバーダウンを検出しました。', '現在復旧中です。しばらくお待ちください。', '16711680')
@@ -220,7 +259,14 @@ def monitoring():
                 set_company_pw()
                 print_with_date('サーバーを再起動しました。')
                 swm_discord_post('サーバーが復旧しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', '65280')
-        start_code = 1
+            if start_code == 2:
+                print_with_date('サーバーを起動します。')
+                nettool_pw = get_nettool_pw()
+                wait_simutrans_responce()
+                set_company_pw()
+                print_with_date('サーバーを起動しました。')
+                swm_discord_post('サーバーを再起動しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', '65280')
+                start_code = 1
         time.sleep(1)
     return None
 

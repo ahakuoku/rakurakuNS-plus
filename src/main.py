@@ -220,7 +220,6 @@ def server_stop(set_code):
         swm_discord_post('まもなく再起動を行います。', 'これからのログインはおやめください。', '16760576')
     time.sleep(30)
     nettool_forcesync()
-    wait_simutrans_responce()
     nettool_say('Server is restarting.')
     print_with_date('再起動中告知メッセージを送信しました。')
     start_code = set_code

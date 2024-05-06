@@ -295,10 +295,13 @@ def start():
     check_nettool()
     thread_1 = threading.Thread(target=monitoring)
     thread_2 = threading.Thread(target=autosave)
+    thread_3 = threading.Thread(target=auto_restart)
     thread_1.start()
     thread_2.start()
+    thread_3.start()
     thread_1.join()
     thread_2.join()
+    thread_3.join()
     # client.run(config.discord_token)
     keywait = input(f'何らかの理由により、らくらくNS+を実行するために必要な処理が終了しました。\n（らくらくNS+を終了します。Enterキーを押してください。）')
 

@@ -1,11 +1,14 @@
 # -*- coding: utf-8 -*- 
 
 import subprocess
-import psutil
 try:
     import config
 except ModuleNotFoundError:
     keywait = input(f'config.template.pyをコピーし、config.pyにリネームして設定を行ってください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+try:
+    import psutil
+except ModuleNotFoundError:
+    keywait = input(f'必要なモジュールがインストールされていません。コマンド「pip install psutil」を実行してからやりなおしてください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
 import time
 # import discord
 import re

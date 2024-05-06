@@ -195,7 +195,7 @@ def save_backup():
     print_with_date('バックアップ処理が終了しました。')
     return None
 
-def restart():
+def monitoring():
     global start_code
     global nettool_pw
     while True:
@@ -244,7 +244,7 @@ def start():
     check_os()
     check_config()
     check_nettool()
-    thread_1 = threading.Thread(target=restart)
+    thread_1 = threading.Thread(target=monitoring)
     thread_2 = threading.Thread(target=autosave)
     thread_1.start()
     thread_2.start()

@@ -9,7 +9,7 @@
 # 
 # 開発版特有の注意
 # 現在、開発の初期段階のため一部設定が使用されていません。
-# 使用されていないのは「restart_time」です。
+# 使用されていないのは「discord_token」「discord_channel」です。
 # 
 # Discordへの書き込みについて
 # 現在暫定的にSimutrans World Monitorとの連携を使用しています。
@@ -50,7 +50,7 @@ player_11_pw       = ''
 player_12_pw       = ''
 player_13_pw       = ''
 player_14_pw       = ''
-restart_time       = ''
+restart_time       = -1
 use_discord_bot    = 1
 discord_token      = r'aiueo'
 discord_channel    = 1234567890

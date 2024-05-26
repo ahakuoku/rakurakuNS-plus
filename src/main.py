@@ -130,7 +130,7 @@ def set_company_pw():
     for company_pw in company_pws:
         # クラッシュ対策（存在しない会社にパスワードをかけるとクラッシュする）
         company_id = str(i)
-        result = subprocess.run(['nettool', '-p', nettool_pw, '-s', '127.0.0.1:' + config.port_number, 'info-company', company_id], capture_output=True, text=True)
+        result = subprocess.run(['nettool', '-p', nettool_pw, '-s', '127.0.0.1:' + config.port_number, 'info-company', company_id], capture_output=True, text=True, encoding='utf-8')
         # Nothing received.の後は改行が必要
         if result.stdout != 'Nothing received.\n' and company_pw != '':
             subprocess.run(['nettool', '-p', nettool_pw, '-s', '127.0.0.1:' + config.port_number, 'lock-company', company_id, company_pw], capture_output=True, text=True)

@@ -272,7 +272,7 @@ def monitoring():
                 set_company_pw()
                 print_with_date('サーバーを再起動しました。')
                 swm_discord_post('サーバーが復旧しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', '65280')
-            if start_code == 2:
+            elif start_code == 2:
                 print_with_date('サーバーを起動します。')
                 nettool_pw = get_nettool_pw()
                 wait_simutrans_responce()

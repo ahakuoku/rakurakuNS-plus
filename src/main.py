@@ -28,6 +28,7 @@ else:
 server_path = server_folder_path + '/' + config.server_name
 server_path = server_path.replace('\\', '/')
 server_save = 'server' + config.port_number + '-network.sve'
+launch_save = '../server' + config.port_number + '-network.sve'
 start_code = 0
 nettool_pw = 0
 scheduler = sched.scheduler(time.time, time.sleep)
@@ -142,9 +143,9 @@ def app_start():
     os_system = platform.system()
     # WindowsとUNIX系OSでコマンドが違うのでその対策
     if os_system == 'Windows':
-        return subprocess.Popen(['start', server_path, '-server', config.port_number, '-fps', '30', '-nomidi', '-nosound', '-load', server_save], shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return subprocess.Popen(['start', server_path, '-server', config.port_number, '-fps', '30', '-nomidi', '-nosound', '-load', launch_save], shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     elif os_system == 'Linux' or os_system == 'Darwin':
-        return subprocess.Popen([server_path, '-server', config.port_number, '-fps', '30', '-nomidi', '-nosound', '-load', server_save], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        return subprocess.Popen([server_path, '-server', config.port_number, '-fps', '30', '-nomidi', '-nosound', '-load', launch_save], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
 
 def swm_discord_post(title, description, color):
     # Simutrans World Monitorを利用してDiscordに書き込み

@@ -43,9 +43,9 @@ def check_nettool():
     try:
         subprocess.run(['nettool'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except FileNotFoundError:
-        keywait = input(f'nettoolの認識に失敗しました。nettoolを実行ファイルと同じフォルダに置いてからやり直してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+        keywait = input(f'nettoolの認識に失敗しました。nettoolをらくらくNS+の実行ファイルと同じフォルダに置いてからやり直してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
     except subprocess.CalledProcessError:
-        keywait = input(f'nettoolの認識に失敗しました。nettoolを実行ファイルと同じフォルダに置いてからやり直してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+        keywait = input(f'nettoolの認識に失敗しました。nettoolをらくらくNS+の実行ファイルと同じフォルダに置いてからやり直してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
     print_with_date('nettoolの認識に成功しました。')
     return None
 

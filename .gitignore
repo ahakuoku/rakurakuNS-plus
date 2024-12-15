@@ -2,4 +2,4 @@
 /src/__pycache__
 src/config.py
 /distribution
-/command_file
+/src/command_file

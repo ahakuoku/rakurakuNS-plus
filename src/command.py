@@ -11,8 +11,8 @@ except ModuleNotFoundError:
 
 # 変数定義
 command_dir = 'command_file'
-command_input_file = './command_file/cmd_input.txt'
-command_output_file = './command_file/cmd_output.txt'
+command_input_file = os.path.abspath('./command_file/cmd_input.txt')
+command_output_file = os.path.abspath('./command_file/cmd_output.txt')
 action_type_map = {
     1: "Added",
     2: "Modified",
@@ -46,18 +46,23 @@ def cmd_file_generate():
 
 def command_control():
     while True:
-        command = input(f'コマンドを入力してください。コマンド一覧はhelpと入力してください。')
-        f = open(command_input_file, 'w')
-        f.write(command)
-        f.close()
-        for changes in watch(command_output_file):
-            for action, path in changes:
-                if action_type_map.get(action) == "Modified":
-                    f = open(command_output_file, 'r', encoding='UTF-8')
-                    data = f.read()
-                    print(data)
-                    f.close()
-    return None
+        command = input('コマンドを入力してください。コマンド一覧はhelpと入力してください: ')
+        with open(command_input_file, 'w') as f:
+            f.write(command)
+        for changes in watch(os.path.dirname(command_output_file)):
+            for action, file_path in changes:
+                normalized_file_path = os.path.normpath(file_path)
+                if normalized_file_path == os.path.normpath(command_output_file) and action_type_map.get(action) == "Modified":
+                    try:
+                        with open(command_output_file, 'r', encoding='UTF-8') as f:
+                            data = f.read()
+                        print(f'{data}')
+                    except Exception as e:
+                        print(f'ファイルの読み取りに失敗しました。{e}\n（らくらくNS+を終了します。Enterキーを押してください。）')
+                    break
+            else:
+                continue
+            break
 
 def start():
     check_os()

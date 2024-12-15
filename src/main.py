@@ -33,6 +33,7 @@ start_code = 0
 nettool_pw = 0
 scheduler = sched.scheduler(time.time, time.sleep)
 scheduler_running = False
+server_ip = '127.0.0.1:'
 # intents = discord.Intents.default()
 # intents.message_content = True
 # client = discord.Client(intents=intents)
@@ -131,10 +132,10 @@ def set_company_pw():
     for company_pw in company_pws:
         # クラッシュ対策（存在しない会社にパスワードをかけるとクラッシュする）
         company_id = str(i)
-        result = subprocess.run(['nettool', '-p', nettool_pw, '-s', '127.0.0.1:' + config.port_number, 'info-company', company_id], capture_output=True, text=True, encoding='utf-8')
+        result = subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'info-company', company_id], capture_output=True, text=True, encoding='utf-8')
         # Nothing received.の後は改行が必要
         if result.stdout != 'Nothing received.\n' and company_pw != '':
-            subprocess.run(['nettool', '-p', nettool_pw, '-s', '127.0.0.1:' + config.port_number, 'lock-company', company_id, company_pw], capture_output=True, text=True)
+            subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'lock-company', company_id, company_pw], capture_output=True, text=True)
         i += 1
     print_with_date('会社にパスワードを設定しました。')
 
@@ -164,7 +165,7 @@ def swm_discord_post(title, description, color):
 def nettool_say(content):
     # contentにはASCII文字以外を入れないこと（文字化け対策）
     global nettool_pw
-    subprocess.run(['nettool', '-p', nettool_pw, '-s', '127.0.0.1:' + config.port_number, 'say', content], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'say', content], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return None
 
 def wait_simutrans_responce():
@@ -172,7 +173,7 @@ def wait_simutrans_responce():
     global nettool_pw
     print_with_date('Simutransの応答を待っています。しばらくお待ちください。')
     while True:
-        result = subprocess.run(['nettool', '-p', nettool_pw, '-s', '127.0.0.1:' + config.port_number, 'clients'], encoding='utf-8', stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        result = subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'clients'], encoding='utf-8', stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
         if result.returncode == 0:
             print_with_date('Simutransが応答しました。処理を再開します。')
             break
@@ -181,7 +182,7 @@ def wait_simutrans_responce():
 def nettool_forcesync():
     # ロード処理
     global nettool_pw
-    subprocess.run(['nettool', '-p', nettool_pw, '-s', '127.0.0.1:' + config.port_number, 'force-sync'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'force-sync'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     wait_simutrans_responce()
     save_backup()
 
@@ -230,7 +231,7 @@ def server_stop(set_code):
         nettool_say('Server is restarting.')
         print_with_date('再起動中告知メッセージを送信しました。')
     start_code = set_code
-    subprocess.run(['nettool', '-p', nettool_pw, '-s', '127.0.0.1:' + config.port_number, 'shutdown'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'shutdown'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     if config.restart_time == 0:
         restart_time = 23
     else:

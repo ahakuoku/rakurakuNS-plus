@@ -8,7 +8,11 @@ except ModuleNotFoundError:
 try:
     import psutil
 except ModuleNotFoundError:
-    keywait = input(f'必要なモジュールがインストールされていません。コマンド「pip install psutil」を実行してからやりなおしてください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+    keywait = input(f'必要なモジュールがインストールされていません。コマンド「pip install psutil schedule」を実行してからやりなおしてください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+try:
+    import schedule
+except ModuleNotFoundError:
+    keywait = input(f'必要なモジュールがインストールされていません。コマンド「pip install psutil schedule」を実行してからやりなおしてください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
 import time
 # import discord
 import re
@@ -19,6 +23,8 @@ import os
 import shutil
 import threading
 import sched
+import tkinter as tk
+from tkinter import ttk
 
 # 変数定義
 if config.server_folder_path.endswith('/') is True:
@@ -38,7 +44,275 @@ server_ip = '127.0.0.1:'
 # intents.message_content = True
 # client = discord.Client(intents=intents)
 
-# 関数定義
+# 関数定義（GUI系）
+class window_main(tk.Frame):
+    def __init__(self, master):
+        super().__init__(master)
+        self.grid(row=0, column=0, sticky="nsew")
+        self.master.title("らくらくNS+")
+        self.master.resizable(False, False)
+        self.master.geometry("550x220")
+        self.maintenance_mode = 0  # メンテナンスモードの状態（0:通常, 1:メンテナンス中）
+        self.create_widgets()
+
+    def create_widgets(self):
+        # Gridの設定
+        self.master.grid_rowconfigure(0, weight=1)
+        self.master.grid_columnconfigure(0, weight=1)
+
+        # GUIの配置
+        self.log_text = tk.Text(self, width=40, height=10, wrap="word")
+        self.log_text.configure(state="disabled")
+        self.log_text.grid(row=0, column=0, columnspan=4, sticky="nsew")
+        
+        self.scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.log_text.yview)
+        self.scrollbar.grid(row=0, column=4, sticky="ns")
+        self.log_text.config(yscrollcommand=self.scrollbar.set)
+
+        self.restart_button = ttk.Button(self, text="サーバー再起動", command=self.server_restart_check_start)
+        self.restart_button.grid(row=1, column=0, padx=5, pady=10, sticky="w")
+
+        # メンテナンスモードボタン
+        self.maintenance_mode_button = ttk.Button(
+            self, text="メンテナンスモード", command=self.maintenance_check_start
+        )
+        self.maintenance_mode_button.grid(row=1, column=1, padx=5, pady=10, sticky="w")
+
+        self.server_stop_button = ttk.Button(self, text="サーバー終了", command=self.server_close_check_start)
+        self.server_stop_button.grid(row=1, column=2, padx=5, pady=10, sticky="w")
+
+        self.exit_button = ttk.Button(self, text="らくらくNS+を終了", style='Accent.TButton', command=self.exit_check_start)
+        self.exit_button.grid(row=1, column=3, padx=5, pady=10, sticky="w")
+
+    def server_restart_check_start(self):
+        # 確認ダイアログを開く
+        if hasattr(self, "newWindow") and self.newWindow.winfo_exists():
+            self.newWindow.lift()
+            return
+
+        self.newWindow = tk.Toplevel(self.master)
+        self.newWindow.grab_set()
+        server_restart_check(self.newWindow)
+
+    def exit_check_start(self):
+        # 確認ダイアログを開く
+        if hasattr(self, "newWindow") and self.newWindow.winfo_exists():
+            self.newWindow.lift()
+            return
+
+        self.newWindow = tk.Toplevel(self.master)
+        self.newWindow.grab_set()
+        exit_check(self.newWindow)
+
+    def server_close_check_start(self):
+        # 確認ダイアログを開く
+        if hasattr(self, "newWindow") and self.newWindow.winfo_exists():
+            self.newWindow.lift()
+            return
+
+        self.newWindow = tk.Toplevel(self.master)
+        self.newWindow.grab_set()
+        server_close_check(self.newWindow)
+
+    def maintenance_check_start(self):
+        # メンテナンスモード確認ダイアログを開く
+        if hasattr(self, "newWindow") and self.newWindow.winfo_exists():
+            self.newWindow.lift()
+            return
+
+        self.newWindow = tk.Toplevel(self.master)
+        self.newWindow.grab_set()
+        maintenance_check(self.newWindow, self)  # 自分自身を渡す
+
+    def toggle_maintenance_mode(self):
+        # メンテナンスモードの切り替え
+        if self.maintenance_mode == 0:
+            self.maintenance_mode = 1
+            self.maintenance_mode_button["text"] = "メンテナンス終了"
+        else:
+            self.maintenance_mode = 0
+            self.maintenance_mode_button["text"] = "メンテナンスモード"
+
+    def log_text_insert(self, content):
+        # 他スレッドからも呼び出せる安全な方法
+        self.master.after(0, self._log_text_insert, content)
+
+    def _log_text_insert(self, content):
+        # 実際にTkinterのUIを更新する処理（必ずメインスレッドで実行）
+        self.log_text.configure(state="normal")
+        self.log_text.insert('end', content + '\n')
+        self.log_text.configure(state="disabled")
+
+class maintenance_check(tk.Frame):
+    # メンテナンスモード確認ダイアログウィンドウ
+    def __init__(self, master, main_window):
+        super().__init__(master)
+        self.master = master  # 既存のToplevelを受け取る
+        self.main_window = main_window  # メインウィンドウの参照
+        self.master.title("らくらくNS+")
+        self.master.resizable(False, False)
+        self.master.geometry("350x120")
+        self.master.protocol('WM_DELETE_WINDOW', self.close_window)
+
+        self.create_widgets()
+
+    def create_widgets(self):
+        # ダイアログのウィジェットを配置
+        if self.main_window.maintenance_mode == 0:
+            self.label = ttk.Label(self.master, text="サーバーを中断しメンテナンスモードに入ります。\nよろしいですか？")
+        else:
+            self.label = ttk.Label(self.master, text="メンテナンスモードを終了しサーバーを再開します。\nよろしいですか？")
+
+        self.label.pack(padx=10, pady=10, fill="both", expand=True)
+
+        button_frame = ttk.Frame(self.master)
+        button_frame.pack(pady=10, fill="x")
+
+        self.exit_button = ttk.Button(button_frame, text="はい", style='Accent.TButton', command=self.maintenance_switch)
+        self.exit_button.pack(side="left", padx=5, expand=True)
+
+        self.cancel_button = ttk.Button(button_frame, text="いいえ", command=self.close_window)
+        self.cancel_button.pack(side="right", padx=5, expand=True)
+
+    def close_window(self):
+        # ダイアログを閉じる
+        self.master.destroy()
+
+    def maintenance_switch(self):
+        # メンテナンスモードの切り替え
+        self.main_window.toggle_maintenance_mode()  # メインウィンドウのボタンを更新
+        self.master.destroy()  # ダイアログを閉じる
+
+class exit_check(tk.Frame):
+    # 確認ダイアログウィンドウ
+    def __init__(self, master):
+        super().__init__(master)
+        self.master = master  # 既存のToplevelを受け取る
+        self.master.title("らくらくNS+")
+        self.master.resizable(False, False)
+        self.master.geometry("250x120")
+        self.master.protocol('WM_DELETE_WINDOW', self.close_window)
+
+        self.create_widgets()
+
+    def create_widgets(self):
+        # ダイアログのウィジェットを配置
+        self.label = ttk.Label(self.master, text="らくらくNS+を終了します。\nよろしいですか？")
+        self.label.pack(padx=10, pady=10, fill="both", expand=True)
+
+        button_frame = ttk.Frame(self.master)
+        button_frame.pack(pady=10, fill="x")
+
+        self.exit_button = ttk.Button(button_frame, text="はい", style='Accent.TButton', command=self.exit_app)
+        self.exit_button.pack(side="left", padx=5, expand=True)
+
+        self.cancel_button = ttk.Button(button_frame, text="いいえ", command=self.close_window)
+        self.cancel_button.pack(side="right", padx=5, expand=True)
+
+    def close_window(self):
+        # ダイアログを閉じる
+        self.master.destroy()
+
+    def exit_app(self):
+        # アプリケーションを終了する
+        self.master.destroy()  # ダイアログを閉じる
+        self.master.master.destroy()  # メインウィンドウも閉じる
+
+class server_close_check(tk.Frame):
+    # 確認ダイアログウィンドウ
+    def __init__(self, master):
+        super().__init__(master)
+        self.master = master  # 既存のToplevelを受け取る
+        self.master.title("らくらくNS+")
+        self.master.resizable(False, False)
+        self.master.geometry("320x120")
+        self.master.protocol('WM_DELETE_WINDOW', self.close_window)
+
+        self.create_widgets()
+
+    def create_widgets(self):
+        # ダイアログのウィジェットを配置
+        self.label = ttk.Label(self.master, text="サーバーを終了し、らくらくNS+を終了します。\nよろしいですか？")
+        self.label.pack(padx=10, pady=10, fill="both", expand=True)
+
+        button_frame = ttk.Frame(self.master)
+        button_frame.pack(pady=10, fill="x")
+
+        self.exit_button = ttk.Button(button_frame, text="はい", style='Accent.TButton', command=self.exit_server)
+        self.exit_button.pack(side="left", padx=5, expand=True)
+
+        self.cancel_button = ttk.Button(button_frame, text="いいえ", command=self.close_window)
+        self.cancel_button.pack(side="right", padx=5, expand=True)
+
+    def close_window(self):
+        # ダイアログを閉じる
+        self.master.destroy()
+
+    def exit_server(self):
+        # アプリケーションを終了する
+        self.master.destroy()  # ダイアログを閉じる
+        self.master.master.destroy()  # メインウィンドウも閉じる
+
+class server_restart_check(tk.Frame):
+    # 確認ダイアログウィンドウ
+    def __init__(self, master):
+        super().__init__(master)
+        self.master = master  # 既存のToplevelを受け取る
+        self.master.title("らくらくNS+")
+        self.master.resizable(False, False)
+        self.master.geometry("250x120")
+        self.master.protocol('WM_DELETE_WINDOW', self.close_window)
+
+        self.create_widgets()
+
+    def create_widgets(self):
+        # ダイアログのウィジェットを配置
+        self.label = ttk.Label(self.master, text="サーバーを再起動します。\nよろしいですか？")
+        self.label.pack(padx=10, pady=10, fill="both", expand=True)
+
+        button_frame = ttk.Frame(self.master)
+        button_frame.pack(pady=10, fill="x")
+
+        self.exit_button = ttk.Button(button_frame, text="はい", style='Accent.TButton', command=self.restart_server)
+        self.exit_button.pack(side="left", padx=5, expand=True)
+
+        self.cancel_button = ttk.Button(button_frame, text="いいえ", command=self.close_window)
+        self.cancel_button.pack(side="right", padx=5, expand=True)
+
+    def close_window(self):
+        # ダイアログを閉じる
+        self.master.destroy()
+
+    def restart_server(self):
+        # 再起動する
+        server_stop(2)
+        self.master.destroy()  # ダイアログを閉じる
+
+def gui_main():
+    global app
+    root = tk.Tk()
+    root.tk.call("source", "azure.tcl")
+    root.tk.call("set_theme", "light")
+
+    root.grid_rowconfigure(0, weight=1)
+    root.grid_columnconfigure(0, weight=1)
+
+    app = window_main(master=root)
+    app.mainloop()
+    return None
+
+def print_gui_log(): # 本番環境では引数「content」を入れる
+    # GUIのログに追記
+    while True: # これもテスト目的
+        # time.sleep(10) # 10秒待ちもテスト
+        content = 'オートセーブしたかもしれないししていないかもしれない' # テスト目的で仮で入れている
+        date_time = datetime.datetime.now()
+        content = date_time.strftime('[%Y/%m/%d %H:%M:%S] ' + content)
+        app.log_text_insert(content)
+        content = ''
+    return None
+
+# 関数定義（GUI系以外）
 def check_nettool():
     # nettoolの存在確認
     try:
@@ -92,9 +366,6 @@ def schedule_event(hour, minute, second, action):
     scheduler.enter(delay, 1, action)
     if not scheduler.empty():
         scheduler.run()
-
-def run_scheduler():
-    scheduler.run()
 
 def get_nettool_pw():
     # simuconf.tabを開き、「server_admin_pw」から始まる行を検索
@@ -232,11 +503,11 @@ def server_stop(set_code):
         print_with_date('再起動中告知メッセージを送信しました。')
     start_code = set_code
     subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'shutdown'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    if config.restart_time == 0:
-        restart_time = 23
-    else:
-        restart_time = config.restart_time - 1
-    schedule_event(restart_time, 59, 30, lambda: server_stop(2))
+    # if config.restart_time == 0:
+    #     restart_time = 23
+    # else:
+    #     restart_time = config.restart_time - 1
+    # schedule_event(restart_time, 59, 30, lambda: server_stop(2))
     return None
 
 def auto_restart():
@@ -248,7 +519,11 @@ def auto_restart():
             restart_time = 23
         else:
             restart_time = config.restart_time - 1
-        schedule_event(restart_time, 59, 30, lambda: server_stop(2))
+        schedule.every().days.at(restart_time + ":59:30").do(server_stop(2))
+        while True:
+            schedule.run_pending()
+            time.sleep(1)
+        # schedule_event(restart_time, 59, 30, lambda: server_stop(2))
     return None
 
 def monitoring():
@@ -308,22 +583,25 @@ def autosave():
             time.sleep(1)
     return None
 
-def start():
-    global nettool_pw
+if __name__ == "__main__":
     check_os()
     check_config()
     check_nettool()
     nettool_pw = get_nettool_pw()
-    thread_1 = threading.Thread(target=monitoring)
-    thread_2 = threading.Thread(target=autosave)
-    thread_3 = threading.Thread(target=auto_restart)
+
+    thread_1 = threading.Thread(target=gui_main)
     thread_1.start()
+
+    thread_2 = threading.Thread(target=monitoring, daemon=True)
     thread_2.start()
+
+    thread_3 = threading.Thread(target=autosave, daemon=True)
     thread_3.start()
+
+    thread_4 = threading.Thread(target=auto_restart, daemon=True)
+    thread_4.start()
+
     thread_1.join()
-    thread_2.join()
-    thread_3.join()
+
     # client.run(config.discord_token)
     keywait = input(f'何らかの理由により、らくらくNS+を実行するために必要な処理が終了しました。\n（らくらくNS+を終了します。Enterキーを押してください。）')
-
-start()

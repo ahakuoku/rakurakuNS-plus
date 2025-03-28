@@ -18,6 +18,7 @@ SimutransのNSを管理するツールです。
 # 使用条件
 ahakuoku simutrans addon license(ASAL)のファイル公開時点における最新版を適用します。  
 ただし、同梱のnettoolについてはSimutransの各開発者様に著作権が帰属します。  
+また、同梱のAzure ttk themeはrdbende様に著作権が帰属します。
 
 ## ASAL 3.2全文
 利用者は、次の条件を守ることでこのアドオン・ツール等（以下、本作品）を自由にご利用いただけます。

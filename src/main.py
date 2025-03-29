@@ -579,9 +579,15 @@ def auto_restart():
 def monitoring():
     global start_code
     global nettool_pw
+    server_pid = get_pid(config.server_name)
+    if not server_pid is None:
+        # 初回起動時、サーバー起動済みであった場合の処理
+        print_gui_log('サーバーは起動済みです。')
+        start_code = 1
     while True:
-        # PIDを取得し、Noneなら起動する
+        # start_codeが3（メンテナンス中）であれば処理を行わない
         if not start_code == 3:
+            # PIDを取得し、Noneなら起動する
             server_pid = get_pid(config.server_name)
             if server_pid is None:
                 app_process = app_start()

@@ -53,7 +53,7 @@ class window_main(tk.Frame):
         self.grid(row=0, column=0, sticky="nsew")
         self.master.title("らくらくNS+")
         self.master.resizable(False, False)
-        self.master.geometry("550x220")
+        self.master.geometry("550x240")
         self.maintenance_mode = 0  # メンテナンスモードの状態（0:通常, 1:メンテナンス中）
         self.create_widgets()
 
@@ -63,28 +63,31 @@ class window_main(tk.Frame):
         self.master.grid_columnconfigure(0, weight=1)
 
         # GUIの配置
+        self.server_name_label = ttk.Label(self, text="管理対象のサーバー：" + config.server_name, anchor="w")
+        self.server_name_label.grid(row=0, column=0, columnspan=4, sticky="w")
+
         self.log_text = tk.Text(self, width=40, height=10, wrap="word")
         self.log_text.configure(state="disabled")
-        self.log_text.grid(row=0, column=0, columnspan=4, sticky="nsew")
+        self.log_text.grid(row=1, column=0, columnspan=4, sticky="nsew")
         
         self.scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.log_text.yview)
-        self.scrollbar.grid(row=0, column=4, sticky="ns")
+        self.scrollbar.grid(row=1, column=4, sticky="ns")
         self.log_text.config(yscrollcommand=self.scrollbar.set)
 
         self.restart_button = ttk.Button(self, text="サーバー再起動", command=self.server_restart_check_start)
-        self.restart_button.grid(row=1, column=0, padx=5, pady=10, sticky="w")
+        self.restart_button.grid(row=2, column=0, padx=5, pady=10, sticky="w")
 
         # メンテナンスモードボタン
         self.maintenance_mode_button = ttk.Button(
             self, text="メンテナンスモード", command=self.maintenance_check_start
         )
-        self.maintenance_mode_button.grid(row=1, column=1, padx=5, pady=10, sticky="w")
+        self.maintenance_mode_button.grid(row=2, column=1, padx=5, pady=10, sticky="w")
 
         self.server_stop_button = ttk.Button(self, text="サーバー終了", command=self.server_close_check_start)
-        self.server_stop_button.grid(row=1, column=2, padx=5, pady=10, sticky="w")
+        self.server_stop_button.grid(row=2, column=2, padx=5, pady=10, sticky="w")
 
         self.exit_button = ttk.Button(self, text="らくらくNS+を終了", style='Accent.TButton', command=self.exit_check_start)
-        self.exit_button.grid(row=1, column=3, padx=5, pady=10, sticky="w")
+        self.exit_button.grid(row=2, column=3, padx=5, pady=10, sticky="w")
 
     def server_restart_check_start(self):
         # 確認ダイアログを開く

@@ -27,6 +27,7 @@ import tkinter as tk
 from tkinter import ttk
 
 # 変数定義
+root = None
 if config.server_folder_path.endswith('/') is True:
     server_folder_path = config.server_folder_path[:-1]
 else:
@@ -36,6 +37,7 @@ server_path = server_path.replace('\\', '/')
 server_save = 'server' + config.port_number + '-network.sve'
 launch_save = '../server' + config.port_number + '-network.sve'
 start_code = 0
+exit_code = 0
 nettool_pw = 0
 scheduler = sched.scheduler(time.time, time.sleep)
 scheduler_running = False
@@ -126,7 +128,9 @@ class window_main(tk.Frame):
 
     def toggle_maintenance_mode(self):
         # メンテナンスモードの切り替え
+        global start_code
         if self.maintenance_mode == 0:
+            start_code = 3
             self.maintenance_mode = 1
             self.maintenance_mode_button["text"] = "メンテナンス終了"
         else:
@@ -142,6 +146,7 @@ class window_main(tk.Frame):
         self.log_text.configure(state="normal")
         self.log_text.insert('end', content + '\n')
         self.log_text.configure(state="disabled")
+        self.log_text.see("end")
 
 class maintenance_check(tk.Frame):
     # メンテナンスモード確認ダイアログウィンドウ
@@ -168,7 +173,7 @@ class maintenance_check(tk.Frame):
         button_frame = ttk.Frame(self.master)
         button_frame.pack(pady=10, fill="x")
 
-        self.exit_button = ttk.Button(button_frame, text="はい", style='Accent.TButton', command=self.maintenance_switch)
+        self.exit_button = ttk.Button(button_frame, text="はい", style='Accent.TButton', command=self.maintenance_mode_check)
         self.exit_button.pack(side="left", padx=5, expand=True)
 
         self.cancel_button = ttk.Button(button_frame, text="いいえ", command=self.close_window)
@@ -178,10 +183,20 @@ class maintenance_check(tk.Frame):
         # ダイアログを閉じる
         self.master.destroy()
 
-    def maintenance_switch(self):
-        # メンテナンスモードの切り替え
+    def maintenance_mode_check(self):
+        # メンテナンスモードかどうかをチェックし、メンテナンスモードの実行/解除
+        global start_code
+        if start_code == 3:
+            start_code = 4
+        else:
+            maintenance_thread = threading.Thread(target=self.server_stop_thread, args=(3,))
+            maintenance_thread.start()
         self.main_window.toggle_maintenance_mode()  # メインウィンドウのボタンを更新
         self.master.destroy()  # ダイアログを閉じる
+
+    def server_stop_thread(self, set_code):
+        # サーバー終了処理をバックグラウンドで実行
+        server_stop(set_code)
 
 class exit_check(tk.Frame):
     # 確認ダイアログウィンドウ
@@ -249,9 +264,20 @@ class server_close_check(tk.Frame):
         self.master.destroy()
 
     def exit_server(self):
-        # アプリケーションを終了する
-        self.master.destroy()  # ダイアログを閉じる
-        self.master.master.destroy()  # メインウィンドウも閉じる
+        # サーバーを終了する
+        exit_thread = threading.Thread(target=self.server_stop_thread, args=(5,))
+        exit_thread.start()
+        self.master.destroy()
+
+    def server_stop_thread(self, set_code):
+        # サーバー終了処理をバックグラウンドで実行
+        server_stop(set_code)
+        self.master.after(0, self.close_main_window)
+
+    def close_main_window(self):
+        # メインウィンドウを閉じる
+        self.master.master.quit()
+        self.master.master.destroy()
 
 class server_restart_check(tk.Frame):
     # 確認ダイアログウィンドウ
@@ -285,7 +311,7 @@ class server_restart_check(tk.Frame):
 
     def restart_server(self):
         # 再起動する
-        server_stop(2)
+        restart_server_threaded(2)
         self.master.destroy()  # ダイアログを閉じる
 
 def gui_main():
@@ -301,16 +327,16 @@ def gui_main():
     app.mainloop()
     return None
 
-def print_gui_log(): # 本番環境では引数「content」を入れる
+def print_gui_log(content):
     # GUIのログに追記
-    while True: # これもテスト目的
-        # time.sleep(10) # 10秒待ちもテスト
-        content = 'オートセーブしたかもしれないししていないかもしれない' # テスト目的で仮で入れている
-        date_time = datetime.datetime.now()
-        content = date_time.strftime('[%Y/%m/%d %H:%M:%S] ' + content)
-        app.log_text_insert(content)
-        content = ''
+    date_time = datetime.datetime.now()
+    content = date_time.strftime('[%Y/%m/%d %H:%M:%S] ' + content)
+    app.log_text_insert(content)
     return None
+
+def restart_server_threaded(set_code):
+    thread = threading.Thread(target=server_stop, args=(set_code,))
+    thread.start()
 
 # 関数定義（GUI系以外）
 def check_nettool():
@@ -367,7 +393,7 @@ def schedule_event(hour, minute, second, action):
     if not scheduler.empty():
         scheduler.run()
 
-def get_nettool_pw():
+def get_nettool_pw(output):
     # simuconf.tabを開き、「server_admin_pw」から始まる行を検索
     simuconf_path = server_folder_path + '/config/simuconf.tab'
     f = open(simuconf_path, 'r', encoding='utf-8')
@@ -379,7 +405,10 @@ def get_nettool_pw():
     f.close()
     # 行頭の「server_admin_pw = 」を削除し返す
     nettool_password = re.sub('^server_admin_pw( *= *)', '', nettool_password_tmp)
-    print_with_date('nettoolのパスワード取得に成功しました。')
+    if output == 0:
+        print_with_date('nettoolのパスワード取得に成功しました。')
+    else:
+        print_gui_log('nettoolのパスワード取得に成功しました。')
     return nettool_password
 
 def print_with_date(content):
@@ -408,7 +437,7 @@ def set_company_pw():
         if result.stdout != 'Nothing received.\n' and company_pw != '':
             subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'lock-company', company_id, company_pw], capture_output=True, text=True)
         i += 1
-    print_with_date('会社にパスワードを設定しました。')
+    print_gui_log('会社にパスワードを設定しました。')
 
 def app_start():
     # Simutransを起動する
@@ -442,11 +471,11 @@ def nettool_say(content):
 def wait_simutrans_responce():
     # Simutransの応答を待つ
     global nettool_pw
-    print_with_date('Simutransの応答を待っています。しばらくお待ちください。')
+    print_gui_log('Simutransの応答を待っています。しばらくお待ちください。')
     while True:
         result = subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'clients'], encoding='utf-8', stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
         if result.returncode == 0:
-            print_with_date('Simutransが応答しました。処理を再開します。')
+            print_gui_log('Simutransが応答しました。処理を再開します。')
             break
         time.sleep(1)
 
@@ -459,11 +488,11 @@ def nettool_forcesync():
 
 def save_backup():
     # バックアップ
-    print_with_date('セーブデータのバックアップを行います。')
+    print_gui_log('セーブデータのバックアップを行います。')
     # autosaveフォルダがないなら作る
     path = server_folder_path + '/autosave'
     if not os.path.isdir(path):
-        print_with_date('autosaveフォルダが存在しません。作成します。')
+        print_gui_log('autosaveフォルダが存在しません。作成します。')
         os.mkdir(path)
     # バックアップ上限を超えたファイルがあるなら削除
     path = server_folder_path + '/autosave/autosave_' + str(config.autosave_backup) + '.sve'
@@ -485,7 +514,7 @@ def save_backup():
         backup_after_number -= 1
     # ファイルをコピー
     shutil.copy(server_folder_path + '/' +  server_save, server_folder_path + '/autosave/autosave_1.sve')
-    print_with_date('バックアップ処理が終了しました。')
+    print_gui_log('バックアップ処理が終了しました。')
     return None
 
 def server_stop(set_code):
@@ -494,13 +523,29 @@ def server_stop(set_code):
     global start_code
     if set_code == 2:
         nettool_say('Server restart soon.')
-        print_with_date('再起動予告メッセージを送信しました。')
+        print_gui_log('再起動予告メッセージを送信しました。')
         swm_discord_post('まもなく再起動を行います。', 'これからのログインはおやめください。', '16760576')
+    elif set_code == 3:
+        nettool_say('Maintenance soon.')
+        print_gui_log('メンテナンス予告メッセージを送信しました。')
+        swm_discord_post('まもなくメンテナンスです。', 'これからのログインはおやめください。', '16760576')
+    elif set_code == 5:
+        nettool_say('Server close soon.')
+        print_gui_log('サーバー終了予告メッセージを送信しました。')
+        swm_discord_post('まもなくサーバーを終了します。', 'これからのログインはおやめください。', '16760576')
     time.sleep(30)
     nettool_forcesync()
     if set_code == 2:
         nettool_say('Server is restarting.')
-        print_with_date('再起動中告知メッセージを送信しました。')
+        print_gui_log('再起動中告知メッセージを送信しました。')
+    elif set_code == 3:
+        nettool_say('Maintenance start.')
+        print_gui_log('メンテナンス告知メッセージを送信しました。')
+        swm_discord_post('ただいまメンテナンス中です。', 'メンテナンス中でもサーバーに入れる場合がありますが、許可なく入らないでください。', '16760576')
+    elif set_code == 5:
+        nettool_say('Server is close. Thank you for playing!')
+        print_gui_log('サーバー終了告知メッセージを送信しました。')
+        swm_discord_post('サーバーは終了しました。', '皆様のご参加ありがとうございました。', '65280')
     start_code = set_code
     subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'shutdown'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     # if config.restart_time == 0:
@@ -531,32 +576,42 @@ def monitoring():
     global nettool_pw
     while True:
         # PIDを取得し、Noneなら起動する
-        server_pid = get_pid(config.server_name)
-        if server_pid is None:
-            app_process = app_start()
-            # 初回起動時とそれ以外で表示メッセージを変える
-            if start_code == 0:
-                print_with_date('サーバーを起動します。')
-                nettool_pw = get_nettool_pw()
-                wait_simutrans_responce()
-                set_company_pw()
-                start_code = 1
-            elif start_code == 1:
-                print_with_date('サーバーダウンを検出しました。再起動します。')
-                swm_discord_post('サーバーダウンを検出しました。', '現在復旧中です。しばらくお待ちください。', '16711680')
-                nettool_pw = get_nettool_pw()
-                wait_simutrans_responce()
-                set_company_pw()
-                print_with_date('サーバーを再起動しました。')
-                swm_discord_post('サーバーが復旧しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', '65280')
-            elif start_code == 2:
-                print_with_date('サーバーを起動します。')
-                nettool_pw = get_nettool_pw()
-                wait_simutrans_responce()
-                set_company_pw()
-                print_with_date('サーバーを起動しました。')
-                swm_discord_post('サーバーを再起動しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', '65280')
-                start_code = 1
+        if not start_code == 3:
+            server_pid = get_pid(config.server_name)
+            if server_pid is None:
+                app_process = app_start()
+                # 初回起動時とそれ以外で表示メッセージを変える
+                if start_code == 0:
+                    print_gui_log('サーバーを起動します。')
+                    nettool_pw = get_nettool_pw(1)
+                    wait_simutrans_responce()
+                    set_company_pw()
+                    start_code = 1
+                elif start_code == 1:
+                    print_gui_log('サーバーダウンを検出しました。再起動します。')
+                    swm_discord_post('サーバーダウンを検出しました。', '現在復旧中です。しばらくお待ちください。', '16711680')
+                    nettool_pw = get_nettool_pw(1)
+                    wait_simutrans_responce()
+                    set_company_pw()
+                    print_gui_log('サーバーを再起動しました。')
+                    swm_discord_post('サーバーが復旧しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', '65280')
+                elif start_code == 2:
+                    print_gui_log('サーバーを起動します。')
+                    nettool_pw = get_nettool_pw(1)
+                    wait_simutrans_responce()
+                    set_company_pw()
+                    print_gui_log('サーバーを起動しました。')
+                    swm_discord_post('サーバーを再起動しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', '65280')
+                elif start_code == 4:
+                    print_gui_log('サーバーを再開します。')
+                    nettool_pw = get_nettool_pw(1)
+                    wait_simutrans_responce()
+                    set_company_pw()
+                    print_gui_log('サーバーを再開しました。')
+                    swm_discord_post('メンテナンスを終了しました。', '皆様のご協力ありがとうございました。', '65280')
+                    start_code = 1
+                elif start_code == 5:
+                    break
         time.sleep(1)
     return None
 
@@ -566,13 +621,13 @@ def autosave():
     time.sleep(autosave_interval)
     while True:
         nettool_say('Autosave soon.')
-        print_with_date('オートセーブ予告メッセージを送信しました。')
+        print_gui_log('オートセーブ予告メッセージを送信しました。')
         time.sleep(30)
         start_time = time.time()
-        print_with_date('オートセーブ中です。')
+        print_gui_log('オートセーブ中です。')
         nettool_forcesync()
         set_company_pw()
-        print_with_date('オートセーブ処理が完了しました。')
+        print_gui_log('オートセーブ処理が完了しました。')
         end_time = time.time()
         time_diff = end_time - start_time
         autosave_interval = config.autosave_interval - 30
@@ -587,10 +642,12 @@ if __name__ == "__main__":
     check_os()
     check_config()
     check_nettool()
-    nettool_pw = get_nettool_pw()
+    nettool_pw = get_nettool_pw(0)
 
     thread_1 = threading.Thread(target=gui_main)
     thread_1.start()
+
+    time.sleep(1)
 
     thread_2 = threading.Thread(target=monitoring, daemon=True)
     thread_2.start()

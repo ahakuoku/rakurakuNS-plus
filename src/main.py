@@ -525,6 +525,8 @@ def server_stop(set_code):
     global nettool_pw
     global start_code
     if set_code == 2:
+        if start_code == 3:
+            return None
         nettool_say('Server restart soon.')
         print_gui_log('再起動予告メッセージを送信しました。')
         swm_discord_post('まもなく再起動を行います。', 'これからのログインはおやめください。', '16760576')

@@ -628,9 +628,9 @@ def monitoring():
 
 def autosave():
     # オートセーブ処理
-    autosave_interval = config.autosave_interval - 30
-    time.sleep(autosave_interval)
     while True:
+        autosave_interval = config.autosave_interval - 30
+        time.sleep(autosave_interval)
         nettool_say('Autosave soon.')
         print_gui_log('オートセーブ予告メッセージを送信しました。')
         time.sleep(30)
@@ -641,8 +641,7 @@ def autosave():
         print_gui_log('オートセーブ処理が完了しました。')
         end_time = time.time()
         time_diff = end_time - start_time
-        autosave_interval = config.autosave_interval - 30
-        next_autosave_in = autosave_interval - (time_diff - 30)
+        next_autosave_in = autosave_interval - time_diff
         if next_autosave_in > 0:
             time.sleep(next_autosave_in)
         else:

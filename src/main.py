@@ -639,6 +639,7 @@ def monitoring():
                     set_company_pw()
                     print_gui_log('サーバーを起動しました。')
                     discord_post('サーバーを再起動しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', 0x00ff00)
+                    start_code = 1
                 elif start_code == 4:
                     print_gui_log('サーバーを再開します。')
                     nettool_pw = get_nettool_pw(1)

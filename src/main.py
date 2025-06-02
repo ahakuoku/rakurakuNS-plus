@@ -14,7 +14,7 @@ try:
 except ModuleNotFoundError:
     keywait = input(f'必要なモジュールがインストールされていません。コマンド「pip install psutil schedule」を実行してからやりなおしてください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
 import time
-# import discord
+import discord
 import re
 import datetime
 import platform
@@ -42,9 +42,8 @@ nettool_pw = 0
 scheduler = sched.scheduler(time.time, time.sleep)
 scheduler_running = False
 server_ip = '127.0.0.1:'
-# intents = discord.Intents.default()
-# intents.message_content = True
-# client = discord.Client(intents=intents)
+intents = discord.Intents.default()
+bot = discord.Client(intents=intents)
 
 # 関数定義（GUI系）
 class window_main(tk.Frame):
@@ -341,7 +340,33 @@ def restart_server_threaded(set_code):
     thread = threading.Thread(target=server_stop, args=(set_code,))
     thread.start()
 
-# 関数定義（GUI系以外）
+# 関数定義（Discord関連）
+async def send_notification(title, description, color=0x00ff00):
+    await bot.wait_until_ready()
+    channel = bot.get_channel(config.discord_channel)
+    if channel:
+        embed = discord.Embed(title=title, description=description, color=color)
+        await channel.send(embed=embed)
+
+def discord_post(title, description, color=0x00ff00):
+    if config.use_discord_bot == 1 or 2:
+        coro = send_notification(title, description, color)
+        future = asyncio.run_coroutine_threadsafe(coro, bot.loop)
+        try:
+            future.result(timeout=10)
+        except Exception as e:
+            print_with_date(f"通知送信エラー: {e}")
+
+# Bot用のスレッドターゲット
+def run_discord_bot():
+    bot.run(config.discord_token)
+
+# Discord botが準備できたときの処理（任意）
+@bot.event
+async def on_ready():
+    print_gui_log(f"DiscordのBotを起動しました。: {bot.user}")
+
+# 関数定義（一般）
 def check_nettool():
     # nettoolの存在確認
     try:
@@ -529,15 +554,15 @@ def server_stop(set_code):
             return None
         nettool_say('Server restart soon.')
         print_gui_log('再起動予告メッセージを送信しました。')
-        swm_discord_post('まもなく再起動を行います。', 'これからのログインはおやめください。', '16760576')
+        discord_post('まもなく再起動を行います。', 'これからのログインはおやめください。', 0xffff00)
     elif set_code == 3:
         nettool_say('Maintenance soon.')
         print_gui_log('メンテナンス予告メッセージを送信しました。')
-        swm_discord_post('まもなくメンテナンスです。', 'これからのログインはおやめください。', '16760576')
+        discord_post('まもなくメンテナンスです。', 'これからのログインはおやめください。', 0xffff00)
     elif set_code == 5:
         nettool_say('Server close soon.')
         print_gui_log('サーバー終了予告メッセージを送信しました。')
-        swm_discord_post('まもなくサーバーを終了します。', 'これからのログインはおやめください。', '16760576')
+        discord_post('まもなくサーバーを終了します。', 'これからのログインはおやめください。', 0xffff00)
     time.sleep(30)
     nettool_forcesync()
     if set_code == 2:
@@ -546,11 +571,11 @@ def server_stop(set_code):
     elif set_code == 3:
         nettool_say('Maintenance start.')
         print_gui_log('メンテナンス告知メッセージを送信しました。')
-        swm_discord_post('ただいまメンテナンス中です。', 'メンテナンス中でもサーバーに入れる場合がありますが、許可なく入らないでください。', '16760576')
+        discord_post('ただいまメンテナンス中です。', 'メンテナンス中でもサーバーに入れる場合がありますが、許可なく入らないでください。', 0xffff00)
     elif set_code == 5:
         nettool_say('Server is close. Thank you for playing!')
         print_gui_log('サーバー終了告知メッセージを送信しました。')
-        swm_discord_post('サーバーは終了しました。', '皆様のご参加ありがとうございました。', '65280')
+        discord_post('サーバーは終了しました。', '皆様のご参加ありがとうございました。', 0x00ff00)
     start_code = set_code
     subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'shutdown'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     # if config.restart_time == 0:
@@ -600,26 +625,26 @@ def monitoring():
                     start_code = 1
                 elif start_code == 1:
                     print_gui_log('サーバーダウンを検出しました。再起動します。')
-                    swm_discord_post('サーバーダウンを検出しました。', '現在復旧中です。しばらくお待ちください。', '16711680')
+                    discord_post('サーバーダウンを検出しました。', '現在復旧中です。しばらくお待ちください。', 0xff0000)
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
                     set_company_pw()
                     print_gui_log('サーバーを再起動しました。')
-                    swm_discord_post('サーバーが復旧しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', '65280')
+                    discord_post('サーバーが復旧しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', 0x00ff00)
                 elif start_code == 2:
                     print_gui_log('サーバーを起動します。')
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
                     set_company_pw()
                     print_gui_log('サーバーを起動しました。')
-                    swm_discord_post('サーバーを再起動しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', '65280')
+                    discord_post('サーバーを再起動しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', 0x00ff00)
                 elif start_code == 4:
                     print_gui_log('サーバーを再開します。')
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
                     set_company_pw()
                     print_gui_log('サーバーを再開しました。')
-                    swm_discord_post('メンテナンスを終了しました。', '皆様のご協力ありがとうございました。', '65280')
+                    discord_post('メンテナンスを終了しました。', '皆様のご協力ありがとうございました。', 0x00ff00)
                     start_code = 1
                 elif start_code == 5:
                     break
@@ -669,6 +694,7 @@ if __name__ == "__main__":
     thread_4 = threading.Thread(target=auto_restart, daemon=True)
     thread_4.start()
 
-    thread_1.join()
+    thread_5 = threading.Thread(target=run_discord_bot, daemon=True)
+    thread_5.start()
 
-    # client.run(config.discord_token)
+    thread_1.join()

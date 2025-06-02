@@ -579,11 +579,6 @@ def server_stop(set_code):
         discord_post('サーバーは終了しました。', '皆様のご参加ありがとうございました。', 0x00ff00)
     start_code = set_code
     subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'shutdown'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    # if config.restart_time == 0:
-    #     restart_time = 23
-    # else:
-    #     restart_time = config.restart_time - 1
-    # schedule_event(restart_time, 59, 30, lambda: server_stop(2))
     return None
 
 def auto_restart():
@@ -599,7 +594,6 @@ def auto_restart():
         while True:
             schedule.run_pending()
             time.sleep(1)
-        # schedule_event(restart_time, 59, 30, lambda: server_stop(2))
     return None
 
 def monitoring():

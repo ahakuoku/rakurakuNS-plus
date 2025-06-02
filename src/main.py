@@ -555,15 +555,15 @@ def server_stop(set_code):
             return None
         nettool_say('Server restart soon.')
         print_gui_log('再起動予告メッセージを送信しました。')
-        discord_post('まもなく再起動を行います。', 'これからのログインはおやめください。', 0xffff00)
+        discord_post('まもなく再起動を行います。', 'これからのログインはおやめください。', 0xffbf00)
     elif set_code == 3:
         nettool_say('Maintenance soon.')
         print_gui_log('メンテナンス予告メッセージを送信しました。')
-        discord_post('まもなくメンテナンスです。', 'これからのログインはおやめください。', 0xffff00)
+        discord_post('まもなくメンテナンスです。', 'これからのログインはおやめください。', 0xffbf00)
     elif set_code == 5:
         nettool_say('Server close soon.')
         print_gui_log('サーバー終了予告メッセージを送信しました。')
-        discord_post('まもなくサーバーを終了します。', 'これからのログインはおやめください。', 0xffff00)
+        discord_post('まもなくサーバーを終了します。', 'これからのログインはおやめください。', 0xffbf00)
     time.sleep(30)
     nettool_forcesync()
     if set_code == 2:
@@ -572,7 +572,7 @@ def server_stop(set_code):
     elif set_code == 3:
         nettool_say('Maintenance start.')
         print_gui_log('メンテナンス告知メッセージを送信しました。')
-        discord_post('ただいまメンテナンス中です。', 'メンテナンス中でもサーバーに入れる場合がありますが、許可なく入らないでください。', 0xffff00)
+        discord_post('ただいまメンテナンス中です。', 'メンテナンス中でもサーバーに入れる場合がありますが、許可なく入らないでください。', 0xffbf00)
     elif set_code == 5:
         nettool_say('Server is close. Thank you for playing!')
         print_gui_log('サーバー終了告知メッセージを送信しました。')

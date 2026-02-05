@@ -8,16 +8,20 @@ except ModuleNotFoundError:
 try:
     import psutil
 except ModuleNotFoundError:
-    keywait = input(f'必要なモジュールがインストールされていません。コマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+    keywait = input(f'必要なモジュールがインストールされていません。コマンド「pip install psutil schedule discord pyyaml」を実行してからやりなおしてください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
 try:
     import schedule
 except ModuleNotFoundError:
-    keywait = input(f'必要なモジュールがインストールされていません。コマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
-import time
+    keywait = input(f'必要なモジュールがインストールされていません。コマンド「pip install psutil schedule discord pyyaml」を実行してからやりなおしてください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
 try:
     import discord
 except ModuleNotFoundError:
-    keywait = input(f'必要なモジュールがインストールされていません。コマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+    keywait = input(f'必要なモジュールがインストールされていません。コマンド「pip install psutil schedule discord pyyaml」を実行してからやりなおしてください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+try:
+    import yaml
+except ModuleNotFoundError:
+    keywait = input(f'必要なモジュールがインストールされていません。コマンド「pip install psutil schedule discord pyyaml」を実行してからやりなおしてください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+import time
 import re
 import datetime
 import platform
@@ -361,13 +365,13 @@ def discord_post(title, description, color=0x00ff00):
         except Exception as e:
             print_with_date(f"通知送信エラー: {e}")
 
-# Bot用のスレッドターゲット
 def run_discord_bot():
+    # Bot用のスレッドターゲット
     bot.run(config.discord_token)
 
-# Discord botが準備できたときの処理（任意）
 @bot.event
 async def on_ready():
+    # Discord botが準備できたときの処理（任意）
     print_gui_log(f"DiscordのBotを起動しました。: {bot.user}")
 
 # 関数定義（一般）
@@ -584,6 +588,11 @@ def server_stop(set_code):
     subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'shutdown'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return None
 
+def load_config(file_path):
+    with open(file_path, 'r') as file:
+        config = yaml.safe_load(file)
+    return config
+
 def auto_restart():
     # サーバー定時再起動
     global nettool_pw
@@ -678,6 +687,8 @@ if __name__ == "__main__":
     check_config()
     check_nettool()
     nettool_pw = get_nettool_pw(0)
+
+    yaml_config = load_config('config.yaml')
 
     thread_1 = threading.Thread(target=gui_main)
     thread_1.start()

@@ -363,7 +363,8 @@ def discord_post(title, description, color=0x00ff00):
 
 # Bot用のスレッドターゲット
 def run_discord_bot():
-    bot.run(config.discord_token)
+    if config.use_discord_bot == 1 or 2:
+        bot.run(config.discord_token)
 
 # Discord botが準備できたときの処理（任意）
 @bot.event

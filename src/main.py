@@ -410,6 +410,16 @@ def check_config():
     print_with_date('設定に正常な値が入力されていることを確認しました。')
     return None
 
+def get_savefile_timestamp(second):
+    # secondが1なら秒単位、それ以外なら分単位で取得する
+    unix_time = os.stat(server_save)
+    dt = datetime.datetime.fromtimestamp(unix_time)
+    if second == 1:
+        final_time = dt.strftime("%H:%M:%S")
+    else:
+        final_time = dt.strftime("%H:%M")
+    return final_time
+
 def convert_to_time(hour):
     if hour == -1:
         pass
@@ -628,7 +638,8 @@ def monitoring():
                     start_code = 1
                 elif start_code == 1:
                     print_gui_log('サーバーダウンを検出しました。再起動します。')
-                    discord_post('サーバーダウンを検出しました。', '現在復旧中です。しばらくお待ちください。', 0xff0000)
+                    save_timestamp = get_savefile_timestamp(0)
+                    discord_post('サーバーがダウンしました。', '自動で復帰します。しばらくお待ちください。\nこれに伴い、' + save_timestamp + 'までデータが巻き戻ります。', 0xff0000)
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
                     set_company_pw()

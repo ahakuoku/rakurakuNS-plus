@@ -1,24 +1,26 @@
 # -*- coding: utf-8 -*- 
 
 import subprocess
+import sys
 try:
     import config
 except ModuleNotFoundError:
     keywait = input(f'config.template.pyをコピーし、config.pyにリネームして設定を行ってください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+    sys.exit()
 try:
     import psutil
 except ModuleNotFoundError:
-    keywait = input(f'必要なモジュールがインストールされていません。コマンド「pip install psutil schedule」を実行してからやりなおしてください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+    keywait = input(f'必要なモジュールがインストールされていません。コマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+    sys.exit()
 try:
     import schedule
 except ModuleNotFoundError:
-    keywait = input(f'必要なモジュールがインストールされていません。コマンド「pip install psutil schedule」を実行してからやりなおしてください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+    keywait = input(f'必要なモジュールがインストールされていません。コマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+    sys.exit()
 import time
-# import discord
 import re
 import datetime
 import platform
-import sys
 import os
 import shutil
 import threading

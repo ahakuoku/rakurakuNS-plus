@@ -10,12 +10,12 @@ except ModuleNotFoundError:
 try:
     import psutil
 except ModuleNotFoundError:
-    keywait = input(f'必要なモジュールがインストールされていません。コマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+    keywait = input(f'必要なモジュールがインストールされていません。コマンド「pip install psutil schedule」を実行してからやりなおしてください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
     sys.exit()
 try:
     import schedule
 except ModuleNotFoundError:
-    keywait = input(f'必要なモジュールがインストールされていません。コマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+    keywait = input(f'必要なモジュールがインストールされていません。コマンド「pip install psutil schedule」を実行してからやりなおしてください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
     sys.exit()
 import time
 import re

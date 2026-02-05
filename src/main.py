@@ -412,7 +412,8 @@ def check_config():
 
 def get_savefile_timestamp(second):
     # secondが1なら秒単位、それ以外なら分単位で取得する
-    unix_time = os.stat(server_folder_path + '/' + server_save)
+    pt = server_folder_path + '/' + server_save
+    unix_time = pt.stat().st_ctime
     dt = datetime.datetime.fromtimestamp(int(unix_time))
     if second == 1:
         final_time = dt.strftime("%H:%M:%S")

@@ -31,7 +31,11 @@ import shutil
 import threading
 import sched
 import asyncio
-import tkinter as tk
+try:
+    import tkinter as tk
+except ModuleNotFoundError:
+    keywait = input(f'必要なモジュールがインストールされていません。\nコマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n\nUbuntu環境の場合は、下記コマンドを実行してください。\npip3 install --break-system-packages psutil schedule discord\nsudo apt update\nsudo apt install python3-tk\n\n（らくらくNS+を終了します。Enterキーを押してください。）')
+    sys.exit()
 from tkinter import ttk
 
 # 変数定義

@@ -145,12 +145,15 @@ class window_main(tk.Frame):
         maintenance_check(self.newWindow, self)  # 自分自身を渡す
 
     def update_maintenance_button(self):
-        if self.maintenance_mode == 0:
-            self.maintenance_mode_button.config(text="メンテナンスモード")
-        elif self.maintenance_mode == 1:
-            self.maintenance_mode_button.config(text="メンテナンス終了")
-        elif self.maintenance_mode == 2:
-            self.maintenance_mode_button.config(text="サーバー再開")
+            if self.maintenance_mode == 0:
+                text = "メンテナンスモード"
+            elif self.maintenance_mode == 1:
+                text = "メンテナンス終了"
+            elif self.maintenance_mode == 2:
+                text = "サーバー再開"
+
+            self.maintenance_mode_button.config(text=text)
+            self.maintenance_mode_button.update_idletasks()
 
     def toggle_maintenance_mode(self):
         global start_code
@@ -168,6 +171,8 @@ class window_main(tk.Frame):
         # メンテ → 通常
         elif self.maintenance_mode == 1:
             self.maintenance_mode = 0
+        
+        self.update_maintenance_button()
 
     def set_manual_restart_mode(self):
         self.maintenance_mode = 2
@@ -431,6 +436,13 @@ async def on_ready():
     print_gui_log(f"DiscordのBotを起動しました。: {bot.user}")
 
 # 関数定義（一般）
+
+def start_threads():
+    threading.Thread(target=monitoring, daemon=True).start()
+    threading.Thread(target=autosave, daemon=True).start()
+    threading.Thread(target=auto_restart, daemon=True).start()
+    threading.Thread(target=run_discord_bot, daemon=True).start()
+
 def check_nettool():
     # nettoolの存在確認
     try:
@@ -689,7 +701,7 @@ def monitoring():
         start_code = 1
     while True:
         # start_codeが3（メンテナンス中）または6（復旧待ち）であれば処理を行わない
-        if not start_code == 3 or 6:
+        if start_code not in (3, 6):
             # PIDを取得し、Noneなら起動する
             server_pid = get_pid(config.server_name)
             if server_pid is None:
@@ -708,7 +720,9 @@ def monitoring():
                         discord_post('サーバーがダウンしました。', '復旧用のデータがないため、今回は自動復旧できません。\nご迷惑をおかけしますが、復旧までしばらくお待ちください。', 0xff0000)
                         start_code = 6
                         app.after(0,app.set_manual_restart_mode)
-                        break
+                        while start_code == 6:
+                            time.sleep(1)
+                        continue
                     else:
                         app_process = app_start()
                         print_gui_log('サーバーダウンを検出しました。再起動します。')
@@ -782,9 +796,6 @@ if __name__ == "__main__":
 
     root = gui_main()
 
-    threading.Thread(target=monitoring, daemon=True).start()
-    threading.Thread(target=autosave, daemon=True).start()
-    threading.Thread(target=auto_restart, daemon=True).start()
-    threading.Thread(target=run_discord_bot, daemon=True).start()
+    root.after(100, start_threads)
 
     root.mainloop()

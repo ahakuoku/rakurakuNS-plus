@@ -380,6 +380,7 @@ class server_restart_check(tk.Frame):
 
 def gui_main():
     global app
+
     root = tk.Tk()
     root.tk.call("source", "azure.tcl")
     root.tk.call("set_theme", "light")
@@ -388,8 +389,8 @@ def gui_main():
     root.grid_columnconfigure(0, weight=1)
 
     app = window_main(master=root)
-    app.mainloop()
-    return None
+
+    return root
 
 def print_gui_log(content):
     # GUIのログに追記
@@ -692,9 +693,9 @@ def monitoring():
             # PIDを取得し、Noneなら起動する
             server_pid = get_pid(config.server_name)
             if server_pid is None:
-                app_process = app_start()
                 # 初回起動時とそれ以外で表示メッセージを変える
                 if start_code == 0:
+                    app_process = app_start()
                     print_gui_log('サーバーを起動します。')
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
@@ -706,9 +707,10 @@ def monitoring():
                         print_gui_log('サーバーダウンを検出しました。復旧用のデータを配置し手動で復旧してください。')
                         discord_post('サーバーがダウンしました。', '復旧用のデータがないため、今回は自動復旧できません。\nご迷惑をおかけしますが、復旧までしばらくお待ちください。', 0xff0000)
                         start_code = 6
-                        window_main.after(0, window_main.set_manual_restart_mode)
+                        app.after(0,app.set_manual_restart_mode)
                         break
                     else:
+                        app_process = app_start()
                         print_gui_log('サーバーダウンを検出しました。再起動します。')
                         discord_post('サーバーがダウンしました。', '自動で復帰します。しばらくお待ちください。\nこれに伴い、' + save_timestamp + 'までデータが巻き戻ります。', 0xff0000)
                     nettool_pw = get_nettool_pw(1)
@@ -717,6 +719,7 @@ def monitoring():
                     print_gui_log('サーバーを再起動しました。')
                     discord_post('サーバーが復旧しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', 0x00ff00)
                 elif start_code == 2:
+                    app_process = app_start()
                     print_gui_log('サーバーを起動します。')
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
@@ -725,6 +728,7 @@ def monitoring():
                     discord_post('サーバーを再起動しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', 0x00ff00)
                     start_code = 1
                 elif start_code == 4:
+                    app_process = app_start()
                     print_gui_log('サーバーを再開します。')
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
@@ -733,6 +737,7 @@ def monitoring():
                     discord_post('メンテナンスを終了しました。', '皆様のご協力ありがとうございました。', 0x00ff00)
                     start_code = 1
                 elif start_code == 7:
+                    app_process = app_start()
                     print_gui_log('サーバーを再開します。')
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
@@ -741,6 +746,7 @@ def monitoring():
                     discord_post('サーバーを再開しました。', '大変お待たせしました。', 0x00ff00)
                     start_code = 1
                 elif start_code == 5:
+                    app_process = app_start()
                     break
         time.sleep(1)
     return None
@@ -774,21 +780,11 @@ if __name__ == "__main__":
     check_nettool()
     nettool_pw = get_nettool_pw(0)
 
-    thread_1 = threading.Thread(target=gui_main)
-    thread_1.start()
+    root = gui_main()
 
-    time.sleep(1)
+    threading.Thread(target=monitoring, daemon=True).start()
+    threading.Thread(target=autosave, daemon=True).start()
+    threading.Thread(target=auto_restart, daemon=True).start()
+    threading.Thread(target=run_discord_bot, daemon=True).start()
 
-    thread_2 = threading.Thread(target=monitoring, daemon=True)
-    thread_2.start()
-
-    thread_3 = threading.Thread(target=autosave, daemon=True)
-    thread_3.start()
-
-    thread_4 = threading.Thread(target=auto_restart, daemon=True)
-    thread_4.start()
-
-    thread_5 = threading.Thread(target=run_discord_bot, daemon=True)
-    thread_5.start()
-
-    thread_1.join()
+    root.mainloop()

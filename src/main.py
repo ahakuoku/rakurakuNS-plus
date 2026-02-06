@@ -55,11 +55,15 @@ server_ip = '127.0.0.1:'
 # 関数定義（GUI系）
 class window_main(tk.Frame):
     def __init__(self, master):
+        global os_type
         super().__init__(master)
         self.grid(row=0, column=0, sticky="nsew")
         self.master.title("らくらくNS+")
         self.master.resizable(False, False)
-        self.master.geometry("550x240")
+        if os_type == "Linux":
+            self.master.geometry("550x280")
+        else:
+            self.master.geometry("550x240")
         self.maintenance_mode = 0  # メンテナンスモードの状態（0:通常, 1:メンテナンス中）
         self.create_widgets()
 
@@ -369,6 +373,7 @@ def check_os():
     else:
         keywait = input(f'らくらくNS+はお使いのOSには対応していません。らくらくNS+はWindows、Mac、Linuxに対応しています。\n（らくらくNS+を終了します。Enterキーを押してください。）')
         sys.exit()
+    return os_system
 
 def check_config():
     # 設定チェック
@@ -658,7 +663,7 @@ def autosave():
     return None
 
 if __name__ == "__main__":
-    check_os()
+    os_type = check_os()
     check_config()
     check_nettool()
     nettool_pw = get_nettool_pw(0)

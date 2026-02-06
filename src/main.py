@@ -688,7 +688,7 @@ def monitoring():
         start_code = 1
     while True:
         # start_codeが3（メンテナンス中）または6（復旧待ち）であれば処理を行わない
-        if not start_code == 3:
+        if not start_code == 3 or 6:
             # PIDを取得し、Noneなら起動する
             server_pid = get_pid(config.server_name)
             if server_pid is None:

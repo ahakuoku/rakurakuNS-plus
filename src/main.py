@@ -10,12 +10,12 @@ except ModuleNotFoundError:
 try:
     import psutil
 except ModuleNotFoundError:
-    keywait = input(f'必要なモジュールがインストールされていません。コマンド「pip install psutil schedule」を実行してからやりなおしてください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+    keywait = input(f'必要なモジュールがインストールされていません。\nコマンド「pip install psutil schedule」を実行してからやりなおしてください。\n\nUbuntu環境の場合は、下記コマンドを実行してください。\npip3 install --break-system-packages psutil schedule\nsudo apt update\nsudo apt install python3-tk\n\n（らくらくNS+を終了します。Enterキーを押してください。）')
     sys.exit()
 try:
     import schedule
 except ModuleNotFoundError:
-    keywait = input(f'必要なモジュールがインストールされていません。コマンド「pip install psutil schedule」を実行してからやりなおしてください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+    keywait = input(f'必要なモジュールがインストールされていません。\nコマンド「pip install psutil schedule」を実行してからやりなおしてください。\n\nUbuntu環境の場合は、下記コマンドを実行してください。\npip3 install --break-system-packages psutil schedule\nsudo apt update\nsudo apt install python3-tk\n\n（らくらくNS+を終了します。Enterキーを押してください。）')
     sys.exit()
 import time
 import re
@@ -349,10 +349,10 @@ def check_nettool():
     try:
         subprocess.run(['nettool'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except FileNotFoundError:
-        keywait = input(f'nettoolの認識に失敗しました。nettoolをらくらくNS+の実行ファイルと同じフォルダに置いてからやり直してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+        keywait = input(f'nettoolの認識に失敗しました。\nWindowsの場合は、nettool.exeをらくらくNS+の実行ファイルと同じフォルダに置いてからやり直してください。\nその他のOSの場合は、nettoolにPATHを通してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
         sys.exit()
     except subprocess.CalledProcessError:
-        keywait = input(f'nettoolの認識に失敗しました。nettoolをらくらくNS+の実行ファイルと同じフォルダに置いてからやり直してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+        keywait = input(f'nettoolの認識に失敗しました。\nWindowsの場合は、nettool.exeをらくらくNS+の実行ファイルと同じフォルダに置いてからやり直してください。\nその他のOSの場合は、nettoolにPATHを通してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
         sys.exit()
     print_with_date('nettoolの認識に成功しました。')
     return None

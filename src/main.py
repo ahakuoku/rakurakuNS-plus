@@ -144,16 +144,34 @@ class window_main(tk.Frame):
         self.newWindow.grab_set()
         maintenance_check(self.newWindow, self)  # 自分自身を渡す
 
-    def toggle_maintenance_mode(self):
-        # メンテナンスモードの切り替え
-        global start_code
+    def update_maintenance_button(self):
         if self.maintenance_mode == 0:
+            self.maintenance_mode_button.config(text="メンテナンスモード")
+        elif self.maintenance_mode == 1:
+            self.maintenance_mode_button.config(text="メンテナンス終了")
+        elif self.maintenance_mode == 2:
+            self.maintenance_mode_button.config(text="サーバー再開")
+
+    def toggle_maintenance_mode(self):
+        global start_code
+
+        # 手動再開モード
+        if self.maintenance_mode == 2:
+            start_code = 7
+            self.maintenance_mode = 0
+
+        # 通常 → メンテ
+        elif self.maintenance_mode == 0:
             start_code = 3
             self.maintenance_mode = 1
-            self.maintenance_mode_button["text"] = "メンテナンス終了"
-        else:
+
+        # メンテ → 通常
+        elif self.maintenance_mode == 1:
             self.maintenance_mode = 0
-            self.maintenance_mode_button["text"] = "メンテナンスモード"
+    
+    def set_manual_restart_mode(self):
+        self.maintenance_mode = 2
+        self.update_maintenance_button()
 
     def log_text_insert(self, content):
         # 他スレッドからも呼び出せる安全な方法
@@ -180,21 +198,37 @@ class maintenance_check(tk.Frame):
         self.create_widgets()
 
     def create_widgets(self):
-        # ダイアログのウィジェットを配置
-        if self.main_window.maintenance_mode == 0:
-            self.label = ttk.Label(self.master, text="サーバーを中断しメンテナンスモードに入ります。\nよろしいですか？")
-        else:
-            self.label = ttk.Label(self.master, text="メンテナンスモードを終了しサーバーを再開します。\nよろしいですか？")
+        mode = self.main_window.maintenance_mode
 
+        # 状態ごとにメッセージを変更
+        if mode == 0:
+            text = "サーバーを中断しメンテナンスモードに入ります。\nよろしいですか？"
+
+        elif mode == 1:
+            text = "メンテナンスモードを終了しサーバーを再開します。\nよろしいですか？"
+
+        elif mode == 2:
+            text = "サーバーを再開します。\nよろしいですか？"
+
+        self.label = ttk.Label(self.master, text=text)
         self.label.pack(padx=10, pady=10, fill="both", expand=True)
 
         button_frame = ttk.Frame(self.master)
         button_frame.pack(pady=10, fill="x")
 
-        self.exit_button = ttk.Button(button_frame, text="はい", style='Accent.TButton', command=self.maintenance_mode_check)
+        self.exit_button = ttk.Button(
+            button_frame,
+            text="はい",
+            style='Accent.TButton',
+            command=self.maintenance_mode_check
+        )
         self.exit_button.pack(side="left", padx=5, expand=True)
 
-        self.cancel_button = ttk.Button(button_frame, text="いいえ", command=self.close_window)
+        self.cancel_button = ttk.Button(
+            button_frame,
+            text="いいえ",
+            command=self.close_window
+        )
         self.cancel_button.pack(side="right", padx=5, expand=True)
 
     def close_window(self):
@@ -204,11 +238,23 @@ class maintenance_check(tk.Frame):
     def maintenance_mode_check(self):
         # メンテナンスモードかどうかをチェックし、メンテナンスモードの実行/解除
         global start_code
-        if start_code == 3:
-            start_code = 4
-        else:
-            maintenance_thread = threading.Thread(target=self.server_stop_thread, args=(3,))
+        mode = self.main_window.maintenance_mode
+
+        # 通常 → メンテナンス
+        if mode == 0:
+            maintenance_thread = threading.Thread(
+                target=self.server_stop_thread,
+                args=(3,)
+            )
             maintenance_thread.start()
+
+        # メンテ終了 → サーバー起動
+        elif mode == 1:
+            start_code = 2  # サーバー起動コード
+
+        # 手動再開待ち → サーバー起動
+        elif mode == 2:
+            start_code = 7
         self.main_window.toggle_maintenance_mode()  # メインウィンドウのボタンを更新
         self.master.destroy()  # ダイアログを閉じる
 
@@ -424,12 +470,18 @@ def check_config():
 def get_savefile_timestamp(second):
     # secondが1なら秒単位、それ以外なら分単位で取得する
     pt = server_folder_path + '/' + server_save
-    unix_time = os.path.getctime(pt)
-    dt = datetime.datetime.fromtimestamp(int(unix_time))
-    if second == 1:
-        final_time = dt.strftime("%H:%M:%S")
+    if os.path.exists(pt) == True:
+        unix_time = os.path.getctime(pt)
+        dt = datetime.datetime.fromtimestamp(int(unix_time))
+        if second == 1:
+            final_time = dt.strftime("%H:%M:%S")
+        else:
+            final_time = dt.strftime("%H:%M")
     else:
-        final_time = dt.strftime("%H:%M")
+        if second == 1:
+            final_time = "99:99:99"
+        else:
+            final_time = "99:99"
     return final_time
 
 def convert_to_time(hour):
@@ -635,7 +687,7 @@ def monitoring():
         print_gui_log('サーバーは起動済みです。')
         start_code = 1
     while True:
-        # start_codeが3（メンテナンス中）であれば処理を行わない
+        # start_codeが3（メンテナンス中）または6（復旧待ち）であれば処理を行わない
         if not start_code == 3:
             # PIDを取得し、Noneなら起動する
             server_pid = get_pid(config.server_name)
@@ -649,9 +701,15 @@ def monitoring():
                     set_company_pw()
                     start_code = 1
                 elif start_code == 1:
-                    print_gui_log('サーバーダウンを検出しました。再起動します。')
                     save_timestamp = get_savefile_timestamp(0)
-                    discord_post('サーバーがダウンしました。', '自動で復帰します。しばらくお待ちください。\nこれに伴い、' + save_timestamp + 'までデータが巻き戻ります。', 0xff0000)
+                    if save_timestamp == "99:99":
+                        print_gui_log('サーバーダウンを検出しました。復旧用のデータを配置し手動で復旧してください。')
+                        discord_post('サーバーがダウンしました。', '復旧用のデータがないため、今回は自動復旧できません。\nご迷惑をおかけしますが、復旧までしばらくお待ちください。', 0xff0000)
+                        start_code = 6
+                        break
+                    else:
+                        print_gui_log('サーバーダウンを検出しました。再起動します。')
+                        discord_post('サーバーがダウンしました。', '自動で復帰します。しばらくお待ちください。\nこれに伴い、' + save_timestamp + 'までデータが巻き戻ります。', 0xff0000)
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
                     set_company_pw()
@@ -672,6 +730,14 @@ def monitoring():
                     set_company_pw()
                     print_gui_log('サーバーを再開しました。')
                     discord_post('メンテナンスを終了しました。', '皆様のご協力ありがとうございました。', 0x00ff00)
+                    start_code = 1
+                elif start_code == 7:
+                    print_gui_log('サーバーを再開します。')
+                    nettool_pw = get_nettool_pw(1)
+                    wait_simutrans_responce()
+                    set_company_pw()
+                    print_gui_log('サーバーを再開しました。')
+                    discord_post('サーバーを再開しました。', '大変お待たせしました。', 0x00ff00)
                     start_code = 1
                 elif start_code == 5:
                     break

@@ -168,7 +168,7 @@ class window_main(tk.Frame):
         # メンテ → 通常
         elif self.maintenance_mode == 1:
             self.maintenance_mode = 0
-    
+
     def set_manual_restart_mode(self):
         self.maintenance_mode = 2
         self.update_maintenance_button()
@@ -706,6 +706,7 @@ def monitoring():
                         print_gui_log('サーバーダウンを検出しました。復旧用のデータを配置し手動で復旧してください。')
                         discord_post('サーバーがダウンしました。', '復旧用のデータがないため、今回は自動復旧できません。\nご迷惑をおかけしますが、復旧までしばらくお待ちください。', 0xff0000)
                         start_code = 6
+                        window_main.after(0, window_main.set_manual_restart_mode)
                         break
                     else:
                         print_gui_log('サーバーダウンを検出しました。再起動します。')

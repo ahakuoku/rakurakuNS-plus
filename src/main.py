@@ -10,18 +10,18 @@ except ModuleNotFoundError:
 try:
     import psutil
 except ModuleNotFoundError:
-    keywait = input(f'必要なモジュールがインストールされていません。コマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+    keywait = input(f'必要なモジュールがインストールされていません。\nコマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n\nUbuntu環境の場合は、下記コマンドを実行してください。\npip3 install --break-system-packages psutil schedule discord\nsudo apt update\nsudo apt install python3-tk\n\n（らくらくNS+を終了します。Enterキーを押してください。）')
     sys.exit()
 try:
     import schedule
 except ModuleNotFoundError:
-    keywait = input(f'必要なモジュールがインストールされていません。コマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+    keywait = input(f'必要なモジュールがインストールされていません。\nコマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n\nUbuntu環境の場合は、下記コマンドを実行してください。\npip3 install --break-system-packages psutil schedule discord\nsudo apt update\nsudo apt install python3-tk\n\n（らくらくNS+を終了します。Enterキーを押してください。）')
     sys.exit()
 import time
 try:
     import discord
 except ModuleNotFoundError:
-    keywait = input(f'必要なモジュールがインストールされていません。コマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+    keywait = input(f'必要なモジュールがインストールされていません。\nコマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n\nUbuntu環境の場合は、下記コマンドを実行してください。\npip3 install --break-system-packages psutil schedule discord\nsudo apt update\nsudo apt install python3-tk\n\n（らくらくNS+を終了します。Enterキーを押してください。）')
     sys.exit()
 import re
 import datetime
@@ -31,7 +31,11 @@ import shutil
 import threading
 import sched
 import asyncio
-import tkinter as tk
+try:
+    import tkinter as tk
+except ModuleNotFoundError:
+    keywait = input(f'必要なモジュールがインストールされていません。\nコマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n\nUbuntu環境の場合は、下記コマンドを実行してください。\npip3 install --break-system-packages psutil schedule discord\nsudo apt update\nsudo apt install python3-tk\n\n（らくらくNS+を終了します。Enterキーを押してください。）')
+    sys.exit()
 from tkinter import ttk
 
 # 変数定義
@@ -56,11 +60,15 @@ bot = discord.Client(intents=intents)
 # 関数定義（GUI系）
 class window_main(tk.Frame):
     def __init__(self, master):
+        global os_type
         super().__init__(master)
         self.grid(row=0, column=0, sticky="nsew")
         self.master.title("らくらくNS+")
         self.master.resizable(False, False)
-        self.master.geometry("550x240")
+        if os_type == "Linux":
+            self.master.geometry("550x280")
+        else:
+            self.master.geometry("550x240")
         self.maintenance_mode = 0  # メンテナンスモードの状態（0:通常, 1:メンテナンス中）
         self.create_widgets()
 
@@ -136,16 +144,39 @@ class window_main(tk.Frame):
         self.newWindow.grab_set()
         maintenance_check(self.newWindow, self)  # 自分自身を渡す
 
+    def update_maintenance_button(self):
+            if self.maintenance_mode == 0:
+                text = "メンテナンスモード"
+            elif self.maintenance_mode == 1:
+                text = "メンテナンス終了"
+            elif self.maintenance_mode == 2:
+                text = "サーバー再開"
+
+            self.maintenance_mode_button.config(text=text)
+            self.maintenance_mode_button.update_idletasks()
+
     def toggle_maintenance_mode(self):
-        # メンテナンスモードの切り替え
         global start_code
-        if self.maintenance_mode == 0:
+
+        # 手動再開モード
+        if self.maintenance_mode == 2:
+            start_code = 7
+            self.maintenance_mode = 0
+
+        # 通常 → メンテ
+        elif self.maintenance_mode == 0:
             start_code = 3
             self.maintenance_mode = 1
-            self.maintenance_mode_button["text"] = "メンテナンス終了"
-        else:
+
+        # メンテ → 通常
+        elif self.maintenance_mode == 1:
             self.maintenance_mode = 0
-            self.maintenance_mode_button["text"] = "メンテナンスモード"
+        
+        self.update_maintenance_button()
+
+    def set_manual_restart_mode(self):
+        self.maintenance_mode = 2
+        self.update_maintenance_button()
 
     def log_text_insert(self, content):
         # 他スレッドからも呼び出せる安全な方法
@@ -172,21 +203,37 @@ class maintenance_check(tk.Frame):
         self.create_widgets()
 
     def create_widgets(self):
-        # ダイアログのウィジェットを配置
-        if self.main_window.maintenance_mode == 0:
-            self.label = ttk.Label(self.master, text="サーバーを中断しメンテナンスモードに入ります。\nよろしいですか？")
-        else:
-            self.label = ttk.Label(self.master, text="メンテナンスモードを終了しサーバーを再開します。\nよろしいですか？")
+        mode = self.main_window.maintenance_mode
 
+        # 状態ごとにメッセージを変更
+        if mode == 0:
+            text = "サーバーを中断しメンテナンスモードに入ります。\nよろしいですか？"
+
+        elif mode == 1:
+            text = "メンテナンスモードを終了しサーバーを再開します。\nよろしいですか？"
+
+        elif mode == 2:
+            text = "サーバーを再開します。\nよろしいですか？"
+
+        self.label = ttk.Label(self.master, text=text)
         self.label.pack(padx=10, pady=10, fill="both", expand=True)
 
         button_frame = ttk.Frame(self.master)
         button_frame.pack(pady=10, fill="x")
 
-        self.exit_button = ttk.Button(button_frame, text="はい", style='Accent.TButton', command=self.maintenance_mode_check)
+        self.exit_button = ttk.Button(
+            button_frame,
+            text="はい",
+            style='Accent.TButton',
+            command=self.maintenance_mode_check
+        )
         self.exit_button.pack(side="left", padx=5, expand=True)
 
-        self.cancel_button = ttk.Button(button_frame, text="いいえ", command=self.close_window)
+        self.cancel_button = ttk.Button(
+            button_frame,
+            text="いいえ",
+            command=self.close_window
+        )
         self.cancel_button.pack(side="right", padx=5, expand=True)
 
     def close_window(self):
@@ -196,11 +243,23 @@ class maintenance_check(tk.Frame):
     def maintenance_mode_check(self):
         # メンテナンスモードかどうかをチェックし、メンテナンスモードの実行/解除
         global start_code
-        if start_code == 3:
-            start_code = 4
-        else:
-            maintenance_thread = threading.Thread(target=self.server_stop_thread, args=(3,))
+        mode = self.main_window.maintenance_mode
+
+        # 通常 → メンテナンス
+        if mode == 0:
+            maintenance_thread = threading.Thread(
+                target=self.server_stop_thread,
+                args=(3,)
+            )
             maintenance_thread.start()
+
+        # メンテ終了 → サーバー起動
+        elif mode == 1:
+            start_code = 2  # サーバー起動コード
+
+        # 手動再開待ち → サーバー起動
+        elif mode == 2:
+            start_code = 7
         self.main_window.toggle_maintenance_mode()  # メインウィンドウのボタンを更新
         self.master.destroy()  # ダイアログを閉じる
 
@@ -326,6 +385,7 @@ class server_restart_check(tk.Frame):
 
 def gui_main():
     global app
+
     root = tk.Tk()
     root.tk.call("source", "azure.tcl")
     root.tk.call("set_theme", "light")
@@ -334,8 +394,8 @@ def gui_main():
     root.grid_columnconfigure(0, weight=1)
 
     app = window_main(master=root)
-    app.mainloop()
-    return None
+
+    return root
 
 def print_gui_log(content):
     # GUIのログに追記
@@ -376,14 +436,23 @@ async def on_ready():
     print_gui_log(f"DiscordのBotを起動しました。: {bot.user}")
 
 # 関数定義（一般）
+
+def start_threads():
+    threading.Thread(target=monitoring, daemon=True).start()
+    threading.Thread(target=autosave, daemon=True).start()
+    threading.Thread(target=auto_restart, daemon=True).start()
+    threading.Thread(target=run_discord_bot, daemon=True).start()
+
 def check_nettool():
     # nettoolの存在確認
     try:
         subprocess.run(['nettool'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except FileNotFoundError:
-        keywait = input(f'nettoolの認識に失敗しました。nettoolをらくらくNS+の実行ファイルと同じフォルダに置いてからやり直してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+        keywait = input(f'nettoolの認識に失敗しました。\nWindowsの場合は、nettool.exeをらくらくNS+の実行ファイルと同じフォルダに置いてからやり直してください。\nその他のOSの場合は、nettoolにPATHを通してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+        sys.exit()
     except subprocess.CalledProcessError:
-        keywait = input(f'nettoolの認識に失敗しました。nettoolをらくらくNS+の実行ファイルと同じフォルダに置いてからやり直してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+        keywait = input(f'nettoolの認識に失敗しました。\nWindowsの場合は、nettool.exeをらくらくNS+の実行ファイルと同じフォルダに置いてからやり直してください。\nその他のOSの場合は、nettoolにPATHを通してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+        sys.exit()
     print_with_date('nettoolの認識に成功しました。')
     return None
 
@@ -395,6 +464,7 @@ def check_os():
     else:
         keywait = input(f'らくらくNS+はお使いのOSには対応していません。らくらくNS+はWindows、Mac、Linuxに対応しています。\n（らくらくNS+を終了します。Enterキーを押してください。）')
         sys.exit()
+    return os_system
 
 def check_config():
     # 設定チェック
@@ -413,12 +483,18 @@ def check_config():
 def get_savefile_timestamp(second):
     # secondが1なら秒単位、それ以外なら分単位で取得する
     pt = server_folder_path + '/' + server_save
-    unix_time = os.path.getctime(pt)
-    dt = datetime.datetime.fromtimestamp(int(unix_time))
-    if second == 1:
-        final_time = dt.strftime("%H:%M:%S")
+    if os.path.isfile(pt) == True:
+        unix_time = os.path.getctime(pt)
+        dt = datetime.datetime.fromtimestamp(int(unix_time))
+        if second == 1:
+            final_time = dt.strftime("%H:%M:%S")
+        else:
+            final_time = dt.strftime("%H:%M")
     else:
-        final_time = dt.strftime("%H:%M")
+        if second == 1:
+            final_time = "99:99:99"
+        else:
+            final_time = "99:99"
     return final_time
 
 def convert_to_time(hour):
@@ -624,29 +700,40 @@ def monitoring():
         print_gui_log('サーバーは起動済みです。')
         start_code = 1
     while True:
-        # start_codeが3（メンテナンス中）であれば処理を行わない
-        if not start_code == 3:
+        # start_codeが3（メンテナンス中）または6（復旧待ち）であれば処理を行わない
+        if start_code not in (3, 6):
             # PIDを取得し、Noneなら起動する
             server_pid = get_pid(config.server_name)
             if server_pid is None:
-                app_process = app_start()
                 # 初回起動時とそれ以外で表示メッセージを変える
                 if start_code == 0:
+                    app_process = app_start()
                     print_gui_log('サーバーを起動します。')
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
                     set_company_pw()
                     start_code = 1
                 elif start_code == 1:
-                    print_gui_log('サーバーダウンを検出しました。再起動します。')
                     save_timestamp = get_savefile_timestamp(0)
-                    discord_post('サーバーがダウンしました。', '自動で復帰します。しばらくお待ちください。\nこれに伴い、' + save_timestamp + 'までデータが巻き戻ります。', 0xff0000)
+                    if save_timestamp == "99:99":
+                        print_gui_log('サーバーダウンを検出しました。復旧用のデータを配置し手動で復旧してください。')
+                        discord_post('サーバーがダウンしました。', '復旧用のデータがないため、今回は自動復旧できません。\nご迷惑をおかけしますが、復旧までしばらくお待ちください。', 0xff0000)
+                        start_code = 6
+                        app.after(0,app.set_manual_restart_mode)
+                        while start_code == 6:
+                            time.sleep(1)
+                        continue
+                    else:
+                        app_process = app_start()
+                        print_gui_log('サーバーダウンを検出しました。再起動します。')
+                        discord_post('サーバーがダウンしました。', '自動で復帰します。しばらくお待ちください。\nこれに伴い、' + save_timestamp + 'までデータが巻き戻ります。', 0xff0000)
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
                     set_company_pw()
                     print_gui_log('サーバーを再起動しました。')
                     discord_post('サーバーが復旧しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', 0x00ff00)
                 elif start_code == 2:
+                    app_process = app_start()
                     print_gui_log('サーバーを起動します。')
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
@@ -655,6 +742,7 @@ def monitoring():
                     discord_post('サーバーを再起動しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', 0x00ff00)
                     start_code = 1
                 elif start_code == 4:
+                    app_process = app_start()
                     print_gui_log('サーバーを再開します。')
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
@@ -662,7 +750,17 @@ def monitoring():
                     print_gui_log('サーバーを再開しました。')
                     discord_post('メンテナンスを終了しました。', '皆様のご協力ありがとうございました。', 0x00ff00)
                     start_code = 1
+                elif start_code == 7:
+                    app_process = app_start()
+                    print_gui_log('サーバーを再開します。')
+                    nettool_pw = get_nettool_pw(1)
+                    wait_simutrans_responce()
+                    set_company_pw()
+                    print_gui_log('サーバーを再開しました。')
+                    discord_post('サーバーを再開しました。', '大変お待たせしました。', 0x00ff00)
+                    start_code = 1
                 elif start_code == 5:
+                    app_process = app_start()
                     break
         time.sleep(1)
     return None
@@ -691,26 +789,13 @@ def autosave():
     return None
 
 if __name__ == "__main__":
-    check_os()
+    os_type = check_os()
     check_config()
     check_nettool()
     nettool_pw = get_nettool_pw(0)
 
-    thread_1 = threading.Thread(target=gui_main)
-    thread_1.start()
+    root = gui_main()
 
-    time.sleep(1)
+    root.after(100, start_threads)
 
-    thread_2 = threading.Thread(target=monitoring, daemon=True)
-    thread_2.start()
-
-    thread_3 = threading.Thread(target=autosave, daemon=True)
-    thread_3.start()
-
-    thread_4 = threading.Thread(target=auto_restart, daemon=True)
-    thread_4.start()
-
-    thread_5 = threading.Thread(target=run_discord_bot, daemon=True)
-    thread_5.start()
-
-    thread_1.join()
+    root.mainloop()

@@ -420,7 +420,8 @@ def get_nettool_pw(output):
             nettool_password_tmp = line
     f.close()
     # 行頭の「server_admin_pw = 」を削除し返す
-    nettool_password = re.sub('^server_admin_pw( *= *)', '', nettool_password_tmp)
+    nettool_password_tmp2 = re.sub('^server_admin_pw( *= *)', '', nettool_password_tmp)
+    nettool_password = nettool_password_tmp2.rstrip('\n')
     if output == 0:
         print_with_date('nettoolのパスワード取得に成功しました。')
     else:

@@ -436,9 +436,18 @@ def print_with_date(content):
 
 def get_pid(process_name):
     # pidを取得する
-    for proc in psutil.process_iter(['pid', 'name']):
-        if proc.info['name'] == process_name:
-            return proc.info['pid']
+    for proc in psutil.process_iter(['pid', 'name', 'status']):
+        try:
+            # 名前が一致し、かつ状態がゾンビ（zombie）でないことを確認
+            if proc.info['name'] == process_name:
+                if proc.info['status'] == psutil.STATUS_ZOMBIE:
+                    # ゾンビ状態なら親として「看取る（wait）」ことでプロセスを完全に消去する
+                    # これをしないとpidが残り続けてしまう
+                    proc.wait(timeout=0) 
+                    continue
+                return proc.info['pid']
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
     return None
 
 def set_company_pw():

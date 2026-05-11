@@ -434,21 +434,38 @@ def print_with_date(content):
     print(date_time.strftime('[%Y/%m/%d %H:%M:%S] ' + content))
     return None
 
-def get_pid(process_name):
-    # pidを取得する
+def get_pid(target_name):
+
+    # 指定したプロセスのPIDを取得し、ゾンビプロセスがあれば回収する。
+
+    target_pid = None
+
+    # システム上の全プロセスをスキャン（必要な情報だけ取得して高速化）
     for proc in psutil.process_iter(['pid', 'name', 'status']):
         try:
-            # 名前が一致し、かつ状態がゾンビ（zombie）でないことを確認
-            if proc.info['name'] == process_name:
+            # 1. 名前が一致するかチェック
+            if proc.info['name'] == target_name:
+                
+                # 2. ゾンビ状態（終了済みだがリストに残っている）の場合
                 if proc.info['status'] == psutil.STATUS_ZOMBIE:
-                    # ゾンビ状態なら親として「看取る（wait）」ことでプロセスを完全に消去する
-                    # これをしないとpidが残り続けてしまう
-                    proc.wait(timeout=0) 
-                    continue
-                return proc.info['pid']
+                    try:
+                        # ゾンビを回収（親プロセスとして終了ステータスを読み取る）
+                        # timeout=0 なので、一瞬で処理が終わります
+                        proc.wait(timeout=0)
+                        # print(f"DEBUG: Zombie process {proc.info['pid']} reaped.")
+                    except (psutil.TimeoutExpired, psutil.NoSuchProcess):
+                        # すでに消えていたり、回収に失敗しても無視して次へ
+                        pass
+                    continue # ゾンビはPIDとして返さない
+
+                # 3. 正常に動作しているプロセスを見つけた場合
+                target_pid = proc.info['pid']
+                
         except (psutil.NoSuchProcess, psutil.AccessDenied):
+            # 権限がないプロセスや、途中で消えたプロセスは無視
             continue
-    return None
+
+    return target_pid
 
 def set_company_pw():
     # パスワードを設定する

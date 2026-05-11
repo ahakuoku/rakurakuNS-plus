@@ -734,7 +734,7 @@ def monitoring():
             if server_pid is None:
                 # 初回起動時とそれ以外で表示メッセージを変える
                 if start_code == 0:
-                    app_process = app_start()
+                    app_start()
                     print_gui_log('サーバーを起動します。')
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
@@ -751,7 +751,7 @@ def monitoring():
                             time.sleep(1)
                         continue
                     else:
-                        app_process = app_start()
+                        app_start()
                         print_gui_log('サーバーダウンを検出しました。再起動します。')
                         discord_post('サーバーがダウンしました。', '自動で復帰します。しばらくお待ちください。\nこれに伴い、' + save_timestamp + 'までデータが巻き戻ります。', 0xff0000)
                     nettool_pw = get_nettool_pw(1)
@@ -760,7 +760,7 @@ def monitoring():
                     print_gui_log('サーバーを再起動しました。')
                     discord_post('サーバーが復旧しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', 0x00ff00)
                 elif start_code == 2:
-                    app_process = app_start()
+                    app_start()
                     print_gui_log('サーバーを起動します。')
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
@@ -769,7 +769,7 @@ def monitoring():
                     discord_post('サーバーを再起動しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', 0x00ff00)
                     start_code = 1
                 elif start_code == 4:
-                    app_process = app_start()
+                    app_start()
                     print_gui_log('サーバーを再開します。')
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
@@ -778,7 +778,7 @@ def monitoring():
                     discord_post('メンテナンスを終了しました。', '皆様のご協力ありがとうございました。', 0x00ff00)
                     start_code = 1
                 elif start_code == 7:
-                    app_process = app_start()
+                    app_start()
                     print_gui_log('サーバーを再開します。')
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
@@ -787,7 +787,7 @@ def monitoring():
                     discord_post('サーバーを再開しました。', '大変お待たせしました。', 0x00ff00)
                     start_code = 1
                 elif start_code == 5:
-                    app_process = app_start()
+                    app_start()
                     break
         time.sleep(1)
     return None

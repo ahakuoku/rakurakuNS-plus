@@ -57,6 +57,7 @@ scheduler_running = False
 server_ip = '127.0.0.1:'
 intents = discord.Intents.default()
 bot = discord.Client(intents=intents)
+autosave_mode = 0
 
 # 関数定義（GUI系）
 class window_main(tk.Frame):
@@ -469,7 +470,6 @@ def check_os():
 
 def check_config():
     # 設定チェック
-    autosave_mode = 1 
     try:
         autosave_mode = config.autosave_mode
     except NameError:
@@ -826,7 +826,7 @@ def autosave():
     # ====================================================
     # 従来タイマー方式
     # ====================================================
-    if config.autosave_mode == 1:
+    if autosave_mode == 1:
 
         autosave_interval = config.autosave_interval - 30
 

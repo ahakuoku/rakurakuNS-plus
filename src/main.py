@@ -37,6 +37,7 @@ except ModuleNotFoundError:
     keywait = input(f'必要なモジュールがインストールされていません。\nコマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n\nUbuntu環境の場合は、下記コマンドを実行してください。\npip3 install --break-system-packages psutil schedule discord\nsudo apt update\nsudo apt install python3-tk\n\n（らくらくNS+を終了します。Enterキーを押してください。）')
     sys.exit()
 from tkinter import ttk
+import array
 
 # 変数定義
 root = None
@@ -480,21 +481,28 @@ def check_config():
     print_with_date('設定に正常な値が入力されていることを確認しました。')
     return None
 
-def get_savefile_timestamp(second):
-    # secondが1なら秒単位、それ以外なら分単位で取得する
+def get_savefile_timestamp(type):
+    # typeが0なら文字列分単位、1なら文字列秒単位、2なら配列で取得する
     pt = server_folder_path + '/' + server_save
     if os.path.isfile(pt) == True:
         unix_time = os.path.getctime(pt)
         dt = datetime.datetime.fromtimestamp(int(unix_time))
-        if second == 1:
-            final_time = dt.strftime("%H:%M:%S")
-        else:
+        if type == 0:
             final_time = dt.strftime("%H:%M")
+        elif type == 1:
+            final_time = dt.strftime("%H:%M:%S")
+        elif type == 2:
+            for_hour = dt.hour
+            for_minute = dt.minute
+            for_second = dt.second
+            final_time = array.array('i', [for_hour, for_minute, for_second])
     else:
-        if second == 1:
-            final_time = "99:99:99"
-        else:
+        if type == 0:
             final_time = "99:99"
+        elif type == 1:
+            final_time = "99:99:99"
+        elif type == 2:
+            final_time = array.array('i', [99, 99, 99])
     return final_time
 
 def convert_to_time(hour):
@@ -800,26 +808,217 @@ def monitoring():
     return None
 
 def autosave():
-    # オートセーブ処理
-    autosave_interval = config.autosave_interval - 30
-    time.sleep(autosave_interval)
-    while True:
-        nettool_say('Autosave soon.')
-        print_gui_log('オートセーブ予告メッセージを送信しました。')
-        time.sleep(30)
-        start_time = time.time()
-        print_gui_log('オートセーブ中です。')
-        nettool_forcesync()
-        set_company_pw()
-        print_gui_log('オートセーブ処理が完了しました。')
-        end_time = time.time()
-        time_diff = end_time - start_time
+
+    pt = server_folder_path + '/' + server_save
+
+    # ====================================================
+    # 従来タイマー方式
+    # ====================================================
+    if config.autosave_mode == 1:
+
         autosave_interval = config.autosave_interval - 30
-        next_autosave_in = autosave_interval - time_diff
-        if next_autosave_in > 0:
-            time.sleep(next_autosave_in)
+
+        # backup用タイマー
+        last_backup_time = time.time()
+
+        if autosave_interval > 0:
+            time.sleep(autosave_interval)
+
+        while True:
+
+            # ----------------------------------------
+            # autosave予告
+            # ----------------------------------------
+            nettool_say('Autosave soon.')
+            print_gui_log('オートセーブ予告メッセージを送信しました。')
+
+            time.sleep(30)
+
+            # ----------------------------------------
+            # autosave
+            # ----------------------------------------
+            print_gui_log('オートセーブ中です。')
+
+            start_time = time.time()
+
+            nettool_forcesync()
+            set_company_pw()
+
+            end_time = time.time()
+
+            print_gui_log('オートセーブ処理が完了しました。')
+
+            last_backup_time = time.time()
+
+            # ----------------------------------------
+            # 次回autosave待機
+            # ----------------------------------------
+            process_time = end_time - start_time
+
+            next_autosave = (
+                config.autosave_interval
+                - 30
+                - process_time
+            )
+
+            # autosave待機中に
+            # backupだけ実行する可能性あり
+            while next_autosave > 0:
+
+                now_time = time.time()
+
+                # backup単独判定
+                if (
+                    now_time - last_backup_time
+                    >= config.autosave_interval
+                ):
+
+                    print_gui_log('定期バックアップを実行します。')
+
+                    save_backup()
+
+                    print_gui_log('定期バックアップ処理が完了しました。')
+
+                    last_backup_time = time.time()
+
+                sleep_time = min(1, next_autosave)
+
+                time.sleep(sleep_time)
+
+                next_autosave -= sleep_time
+
+        return None
+
+    # ====================================================
+    # savefile timestamp方式
+    # ====================================================
+    now_time = time.time()
+
+    # 最後のsave activity時刻
+    last_save_activity_time = now_time
+
+    # 最後のbackup時刻
+    last_backup_time = now_time
+
+    # autosave予告済みフラグ
+    autosave_warned = False
+
+    while True:
+
+        now_time = time.time()
+
+        # ------------------------------------------------
+        # セーブファイル存在確認
+        # ------------------------------------------------
+        if os.path.isfile(pt):
+
+            current_save_time = os.path.getctime(pt)
+
+            # save更新検知
+            if current_save_time > last_save_activity_time:
+
+                last_save_activity_time = current_save_time
+
+                # save更新があったので予告リセット
+                autosave_warned = False
+
         else:
+
+            # ファイルがない場合は従来タイマー方式
+            current_save_time = now_time
+
+        # ------------------------------------------------
+        # autosave予告判定
+        # ------------------------------------------------
+        autosave_warn_time = (
+            last_save_activity_time
+            + config.autosave_interval
+            - 30
+        )
+
+        if (
+            autosave_warned == False
+            and now_time >= autosave_warn_time
+        ):
+
+            nettool_say('Autosave soon.')
+            print_gui_log('オートセーブ予告メッセージを送信しました。')
+
+            autosave_warned = True
+
+        # ------------------------------------------------
+        # autosave判定
+        # ------------------------------------------------
+        autosave_execute_time = (
+            last_save_activity_time
+            + config.autosave_interval
+        )
+
+        if now_time >= autosave_execute_time:
+
+            # 予告後に手動saveされた可能性を再確認
+            if os.path.isfile(pt):
+
+                latest_save_time = os.path.getctime(pt)
+
+                if latest_save_time > last_save_activity_time:
+
+                    last_save_activity_time = latest_save_time
+                    autosave_warned = False
+
+                    time.sleep(1)
+                    continue
+
+            # ----------------------------------------
+            # autosave
+            # ----------------------------------------
+            print_gui_log('オートセーブ中です。')
+
+            nettool_forcesync()
+            set_company_pw()
+
+            print_gui_log('オートセーブ処理が完了しました。')
+
+            # autosave後のsave時刻取得
+            if os.path.isfile(pt):
+
+                last_save_activity_time = os.path.getctime(pt)
+
+            else:
+
+                last_save_activity_time = time.time()
+
+            # backupタイマー更新
+            last_backup_time = time.time()
+
+            # 次回予告用
+            autosave_warned = False
+
             time.sleep(1)
+            continue
+
+        # ------------------------------------------------
+        # backup単独判定
+        # ------------------------------------------------
+        backup_execute_time = (
+            last_backup_time
+            + config.autosave_interval
+        )
+
+        if now_time >= backup_execute_time:
+
+            print_gui_log('定期バックアップを実行します。')
+
+            save_backup()
+
+            print_gui_log('定期バックアップ処理が完了しました。')
+
+            # backupタイマー更新
+            last_backup_time = time.time()
+
+        # CPU負荷軽減
+        time.sleep(1)
+
     return None
 
 if __name__ == "__main__":

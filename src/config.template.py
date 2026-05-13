@@ -11,6 +11,9 @@
 # server_folder_path: サーバーフォルダのパスを指定します。「'」で囲み、囲みの前に「r」が存在する必要があります。
 # server_name       : サーバーのファイル名を指定します。「'」で囲む必要があります。
 # port_number       : ポート番号を指定します。「'」で囲む必要があります。
+# autosave_mode     : オートセーブのモードを指定します。
+#                     0の場合は、autosave_intervalで指定した間隔でオートセーブが行われます。
+#                     1の場合は、最後のロードからautosave_intervalで指定した秒数が経過した時にオートセーブが行われます。
 # autosave_backup   : オートセーブのバックアップ数を指定します。
 # autosave_interval : オートセーブの間隔を秒で指定します。間隔は多少ずれるかもしれません。
 # player_n_pw       : 各会社のパスワードを設定します。0がプレイヤー会社、1が公共事業です。空欄にするとパスワードを設定しません。
@@ -23,6 +26,7 @@
 server_folder_path = r'C:/Users/XXX/Simutrans'
 server_name        = 'sim-WinGDI64-OTRP.exe'
 port_number        = '13353'
+autosave_mode      = 1
 autosave_backup    = 80
 autosave_interval  = 1200
 player_0_pw        = ''

@@ -469,6 +469,17 @@ def check_os():
 
 def check_config():
     # 設定チェック
+    autosave_mode = 1 
+    try:
+        autosave_mode = config.autosave_mode
+    except NameError:
+        pass
+    except TypeError:
+        keywait = input(f'設定「autosave_mode」に不正な値が入力されています。0か1いずれかの値を入力してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+        sys.exit()
+    if config.autosave_mode != 0 and config.autosave_mode != 1:
+        keywait = input(f'設定「autosave_mode」に不正な値が入力されています。0か1いずれかの値を入力してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+        sys.exit()
     try:
         hour = int(config.restart_time)
         if hour == -1 or 0 <= hour <= 24:
@@ -478,6 +489,7 @@ def check_config():
             sys.exit()
     except ValueError:
         keywait = input(f'設定「restart_time」に不正な値が入力されています。-1、0～24のいずれかの整数を入力してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+        sys.exit()
     print_with_date('設定に正常な値が入力されていることを確認しました。')
     return None
 

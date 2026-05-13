@@ -734,6 +734,7 @@ def monitoring():
             if server_pid is None:
                 # 初回起動時とそれ以外で表示メッセージを変える
                 if start_code == 0:
+                    # 初回起動時
                     app_start()
                     print_gui_log('サーバーを起動します。')
                     nettool_pw = get_nettool_pw(1)
@@ -741,8 +742,10 @@ def monitoring():
                     set_company_pw()
                     start_code = 1
                 elif start_code == 1:
+                    # サーバーダウン時
                     save_timestamp = get_savefile_timestamp(0)
                     if save_timestamp == "99:99":
+                        # サーバーダウン（手動復旧必要時）
                         print_gui_log('サーバーダウンを検出しました。復旧用のデータを配置し手動で復旧してください。')
                         discord_post('サーバーがダウンしました。', '復旧用のデータがないため、今回は自動復旧できません。\nご迷惑をおかけしますが、復旧までしばらくお待ちください。', 0xff0000)
                         start_code = 6
@@ -751,6 +754,7 @@ def monitoring():
                             time.sleep(1)
                         continue
                     else:
+                        # サーバーダウン（自動復旧時）
                         app_start()
                         print_gui_log('サーバーダウンを検出しました。再起動します。')
                         discord_post('サーバーがダウンしました。', '自動で復帰します。しばらくお待ちください。\nこれに伴い、' + save_timestamp + 'までデータが巻き戻ります。', 0xff0000)
@@ -760,6 +764,7 @@ def monitoring():
                     print_gui_log('サーバーを再起動しました。')
                     discord_post('サーバーが復旧しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', 0x00ff00)
                 elif start_code == 2:
+                    # 再起動した場合
                     app_start()
                     print_gui_log('サーバーを起動します。')
                     nettool_pw = get_nettool_pw(1)
@@ -769,6 +774,7 @@ def monitoring():
                     discord_post('サーバーを再起動しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', 0x00ff00)
                     start_code = 1
                 elif start_code == 4:
+                    # メンテナンス終了時
                     app_start()
                     print_gui_log('サーバーを再開します。')
                     nettool_pw = get_nettool_pw(1)
@@ -778,6 +784,7 @@ def monitoring():
                     discord_post('メンテナンスを終了しました。', '皆様のご協力ありがとうございました。', 0x00ff00)
                     start_code = 1
                 elif start_code == 7:
+                    # サーバー手動再開時
                     app_start()
                     print_gui_log('サーバーを再開します。')
                     nettool_pw = get_nettool_pw(1)

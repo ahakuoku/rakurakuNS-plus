@@ -58,6 +58,7 @@ server_ip = '127.0.0.1:'
 intents = discord.Intents.default()
 bot = discord.Client(intents=intents)
 autosave_mode = 0
+long_backup_folder_path = server_folder_path + '/autosave/long-backup'
 
 # 関数定義（GUI系）
 class window_main(tk.Frame):
@@ -444,6 +445,7 @@ def start_threads():
     threading.Thread(target=autosave, daemon=True).start()
     threading.Thread(target=auto_restart, daemon=True).start()
     threading.Thread(target=run_discord_bot, daemon=True).start()
+    threading.Thread(target=auto_long_backup, daemon=True).start()
 
 def check_nettool():
     # nettoolの存在確認
@@ -657,6 +659,39 @@ def nettool_forcesync():
     wait_simutrans_responce()
     save_backup()
 
+def delete_old_long_backup_files():
+    # 指定日数を超えたファイルを削除する
+
+    print_gui_log('古い長期バックアップのデータを削除します。')
+    # 現在時刻
+    now = time.time()
+
+    # 日数 → 秒に変換
+    limit_seconds = config.long_backup_keep * 24 * 60 * 60
+
+    # フォルダ内を走査
+    for filename in os.listdir(long_backup_folder_path):
+        file_path = os.path.join(long_backup_folder_path, filename)
+
+        # ファイルのみ対象
+        if os.path.isfile(file_path):
+
+            # 最終更新時刻を取得
+            modified_time = os.path.getmtime(file_path)
+
+            # 経過時間
+            elapsed = now - modified_time
+
+            # 指定日数を超えていたら削除
+            if elapsed > limit_seconds:
+                try:
+                    os.remove(file_path)
+
+                except Exception as e:
+                    pass
+    
+    print_gui_log('古い長期バックアップのデータを削除しました。')
+
 def save_backup():
     # バックアップ
     print_gui_log('セーブデータのバックアップを行います。')
@@ -686,6 +721,34 @@ def save_backup():
     # ファイルをコピー
     shutil.copy(server_folder_path + '/' +  server_save, server_folder_path + '/autosave/autosave_1.sve')
     print_gui_log('バックアップ処理が終了しました。')
+    return None
+
+def long_backup():
+    # 長期バックアップする
+    print_gui_log('長期バックアップを作成します。')
+
+    # 長期バックアップ用のフォルダがないなら作る
+    if not os.path.isdir(long_backup_folder_path):
+        print_gui_log('autosave/long-backupフォルダが存在しません。作成します。')
+        os.mkdir(long_backup_folder_path)
+
+    # 長期バックアップ
+    dt = datetime.datetime.now()
+    nowdate = dt.strftime('%Y%m%d%H%%M')
+    shutil.copy(server_folder_path + '/' + server_save, server_folder_path + '/autosave/long-backup/backup-' + nowdate + '.sve')
+    print_gui_log('長期バックアップを作成しました。')
+
+    # 古いデータを削除
+    delete_old_long_backup_files()
+    return None
+
+def auto_long_backup():
+    # 指定の時間に長期バックアップする
+    if config.long_backup_time != -1:
+        schedule.every().days.at(config.long_backup_time + ':00:00').do(long_backup)
+        while True:
+            schedule.run_pending()
+            time.sleep(1)
     return None
 
 def server_stop(set_code):

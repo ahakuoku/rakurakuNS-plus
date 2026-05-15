@@ -492,27 +492,75 @@ def check_os():
 
 def check_config():
     # 設定チェック
+
+    # グローバル変数を宣言
+    global autosave_mode
+    global restart_time
+    global long_backup_keep
+    global long_backup_time
+
+    # autosave_mode
     try:
-        autosave_mode = config.autosave_mode
-    except NameError:
-        pass
-    except TypeError:
-        keywait = input(f'設定「autosave_mode」に不正な値が入力されています。0か1いずれかの値を入力してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+        autosave_mode = int(config.autosave_mode)
+
+        if autosave_mode not in (0, 1):
+            raise ValueError
+
+    except (NameError, ValueError, TypeError):
+        input(
+            '設定「autosave_mode」に不正な値が入力されています。'
+            '0か1いずれかの値を入力してください。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
         sys.exit()
-    if config.autosave_mode != 0 and config.autosave_mode != 1:
-        keywait = input(f'設定「autosave_mode」に不正な値が入力されています。0か1いずれかの値を入力してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
-        sys.exit()
+
+    # restart_time
     try:
-        hour = int(config.restart_time)
-        if hour == -1 or 0 <= hour <= 24:
-            pass
-        else:
-            keywait = input(f'設定「restart_time」に不正な値が入力されています。-1、0～24のいずれかの整数を入力してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
-            sys.exit()
-    except ValueError:
-        keywait = input(f'設定「restart_time」に不正な値が入力されています。-1、0～24のいずれかの整数を入力してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+        restart_time = int(config.restart_time)
+
+        if restart_time != -1 and not (0 <= restart_time <= 24):
+            raise ValueError
+
+    except (NameError, ValueError, TypeError):
+        input(
+            '設定「restart_time」に不正な値が入力されています。'
+            '-1、0～24のいずれかの整数を入力してください。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
         sys.exit()
+
+    # long_backup_keep
+    try:
+        long_backup_keep = int(config.long_backup_keep)
+
+        if long_backup_keep < -1:
+            raise ValueError
+
+    except (NameError, ValueError, TypeError):
+        input(
+            '設定「long_backup_keep」に不正な値が入力されています。'
+            '-1以上の整数を入力してください。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
+        sys.exit()
+
+    # long_backup_time
+    try:
+        long_backup_time = int(config.long_backup_time)
+
+        if not (0 <= long_backup_time <= 24):
+            raise ValueError
+
+    except (NameError, ValueError, TypeError):
+        input(
+            '設定「long_backup_time」に不正な値が入力されています。'
+            '0～24のいずれかの整数を入力してください。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
+        sys.exit()
+
     print_with_date('設定に正常な値が入力されていることを確認しました。')
+
     return None
 
 def get_savefile_timestamp(type):
@@ -683,6 +731,12 @@ def delete_old_long_backup_files():
     # 指定日数を超えたファイルを削除する
 
     print_gui_log('古い長期バックアップのデータを削除します。')
+
+    # -1なら無期限保管
+    if long_backup_keep == -1:
+        print_gui_log('長期バックアップは無期限保管設定のため削除をスキップします。')
+        return
+
     # 現在時刻
     now = time.time()
 
@@ -705,11 +759,13 @@ def delete_old_long_backup_files():
             # 指定日数を超えていたら削除
             if elapsed > limit_seconds:
                 try:
+                    # print_gui_log(f'削除: {file_path}')
                     os.remove(file_path)
 
                 except Exception as e:
+                    # print_gui_log(f'削除失敗: {e}')
                     pass
-    
+
     print_gui_log('古い長期バックアップのデータを削除しました。')
 
 def save_backup():
@@ -743,30 +799,48 @@ def save_backup():
     print_gui_log('バックアップ処理が終了しました。')
     return None
 
-def long_backup():
-    # 長期バックアップする
+def long_backup(force_backup):
+    # 0なら長期バックアップ無効
+    if long_backup_keep == 0 and force_backup == 0:
+        print_gui_log('長期バックアップは無効化されています。')
+        return
     print_gui_log('長期バックアップを作成します。')
 
-    # 長期バックアップ用のフォルダがないなら作る
-    if not os.path.isdir(long_backup_folder_path):
-        print_gui_log('autosave/long-backupフォルダが存在しません。作成します。')
-        os.mkdir(long_backup_folder_path)
+    try:
+        # フォルダ作成
+        os.makedirs(long_backup_folder_path, exist_ok=True)
 
-    # 長期バックアップ
-    dt = datetime.datetime.now()
-    nowdate = dt.strftime('%Y%m%d%H%%M')
-    shutil.copy(server_folder_path + '/' + server_save, server_folder_path + '/autosave/long-backup/backup-' + nowdate + '.sve')
-    print_gui_log('長期バックアップを作成しました。')
+        dt = datetime.datetime.now()
+        nowdate = dt.strftime('%Y%m%d%H%M')
 
-    # 古いデータを削除
-    delete_old_long_backup_files()
-    return None
+        src = os.path.join(server_folder_path, server_save)
+        dst = os.path.join(
+            long_backup_folder_path,
+            f'backup-{nowdate}.sve'
+        )
+
+        # デバッグ用
+        # print_gui_log(f'コピー元: {src}')
+        # print_gui_log(f'コピー先: {dst}')
+
+        shutil.copy(src, dst)
+
+        # 本当に存在するか確認
+        if os.path.exists(dst):
+            print_gui_log('長期バックアップを作成しました。')
+        else:
+            print_gui_log('バックアップファイルが存在しません。')
+
+        delete_old_long_backup_files()
+
+    except Exception as e:
+        print_gui_log(f'長期バックアップの作成に失敗しました。: {e}')
 
 def auto_long_backup():
     # 指定の時間に長期バックアップする
     # long_backup_keepが0の場合はバックアップしない
     if long_backup_keep != 0:
-        schedule.every().days.at(long_backup_time + ':00:00').do(long_backup)
+        schedule.every().days.at(f'{long_backup_time:02}:00:00').do(long_backup, 0)
         while True:
             schedule.run_pending()
             time.sleep(1)
@@ -793,7 +867,7 @@ def server_stop(set_code, long_backup_code):
     time.sleep(30)
     nettool_forcesync()
     if long_backup_code == 1:
-        long_backup()
+        long_backup(1)
     if set_code == 2:
         nettool_say('Server is restarting.')
         print_gui_log('再起動中告知メッセージを送信しました。')

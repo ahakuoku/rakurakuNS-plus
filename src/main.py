@@ -746,7 +746,8 @@ def long_backup():
 
 def auto_long_backup():
     # 指定の時間に長期バックアップする
-    if long_backup_time != -1:
+    # long_backup_keepが0の場合はバックアップしない
+    if long_backup_keep != 0:
         schedule.every().days.at(long_backup_time + ':00:00').do(long_backup)
         while True:
             schedule.run_pending()

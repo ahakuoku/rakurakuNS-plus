@@ -59,6 +59,8 @@ intents = discord.Intents.default()
 bot = discord.Client(intents=intents)
 autosave_mode = 0
 long_backup_folder_path = server_folder_path + '/autosave/long-backup'
+long_backup_time = 5
+long_backup_keep = 0
 
 # 関数定義（GUI系）
 class window_main(tk.Frame):
@@ -667,7 +669,7 @@ def delete_old_long_backup_files():
     now = time.time()
 
     # 日数 → 秒に変換
-    limit_seconds = config.long_backup_keep * 24 * 60 * 60
+    limit_seconds = long_backup_keep * 24 * 60 * 60
 
     # フォルダ内を走査
     for filename in os.listdir(long_backup_folder_path):
@@ -744,8 +746,8 @@ def long_backup():
 
 def auto_long_backup():
     # 指定の時間に長期バックアップする
-    if config.long_backup_time != -1:
-        schedule.every().days.at(config.long_backup_time + ':00:00').do(long_backup)
+    if long_backup_time != -1:
+        schedule.every().days.at(long_backup_time + ':00:00').do(long_backup)
         while True:
             schedule.run_pending()
             time.sleep(1)

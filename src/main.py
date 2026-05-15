@@ -202,7 +202,11 @@ class maintenance_check(tk.Frame):
         self.main_window = main_window  # メインウィンドウの参照
         self.master.title("らくらくNS+")
         self.master.resizable(False, False)
-        self.master.geometry("350x120")
+        mode = self.main_window.maintenance_mode
+        if mode == 0:
+            self.master.geometry("350x160")
+        else:
+            self.master.geometry("350x120")
         self.master.protocol('WM_DELETE_WINDOW', self.close_window)
 
         self.create_widgets()
@@ -241,6 +245,17 @@ class maintenance_check(tk.Frame):
         )
         self.cancel_button.pack(side="right", padx=5, expand=True)
 
+        # 長期バックアップ用スイッチ（メンテ開始時以外は出さない）
+        self.long_backup_var = tk.IntVar(value=0)
+        if mode == 0:
+            self.switch = ttk.Checkbutton(
+                self.master,
+                text="メンテナンス開始時点のデータを\n長期バックアップする",
+                style="Switch.TCheckbutton",
+                variable=self.long_backup_var
+            )
+            self.switch.pack(padx=10, pady=(0, 10), anchor="w")
+
     def close_window(self):
         # ダイアログを閉じる
         self.master.destroy()
@@ -250,11 +265,14 @@ class maintenance_check(tk.Frame):
         global start_code
         mode = self.main_window.maintenance_mode
 
+        # スイッチ状態取得（ON=1 / OFF=0）
+        long_backup_code = self.long_backup_var.get()
+
         # 通常 → メンテナンス
         if mode == 0:
             maintenance_thread = threading.Thread(
                 target=self.server_stop_thread,
-                args=(3,)
+                args=(3, long_backup_code)
             )
             maintenance_thread.start()
 
@@ -268,9 +286,9 @@ class maintenance_check(tk.Frame):
         self.main_window.toggle_maintenance_mode()  # メインウィンドウのボタンを更新
         self.master.destroy()  # ダイアログを閉じる
 
-    def server_stop_thread(self, set_code):
+    def server_stop_thread(self, set_code, long_backup_code):
         # サーバー終了処理をバックグラウンドで実行
-        server_stop(set_code)
+        server_stop(set_code, long_backup_code)
 
 class exit_check(tk.Frame):
     # 確認ダイアログウィンドウ
@@ -345,7 +363,7 @@ class server_close_check(tk.Frame):
 
     def server_stop_thread(self, set_code):
         # サーバー終了処理をバックグラウンドで実行
-        server_stop(set_code)
+        server_stop(set_code, 0)
         self.master.after(0, self.close_main_window)
 
     def close_main_window(self):
@@ -754,7 +772,7 @@ def auto_long_backup():
             time.sleep(1)
     return None
 
-def server_stop(set_code):
+def server_stop(set_code, long_backup_code):
     # サーバーを止める機能
     global nettool_pw
     global start_code
@@ -774,6 +792,8 @@ def server_stop(set_code):
         discord_post('まもなくサーバーを終了します。', 'これからのログインはおやめください。', 0xffbf00)
     time.sleep(30)
     nettool_forcesync()
+    if long_backup_code == 1:
+        long_backup()
     if set_code == 2:
         nettool_say('Server is restarting.')
         print_gui_log('再起動中告知メッセージを送信しました。')
@@ -798,7 +818,7 @@ def auto_restart():
             restart_time = 23
         else:
             restart_time = config.restart_time - 1
-        schedule.every().days.at(restart_time + ":59:30").do(server_stop(2))
+        schedule.every().days.at(restart_time + ":59:30").do(server_stop(2, 0))
         while True:
             schedule.run_pending()
             time.sleep(1)

@@ -1,1 +1,1 @@
-pyinstaller --onefile --name=RakurakuNS-Plus --icon=icon_small.ico --exclude-module=config main.py
+pyinstaller --onefile --add-binary "nettool.exe;." main.py --name=RakurakuNS-Plus --icon=icon_small.ico --exclude-module=config main.py

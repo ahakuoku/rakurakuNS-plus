@@ -505,14 +505,55 @@ def start_threads():
 def check_nettool():
     # nettoolの存在確認
     try:
-        subprocess.run(['nettool'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        os_system = platform.system()
+
+        # Windows
+        if os_system == 'Windows':
+
+            # PyInstaller実行時
+            if getattr(sys, 'frozen', False):
+                base_dir = sys._MEIPASS
+
+            # 通常Python実行時
+            else:
+                base_dir = os.path.dirname(os.path.abspath(__file__))
+
+            nettool_path = os.path.join(base_dir, 'nettool.exe')
+
+            subprocess.run(
+                [nettool_path],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+
+        # Linux / macOS
+        else:
+            subprocess.run(
+                ['nettool'],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+
     except FileNotFoundError:
-        keywait = input(f'nettoolの認識に失敗しました。\nWindowsの場合は、nettool.exeをらくらくNS+の実行ファイルと同じフォルダに置いてからやり直してください。\nその他のOSの場合は、nettoolにPATHを通してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+        keywait = input(
+            'nettoolの認識に失敗しました。\n'
+            'Windowsの場合は、nettool.exeをらくらくNS+の実行ファイルと同じフォルダに置いてからやり直してください。\n'
+            'その他のOSの場合は、nettoolにPATHを通してください。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
         sys.exit()
+
     except subprocess.CalledProcessError:
-        keywait = input(f'nettoolの認識に失敗しました。\nWindowsの場合は、nettool.exeをらくらくNS+の実行ファイルと同じフォルダに置いてからやり直してください。\nその他のOSの場合は、nettoolにPATHを通してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+        keywait = input(
+            'nettoolの認識に失敗しました。\n'
+            'Windowsの場合は、nettool.exeをらくらくNS+の実行ファイルと同じフォルダに置いてからやり直してください。\n'
+            'その他のOSの場合は、nettoolにPATHを通してください。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
         sys.exit()
+
     print_with_date('nettoolの認識に成功しました。')
+
     return None
 
 def check_os():

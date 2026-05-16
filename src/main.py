@@ -596,17 +596,6 @@ def convert_to_time(hour):
         return time(hour, 0, 0)
     return time(0, 0, 0)
 
-def schedule_event(hour, minute, second, action):
-    # 関数を予約する
-    now = datetime.datetime.now()
-    run_time = now.replace(hour=hour, minute=minute, second=second, microsecond=0)
-    if run_time <= now:
-        run_time += datetime.timedelta(days=1)
-    delay = (run_time - now).total_seconds()
-    scheduler.enter(delay, 1, action)
-    if not scheduler.empty():
-        scheduler.run()
-
 def get_nettool_pw(output):
     # simuconf.tabを開き、「server_admin_pw」から始まる行を検索
     simuconf_path = server_folder_path + '/config/simuconf.tab'

@@ -96,10 +96,7 @@ scheduler_running = False
 server_ip = '127.0.0.1:'
 intents = discord.Intents.default()
 bot = discord.Client(intents=intents)
-autosave_mode = 0
 long_backup_folder_path = server_folder_path + '/autosave/long-backup'
-long_backup_time = 5
-long_backup_keep = 0
 
 # 関数定義（GUI系）
 class window_main(tk.Frame):
@@ -1080,13 +1077,14 @@ def monitoring():
     return None
 
 def autosave():
+    global autosave_mode
 
     pt = server_folder_path + '/' + server_save
 
     # ====================================================
     # 従来タイマー方式
     # ====================================================
-    if autosave_mode == 1:
+    if autosave_mode == 0:
 
         autosave_interval = config.autosave_interval - 30
 

@@ -416,6 +416,9 @@ def gui_main():
     root.tk.call("source", "azure.tcl")
     root.tk.call("set_theme", "light")
 
+    iconfile = tk.PhotoImage(file='icon_small.png')
+    root.iconphoto(True, iconfile)
+
     root.grid_rowconfigure(0, weight=1)
     root.grid_columnconfigure(0, weight=1)
 

@@ -2,27 +2,53 @@
 
 import subprocess
 import sys
+import importlib.util
+
 try:
-    import config
-except ModuleNotFoundError:
-    keywait = input(f'config.template.pyをコピーし、config.pyにリネームして設定を行ってください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+    # exe時 / 通常実行時 の基準フォルダ取得
+    if getattr(sys, 'frozen', False):
+        base_dir = os.path.dirname(sys.executable)
+    else:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+
+    config_path = os.path.join(base_dir, 'config.py')
+
+    # config.py 存在確認
+    if os.path.exists(config_path) is False:
+        raise FileNotFoundError
+
+    # config.py 読み込み
+    spec = importlib.util.spec_from_file_location("config", config_path)
+    config = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(config)
+
+except Exception:
+    keywait = input(
+        'config.template.pyをコピーし、config.pyにリネームして設定を行ってください。\n'
+        '（らくらくNS+を終了します。Enterキーを押してください。）'
+    )
     sys.exit()
+
 try:
     import psutil
 except ModuleNotFoundError:
     keywait = input(f'必要なモジュールがインストールされていません。\nコマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n\nUbuntu環境の場合は、下記コマンドを実行してください。\npip3 install --break-system-packages psutil schedule discord\nsudo apt update\nsudo apt install python3-tk\n\n（らくらくNS+を終了します。Enterキーを押してください。）')
     sys.exit()
+
 try:
     import schedule
 except ModuleNotFoundError:
     keywait = input(f'必要なモジュールがインストールされていません。\nコマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n\nUbuntu環境の場合は、下記コマンドを実行してください。\npip3 install --break-system-packages psutil schedule discord\nsudo apt update\nsudo apt install python3-tk\n\n（らくらくNS+を終了します。Enterキーを押してください。）')
     sys.exit()
+
 import time
+
 try:
     import discord
 except ModuleNotFoundError:
     keywait = input(f'必要なモジュールがインストールされていません。\nコマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n\nUbuntu環境の場合は、下記コマンドを実行してください。\npip3 install --break-system-packages psutil schedule discord\nsudo apt update\nsudo apt install python3-tk\n\n（らくらくNS+を終了します。Enterキーを押してください。）')
     sys.exit()
+
 import re
 import datetime
 import platform
@@ -31,11 +57,13 @@ import shutil
 import threading
 import sched
 import asyncio
+
 try:
     import tkinter as tk
 except ModuleNotFoundError:
     keywait = input(f'必要なモジュールがインストールされていません。\nコマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n\nUbuntu環境の場合は、下記コマンドを実行してください。\npip3 install --break-system-packages psutil schedule discord\nsudo apt update\nsudo apt install python3-tk\n\n（らくらくNS+を終了します。Enterキーを押してください。）')
     sys.exit()
+
 from tkinter import ttk
 import array
 

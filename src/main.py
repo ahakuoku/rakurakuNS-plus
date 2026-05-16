@@ -2,42 +2,81 @@
 
 import subprocess
 import sys
+import importlib.util
+import os
+
 try:
-    import config
-except ModuleNotFoundError:
-    keywait = input(f'config.template.pyをコピーし、config.pyにリネームして設定を行ってください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+
+    # exe起動時
+    if getattr(sys, 'frozen', False):
+        base_dir = os.path.dirname(sys.executable)
+
+    # 通常Python実行時
+    else:
+        base_dir = os.path.dirname(os.path.realpath(__file__))
+
+    config_path = os.path.join(base_dir, 'config.py')
+
+    # config.py 存在確認
+    if os.path.exists(config_path) is False:
+        raise FileNotFoundError
+
+    # 動的import
+    spec = importlib.util.spec_from_file_location("config", config_path)
+
+    if spec is None or spec.loader is None:
+        raise ImportError
+
+    config = importlib.util.module_from_spec(spec)
+
+    spec.loader.exec_module(config)
+
+except Exception:
+
+    keywait = input(
+        'config.template.pyをコピーし、config.pyにリネームして設定を行ってください。\n'
+        '（らくらくNS+を終了します。Enterキーを押してください。）'
+    )
+
     sys.exit()
+
 try:
     import psutil
 except ModuleNotFoundError:
     keywait = input(f'必要なモジュールがインストールされていません。\nコマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n\nUbuntu環境の場合は、下記コマンドを実行してください。\npip3 install --break-system-packages psutil schedule discord\nsudo apt update\nsudo apt install python3-tk\n\n（らくらくNS+を終了します。Enterキーを押してください。）')
     sys.exit()
+
 try:
     import schedule
 except ModuleNotFoundError:
     keywait = input(f'必要なモジュールがインストールされていません。\nコマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n\nUbuntu環境の場合は、下記コマンドを実行してください。\npip3 install --break-system-packages psutil schedule discord\nsudo apt update\nsudo apt install python3-tk\n\n（らくらくNS+を終了します。Enterキーを押してください。）')
     sys.exit()
+
 import time
+
 try:
     import discord
 except ModuleNotFoundError:
     keywait = input(f'必要なモジュールがインストールされていません。\nコマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n\nUbuntu環境の場合は、下記コマンドを実行してください。\npip3 install --break-system-packages psutil schedule discord\nsudo apt update\nsudo apt install python3-tk\n\n（らくらくNS+を終了します。Enterキーを押してください。）')
     sys.exit()
+
 import re
 import datetime
 import platform
-import os
 import shutil
 import threading
 import sched
 import asyncio
+
 try:
     import tkinter as tk
 except ModuleNotFoundError:
     keywait = input(f'必要なモジュールがインストールされていません。\nコマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n\nUbuntu環境の場合は、下記コマンドを実行してください。\npip3 install --break-system-packages psutil schedule discord\nsudo apt update\nsudo apt install python3-tk\n\n（らくらくNS+を終了します。Enterキーを押してください。）')
     sys.exit()
+
 from tkinter import ttk
 import array
+import tempfile
 
 # 変数定義
 root = None
@@ -203,8 +242,11 @@ class maintenance_check(tk.Frame):
         self.master.title("らくらくNS+")
         self.master.resizable(False, False)
         mode = self.main_window.maintenance_mode
-        if mode == 0:
+        os_system = platform.system()
+        if mode == 0 and os_system == 'Windows':
             self.master.geometry("350x160")
+        elif mode == 0 and os_system in ('Linux', 'Darwin'):
+            self.master.geometry("350x175")
         else:
             self.master.geometry("350x120")
         self.master.protocol('WM_DELETE_WINDOW', self.close_window)
@@ -410,7 +452,31 @@ def gui_main():
     global app
 
     root = tk.Tk()
-    root.tk.call("source", "azure.tcl")
+
+    os_system = platform.system()
+
+    # Windows
+    if os_system == 'Windows':
+
+        # タスクバー・Explorer用
+        try:
+            root.iconbitmap(resource_path("icon.ico"))
+        except Exception:
+            pass
+
+    # 共通アイコン設定（Win/Mac/Linux）
+    try:
+        icon_image = tk.PhotoImage(file=resource_path("icon.png"))
+        root.iconphoto(True, icon_image)
+
+        # ガベージコレクション対策
+        root.icon_image = icon_image
+
+    except Exception:
+        pass
+
+    # テーマ読み込み
+    root.tk.call("source", resource_path("azure.tcl"))
     root.tk.call("set_theme", "light")
 
     root.grid_rowconfigure(0, weight=1)
@@ -428,7 +494,7 @@ def print_gui_log(content):
     return None
 
 def restart_server_threaded(set_code):
-    thread = threading.Thread(target=server_stop, args=(set_code,))
+    thread = threading.Thread(target=server_stop, args=(set_code, 0))
     thread.start()
 
 # 関数定義（Discord関連）
@@ -467,17 +533,37 @@ def start_threads():
     threading.Thread(target=run_discord_bot, daemon=True).start()
     threading.Thread(target=auto_long_backup, daemon=True).start()
 
+def resource_path(filename):
+    # pyinstaller対策
+    if getattr(sys, 'frozen', False):
+        base_dir = sys._MEIPASS
+    else:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+
+    return os.path.join(base_dir, filename)
+
 def check_nettool():
     # nettoolの存在確認
+
     try:
-        subprocess.run(['nettool'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except FileNotFoundError:
-        keywait = input(f'nettoolの認識に失敗しました。\nWindowsの場合は、nettool.exeをらくらくNS+の実行ファイルと同じフォルダに置いてからやり直してください。\nその他のOSの場合は、nettoolにPATHを通してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+
+        nettool_path = run_nettool()
+
+        subprocess.run(
+            [nettool_path],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+
+    except Exception:
+        keywait = input(
+            'nettoolの認識に失敗しました。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
         sys.exit()
-    except subprocess.CalledProcessError:
-        keywait = input(f'nettoolの認識に失敗しました。\nWindowsの場合は、nettool.exeをらくらくNS+の実行ファイルと同じフォルダに置いてからやり直してください。\nその他のOSの場合は、nettoolにPATHを通してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
-        sys.exit()
+
     print_with_date('nettoolの認識に成功しました。')
+
     return None
 
 def check_os():
@@ -492,6 +578,19 @@ def check_os():
 
 def check_config():
     # 設定チェック
+
+    # configに存在しない場合はデフォルト値を代入
+    if not hasattr(config, 'autosave_mode'):
+        config.autosave_mode = 0
+        print_with_date('設定「autosave_mode」が定義されていません。一定間隔でオートセーブを行います。')
+
+    if not hasattr(config, 'long_backup_keep'):
+        config.long_backup_keep = 0
+        print_with_date('設定「long_backup_keep」が定義されていません。自動長期バックアップは無効になっています。')
+
+    if not hasattr(config, 'long_backup_time'):
+        config.long_backup_time = 5
+        print_with_date('設定「long_backup_time」が定義されていません。自動長期バックアップが有効な場合、午前5時に行います。')
 
     # グローバル変数を宣言
     global autosave_mode
@@ -596,16 +695,31 @@ def convert_to_time(hour):
         return time(hour, 0, 0)
     return time(0, 0, 0)
 
-def schedule_event(hour, minute, second, action):
-    # 関数を予約する
-    now = datetime.datetime.now()
-    run_time = now.replace(hour=hour, minute=minute, second=second, microsecond=0)
-    if run_time <= now:
-        run_time += datetime.timedelta(days=1)
-    delay = (run_time - now).total_seconds()
-    scheduler.enter(delay, 1, action)
-    if not scheduler.empty():
-        scheduler.run()
+def run_nettool():
+    # Windows
+    if platform.system() == 'Windows':
+
+        # PyInstaller実行時
+        if getattr(sys, 'frozen', False):
+
+            internal_path = resource_path('nettool.exe')
+
+            # 一時フォルダへコピー
+            temp_dir = tempfile.gettempdir()
+            external_path = os.path.join(temp_dir, 'nettool.exe')
+
+            # 上書きコピー
+            shutil.copy2(internal_path, external_path)
+
+            return external_path
+
+        # 通常Python実行時
+        else:
+            return resource_path('nettool.exe')
+
+    # Linux/macOS
+    else:
+        return 'nettool'
 
 def get_nettool_pw(output):
     # simuconf.tabを開き、「server_admin_pw」から始まる行を検索
@@ -673,10 +787,10 @@ def set_company_pw():
     for company_pw in company_pws:
         # クラッシュ対策（存在しない会社にパスワードをかけるとクラッシュする）
         company_id = str(i)
-        result = subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'info-company', company_id], capture_output=True, text=True, encoding='utf-8')
+        result = subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'info-company', company_id], capture_output=True, text=True, encoding='utf-8')
         # Nothing received.の後は改行が必要
         if result.stdout != 'Nothing received.\n' and company_pw != '':
-            subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'lock-company', company_id, company_pw], capture_output=True, text=True)
+            subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'lock-company', company_id, company_pw], capture_output=True, text=True)
         i += 1
     print_gui_log('会社にパスワードを設定しました。')
 
@@ -689,24 +803,10 @@ def app_start():
     elif os_system == 'Linux' or os_system == 'Darwin':
         return subprocess.Popen([server_path, '-server', config.port_number, '-fps', '30', '-nomidi', '-nosound', '-load', launch_save], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
 
-def swm_discord_post(title, description, color):
-    # Simutrans World Monitorを利用してDiscordに書き込み
-    discord_io_file_plain = server_folder_path + '/file_io/out.txt'
-    discord_io_file_embed = server_folder_path + '/file_io/out_embed.json'
-    if config.use_discord_bot == 1:
-        f = open(discord_io_file_plain, 'w', encoding='utf-8')
-        f.write('# ' + title + '\n' + description + '\n')
-        f.close()
-    elif config.use_discord_bot == 2:
-        title = title.replace('\n', '\\n')
-        description = description.replace('\n', '\\n')
-        f = open(discord_io_file_embed, 'w', encoding='utf-8')
-        f.write('{"description":"' + description + '","fields":null,"title":"' + title + '","color":' + color + ',"footer":null}')
-
 def nettool_say(content):
     # contentにはASCII文字以外を入れないこと（文字化け対策）
     global nettool_pw
-    subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'say', content], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'say', content], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return None
 
 def wait_simutrans_responce():
@@ -714,7 +814,7 @@ def wait_simutrans_responce():
     global nettool_pw
     print_gui_log('Simutransの応答を待っています。しばらくお待ちください。')
     while True:
-        result = subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'clients'], encoding='utf-8', stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        result = subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'clients'], encoding='utf-8', stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
         if result.returncode == 0:
             print_gui_log('Simutransが応答しました。処理を再開します。')
             break
@@ -723,7 +823,7 @@ def wait_simutrans_responce():
 def nettool_forcesync():
     # ロード処理
     global nettool_pw
-    subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'force-sync'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'force-sync'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     wait_simutrans_responce()
     save_backup()
 
@@ -880,7 +980,7 @@ def server_stop(set_code, long_backup_code):
         print_gui_log('サーバー終了告知メッセージを送信しました。')
         discord_post('サーバーは終了しました。', '皆様のご参加ありがとうございました。', 0x00ff00)
     start_code = set_code
-    subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'shutdown'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'shutdown'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return None
 
 def auto_restart():

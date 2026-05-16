@@ -4,7 +4,7 @@
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=[],
+    binaries=[('nettool.exe', '.')],
     datas=[],
     hiddenimports=[],
     hookspath=[],

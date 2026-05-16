@@ -4,4 +4,5 @@ src/config.py
 /distribution
 /src/command_file
 /src/build
-src/main.spec
+src/RakurakuNS-Plus.spec
+/src/dist

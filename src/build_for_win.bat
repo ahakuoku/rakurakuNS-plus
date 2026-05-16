@@ -1,1 +1,1 @@
-pyinstaller --onefile --icon=icon.png --exclude-module=config main.py
+pyinstaller --onefile --name=RakurakuNS-Plus --icon=icon_small.ico --exclude-module=config main.py

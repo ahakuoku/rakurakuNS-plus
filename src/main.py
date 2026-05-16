@@ -413,6 +413,7 @@ def gui_main():
     global app
 
     root = tk.Tk()
+    root.iconbitmap("icon.ico")
     root.tk.call("source", "azure.tcl")
     root.tk.call("set_theme", "light")
 

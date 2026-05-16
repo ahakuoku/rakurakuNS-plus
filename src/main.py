@@ -203,8 +203,11 @@ class maintenance_check(tk.Frame):
         self.master.title("らくらくNS+")
         self.master.resizable(False, False)
         mode = self.main_window.maintenance_mode
-        if mode == 0:
+        os_system = platform.system()
+        if mode == 0 and os_system == 'Windows':
             self.master.geometry("350x160")
+        elif mode == 0 and os_system in ('Linux', 'Darwin'):
+            self.master.geometry("350x175")
         else:
             self.master.geometry("350x120")
         self.master.protocol('WM_DELETE_WINDOW', self.close_window)

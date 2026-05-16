@@ -469,7 +469,7 @@ def print_gui_log(content):
     return None
 
 def restart_server_threaded(set_code):
-    thread = threading.Thread(target=server_stop, args=(set_code,))
+    thread = threading.Thread(target=server_stop, args=(set_code, 0))
     thread.start()
 
 # 関数定義（Discord関連）

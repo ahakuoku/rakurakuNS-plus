@@ -1,0 +1,1 @@
+pyinstaller --onefile --icon=icon.png --exclude-module=config main.py

@@ -691,20 +691,6 @@ def app_start():
     elif os_system == 'Linux' or os_system == 'Darwin':
         return subprocess.Popen([server_path, '-server', config.port_number, '-fps', '30', '-nomidi', '-nosound', '-load', launch_save], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
 
-def swm_discord_post(title, description, color):
-    # Simutrans World Monitorを利用してDiscordに書き込み
-    discord_io_file_plain = server_folder_path + '/file_io/out.txt'
-    discord_io_file_embed = server_folder_path + '/file_io/out_embed.json'
-    if config.use_discord_bot == 1:
-        f = open(discord_io_file_plain, 'w', encoding='utf-8')
-        f.write('# ' + title + '\n' + description + '\n')
-        f.close()
-    elif config.use_discord_bot == 2:
-        title = title.replace('\n', '\\n')
-        description = description.replace('\n', '\\n')
-        f = open(discord_io_file_embed, 'w', encoding='utf-8')
-        f.write('{"description":"' + description + '","fields":null,"title":"' + title + '","color":' + color + ',"footer":null}')
-
 def nettool_say(content):
     # contentにはASCII文字以外を入れないこと（文字化け対策）
     global nettool_pw

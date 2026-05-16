@@ -443,16 +443,31 @@ def gui_main():
 
     root = tk.Tk()
 
-    # アイコン設定
-    root.iconbitmap(resource_path("icon.ico"))
+    os_system = platform.system()
+
+    # Windows
+    if os_system == 'Windows':
+
+        # タスクバー・Explorer用
+        try:
+            root.iconbitmap(resource_path("icon.ico"))
+        except Exception:
+            pass
+
+    # 共通アイコン設定（Win/Mac/Linux）
+    try:
+        icon_image = tk.PhotoImage(file=resource_path("icon.png"))
+        root.iconphoto(True, icon_image)
+
+        # ガベージコレクション対策
+        root.icon_image = icon_image
+
+    except Exception:
+        pass
 
     # テーマ読み込み
     root.tk.call("source", resource_path("azure.tcl"))
     root.tk.call("set_theme", "light")
-
-    # ウィンドウアイコン設定
-    icon_image = tk.PhotoImage(file=resource_path("icon_small.png"))
-    root.iconphoto(True, icon_image)
 
     root.grid_rowconfigure(0, weight=1)
     root.grid_columnconfigure(0, weight=1)

@@ -66,6 +66,7 @@ except ModuleNotFoundError:
 
 from tkinter import ttk
 import array
+import tempfile
 
 # 変数定義
 root = None
@@ -441,12 +442,17 @@ def gui_main():
     global app
 
     root = tk.Tk()
-    root.iconbitmap("icon.ico")
-    root.tk.call("source", "azure.tcl")
+
+    # アイコン設定
+    root.iconbitmap(resource_path("icon.ico"))
+
+    # テーマ読み込み
+    root.tk.call("source", resource_path("azure.tcl"))
     root.tk.call("set_theme", "light")
 
-    iconfile = tk.PhotoImage(file='icon_small.png')
-    root.iconphoto(True, iconfile)
+    # ウィンドウアイコン設定
+    icon_image = tk.PhotoImage(file=resource_path("icon_small.png"))
+    root.iconphoto(True, icon_image)
 
     root.grid_rowconfigure(0, weight=1)
     root.grid_columnconfigure(0, weight=1)
@@ -502,52 +508,31 @@ def start_threads():
     threading.Thread(target=run_discord_bot, daemon=True).start()
     threading.Thread(target=auto_long_backup, daemon=True).start()
 
+def resource_path(filename):
+    # pyinstaller対策
+    if getattr(sys, 'frozen', False):
+        base_dir = sys._MEIPASS
+    else:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+
+    return os.path.join(base_dir, filename)
+
 def check_nettool():
     # nettoolの存在確認
+
     try:
-        os_system = platform.system()
 
-        # Windows
-        if os_system == 'Windows':
+        nettool_path = run_nettool()
 
-            # PyInstaller実行時
-            if getattr(sys, 'frozen', False):
-                base_dir = sys._MEIPASS
-
-            # 通常Python実行時
-            else:
-                base_dir = os.path.dirname(os.path.abspath(__file__))
-
-            nettool_path = os.path.join(base_dir, 'nettool.exe')
-
-            subprocess.run(
-                [nettool_path],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
-
-        # Linux / macOS
-        else:
-            subprocess.run(
-                ['nettool'],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
-
-    except FileNotFoundError:
-        keywait = input(
-            'nettoolの認識に失敗しました。\n'
-            'Windowsの場合は、nettool.exeをらくらくNS+の実行ファイルと同じフォルダに置いてからやり直してください。\n'
-            'その他のOSの場合は、nettoolにPATHを通してください。\n'
-            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        subprocess.run(
+            [nettool_path],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
         )
-        sys.exit()
 
-    except subprocess.CalledProcessError:
+    except Exception:
         keywait = input(
             'nettoolの認識に失敗しました。\n'
-            'Windowsの場合は、nettool.exeをらくらくNS+の実行ファイルと同じフォルダに置いてからやり直してください。\n'
-            'その他のOSの場合は、nettoolにPATHを通してください。\n'
             '（らくらくNS+を終了します。Enterキーを押してください。）'
         )
         sys.exit()
@@ -685,6 +670,32 @@ def convert_to_time(hour):
         return time(hour, 0, 0)
     return time(0, 0, 0)
 
+def run_nettool():
+    # Windows
+    if platform.system() == 'Windows':
+
+        # PyInstaller実行時
+        if getattr(sys, 'frozen', False):
+
+            internal_path = resource_path('nettool.exe')
+
+            # 一時フォルダへコピー
+            temp_dir = tempfile.gettempdir()
+            external_path = os.path.join(temp_dir, 'nettool.exe')
+
+            # 上書きコピー
+            shutil.copy2(internal_path, external_path)
+
+            return external_path
+
+        # 通常Python実行時
+        else:
+            return resource_path('nettool.exe')
+
+    # Linux/macOS
+    else:
+        return 'nettool'
+
 def get_nettool_pw(output):
     # simuconf.tabを開き、「server_admin_pw」から始まる行を検索
     simuconf_path = server_folder_path + '/config/simuconf.tab'
@@ -751,10 +762,10 @@ def set_company_pw():
     for company_pw in company_pws:
         # クラッシュ対策（存在しない会社にパスワードをかけるとクラッシュする）
         company_id = str(i)
-        result = subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'info-company', company_id], capture_output=True, text=True, encoding='utf-8')
+        result = subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'info-company', company_id], capture_output=True, text=True, encoding='utf-8')
         # Nothing received.の後は改行が必要
         if result.stdout != 'Nothing received.\n' and company_pw != '':
-            subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'lock-company', company_id, company_pw], capture_output=True, text=True)
+            subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'lock-company', company_id, company_pw], capture_output=True, text=True)
         i += 1
     print_gui_log('会社にパスワードを設定しました。')
 
@@ -770,7 +781,7 @@ def app_start():
 def nettool_say(content):
     # contentにはASCII文字以外を入れないこと（文字化け対策）
     global nettool_pw
-    subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'say', content], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'say', content], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return None
 
 def wait_simutrans_responce():
@@ -778,7 +789,7 @@ def wait_simutrans_responce():
     global nettool_pw
     print_gui_log('Simutransの応答を待っています。しばらくお待ちください。')
     while True:
-        result = subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'clients'], encoding='utf-8', stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        result = subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'clients'], encoding='utf-8', stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
         if result.returncode == 0:
             print_gui_log('Simutransが応答しました。処理を再開します。')
             break
@@ -787,7 +798,7 @@ def wait_simutrans_responce():
 def nettool_forcesync():
     # ロード処理
     global nettool_pw
-    subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'force-sync'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'force-sync'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     wait_simutrans_responce()
     save_backup()
 
@@ -944,7 +955,7 @@ def server_stop(set_code, long_backup_code):
         print_gui_log('サーバー終了告知メッセージを送信しました。')
         discord_post('サーバーは終了しました。', '皆様のご参加ありがとうございました。', 0x00ff00)
     start_code = set_code
-    subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'shutdown'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'shutdown'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return None
 
 def auto_restart():

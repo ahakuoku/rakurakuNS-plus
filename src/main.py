@@ -3,13 +3,17 @@
 import subprocess
 import sys
 import importlib.util
+import os
 
 try:
-    # exe時 / 通常実行時 の基準フォルダ取得
+
+    # exe起動時
     if getattr(sys, 'frozen', False):
         base_dir = os.path.dirname(sys.executable)
+
+    # 通常Python実行時
     else:
-        base_dir = os.path.dirname(os.path.abspath(__file__))
+        base_dir = os.path.dirname(os.path.realpath(__file__))
 
     config_path = os.path.join(base_dir, 'config.py')
 
@@ -17,16 +21,23 @@ try:
     if os.path.exists(config_path) is False:
         raise FileNotFoundError
 
-    # config.py 読み込み
+    # 動的import
     spec = importlib.util.spec_from_file_location("config", config_path)
+
+    if spec is None or spec.loader is None:
+        raise ImportError
+
     config = importlib.util.module_from_spec(spec)
+
     spec.loader.exec_module(config)
 
 except Exception:
+
     keywait = input(
         'config.template.pyをコピーし、config.pyにリネームして設定を行ってください。\n'
         '（らくらくNS+を終了します。Enterキーを押してください。）'
     )
+
     sys.exit()
 
 try:
@@ -52,7 +63,6 @@ except ModuleNotFoundError:
 import re
 import datetime
 import platform
-import os
 import shutil
 import threading
 import sched

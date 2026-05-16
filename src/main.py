@@ -493,6 +493,19 @@ def check_os():
 def check_config():
     # 設定チェック
 
+    # configに存在しない場合はデフォルト値を代入
+    if not hasattr(config, 'autosave_mode'):
+        config.autosave_mode = 0
+        print_with_date('設定「autosave_mode」が定義されていません。一定間隔でオートセーブを行います。')
+
+    if not hasattr(config, 'long_backup_keep'):
+        config.long_backup_keep = 0
+        print_with_date('設定「long_backup_keep」が定義されていません。自動長期バックアップは無効になっています。')
+
+    if not hasattr(config, 'long_backup_time'):
+        config.long_backup_time = 5
+        print_with_date('設定「long_backup_time」が定義されていません。自動長期バックアップが有効な場合、午前5時に行います。')
+
     # グローバル変数を宣言
     global autosave_mode
     global restart_time

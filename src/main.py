@@ -1086,7 +1086,7 @@ def autosave():
     # ====================================================
     # 従来タイマー方式
     # ====================================================
-    if autosave_mode == 1:
+    if autosave_mode == 0:
 
         autosave_interval = config.autosave_interval - 30
 

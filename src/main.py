@@ -78,43 +78,6 @@ from tkinter import ttk
 import array
 import tempfile
 
-# こいつだけ変数定義の都合上こっちに書く
-if not hasattr(config, 'use_discord_bot'):
-
-    config.use_discord_bot = 0
-
-    date_time = datetime.datetime.now()
-
-    print(
-        date_time.strftime(
-            '[%Y/%m/%d %H:%M:%S] '
-            + '設定「use_discord_bot」が定義されていません。Discordのbotは使用しません。'
-        )
-    )
-
-# 変数定義
-root = None
-if config.server_folder_path.endswith('/') is True:
-    server_folder_path = config.server_folder_path[:-1]
-else:
-    server_folder_path = config.server_folder_path
-server_path = server_folder_path + '/' + config.server_name
-server_path = server_path.replace('\\', '/')
-server_save = 'server' + config.port_number + '-network.sve'
-launch_save = '../server' + config.port_number + '-network.sve'
-start_code = 0
-exit_code = 0
-nettool_pw = 0
-scheduler = sched.scheduler(time.time, time.sleep)
-scheduler_running = False
-server_ip = '127.0.0.1:'
-intents = discord.Intents.default()
-bot = discord.Client(intents=intents)
-autosave_mode = 0
-long_backup_folder_path = server_folder_path + '/autosave/long-backup'
-long_backup_time = 5
-long_backup_keep = 0
-
 # 関数定義（GUI系）
 class window_main(tk.Frame):
     def __init__(self, master):
@@ -651,29 +614,181 @@ def check_os():
         sys.exit()
     return os_system
 
+# 初期化・設定チェック
 def check_config():
-    # 設定チェック
-
-    # configに存在しない場合はデフォルト値を代入
-    if not hasattr(config, 'autosave_mode'):
-        config.autosave_mode = 0
-        print_with_date('設定「autosave_mode」が定義されていません。一定間隔でオートセーブを行います。')
-
-    if not hasattr(config, 'long_backup_keep'):
-        config.long_backup_keep = 0
-        print_with_date('設定「long_backup_keep」が定義されていません。自動長期バックアップは無効になっています。')
-
-    if not hasattr(config, 'long_backup_time'):
-        config.long_backup_time = 5
-        print_with_date('設定「long_backup_time」が定義されていません。自動長期バックアップが有効な場合、午前5時に行います。')
-
-    # グローバル変数を宣言
+    global server_folder_path
+    global server_path
+    global server_save
+    global launch_save
+    global start_code
+    global exit_code
+    global nettool_pw
+    global scheduler
+    global scheduler_running
+    global server_ip
+    global intents
+    global bot
     global autosave_mode
-    global restart_time
-    global long_backup_keep
+    global long_backup_folder_path
     global long_backup_time
+    global long_backup_keep
+    global restart_time
+    global root
 
+    # ====================================================
+    # 必須設定
+    # ====================================================
+
+    required_settings = (
+        'server_folder_path',
+        'server_name',
+    )
+
+    for setting in required_settings:
+        if not hasattr(config, setting):
+            input(
+                f'設定「{setting}」が定義されていません。設定をしてください。\n'
+                '（らくらくNS+を終了します。Enterキーを押してください。）'
+            )
+            sys.exit()
+
+    # ====================================================
+    # デフォルト値
+    # ====================================================
+
+    default_settings = {
+        'port_number': (
+            '13353',
+            '設定「port_number」が定義されていません。'
+            'ポート13353でサーバーを開始します。'
+        ),
+
+        'autosave_mode': (
+            0,
+            '設定「autosave_mode」が定義されていません。'
+            '一定間隔でオートセーブを行います。'
+        ),
+
+        'autosave_backup': (
+            80,
+            '設定「autosave_backup」が定義されていません。'
+            'バックアップは80個取ります。'
+        ),
+
+        'autosave_interval': (
+            20,
+            '設定「autosave_interval」が定義されていません。'
+            'オートセーブは20分間隔、もしくは最後のロードから20分後に行います。'
+        ),
+
+        'long_backup_keep': (
+            0,
+            '設定「long_backup_keep」が定義されていません。'
+            '自動長期バックアップは行いません。'
+        ),
+
+        'long_backup_time': (
+            5,
+            '設定「long_backup_time」が定義されていません。'
+            '自動長期バックアップが有効な場合、午前5時に行います。'
+        ),
+
+        'restart_time': (
+            -1,
+            '設定「restart_time」が定義されていません。'
+            '自動再起動は行いません。'
+        ),
+    }
+
+    for setting, (default_value, message) in default_settings.items():
+        if not hasattr(config, setting):
+            setattr(config, setting, default_value)
+            print_with_date(message)
+
+    # ====================================================
+    # プレイヤーパスワード
+    # ====================================================
+
+    for i in range(15):
+        attr_name = f'player_{i}_pw'
+
+        if not hasattr(config, attr_name):
+            setattr(config, attr_name, '')
+            print_with_date(
+                f'設定「{attr_name}」が定義されていません。'
+                f'プレイヤー{i}にパスワードはかけません。'
+            )
+
+    # ====================================================
+    # server_folder_path
+    # ====================================================
+
+    try:
+        server_folder_path = os.path.normpath(
+            str(config.server_folder_path)
+        )
+
+        if not os.path.isdir(server_folder_path):
+            raise FileNotFoundError
+
+    except (NameError, TypeError, ValueError):
+        input(
+            '設定「server_folder_path」に不正な値が設定されています。'
+            '存在するフォルダを入力してください。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
+        sys.exit()
+
+    except FileNotFoundError:
+        input(
+            '設定「server_folder_path」で設定されたフォルダは存在しません。'
+            '存在するフォルダを入力してください。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
+        sys.exit()
+
+    # ====================================================
+    # server_name
+    # ====================================================
+
+    try:
+        server_name = str(config.server_name).strip()
+
+        if server_name == '':
+            raise ValueError
+
+        # server_path生成
+        server_path = os.path.normpath(
+            os.path.join(server_folder_path, server_name)
+        )
+
+        # Linux/macOS向けに / に統一
+        server_path = server_path.replace('\\', '/')
+
+        # 存在確認
+        if not os.path.exists(server_path):
+            raise FileNotFoundError
+
+    except (NameError, TypeError, ValueError):
+        input(
+            '設定「server_name」に不正な値が設定されています。'
+            '正しいサーバー名を入力してください。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
+        sys.exit()
+
+    except FileNotFoundError:
+        input(
+            '設定「server_name」で設定されたサーバーファイルが存在しません。'
+            '設定を確認してください。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
+        sys.exit()
+
+    # ====================================================
     # autosave_mode
+    # ====================================================
+
     try:
         autosave_mode = int(config.autosave_mode)
 
@@ -682,13 +797,16 @@ def check_config():
 
     except (NameError, ValueError, TypeError):
         input(
-            '設定「autosave_mode」に不正な値が入力されています。'
+            '設定「autosave_mode」に不正な値が設定されています。'
             '0か1いずれかの値を入力してください。\n'
             '（らくらくNS+を終了します。Enterキーを押してください。）'
         )
         sys.exit()
 
+    # ====================================================
     # restart_time
+    # ====================================================
+
     try:
         restart_time = int(config.restart_time)
 
@@ -697,13 +815,16 @@ def check_config():
 
     except (NameError, ValueError, TypeError):
         input(
-            '設定「restart_time」に不正な値が入力されています。'
+            '設定「restart_time」に不正な値が設定されています。'
             '-1、0～24のいずれかの整数を入力してください。\n'
             '（らくらくNS+を終了します。Enterキーを押してください。）'
         )
         sys.exit()
 
+    # ====================================================
     # long_backup_keep
+    # ====================================================
+
     try:
         long_backup_keep = int(config.long_backup_keep)
 
@@ -712,13 +833,16 @@ def check_config():
 
     except (NameError, ValueError, TypeError):
         input(
-            '設定「long_backup_keep」に不正な値が入力されています。'
+            '設定「long_backup_keep」に不正な値が設定されています。'
             '-1以上の整数を入力してください。\n'
             '（らくらくNS+を終了します。Enterキーを押してください。）'
         )
         sys.exit()
 
+    # ====================================================
     # long_backup_time
+    # ====================================================
+
     try:
         long_backup_time = int(config.long_backup_time)
 
@@ -727,11 +851,157 @@ def check_config():
 
     except (NameError, ValueError, TypeError):
         input(
-            '設定「long_backup_time」に不正な値が入力されています。'
+            '設定「long_backup_time」に不正な値が設定されています。'
             '0～24のいずれかの整数を入力してください。\n'
             '（らくらくNS+を終了します。Enterキーを押してください。）'
         )
         sys.exit()
+
+    # ====================================================
+    # port_number
+    # ====================================================
+
+    try:
+        port_number = int(config.port_number)
+
+        if not (0 <= port_number <= 65535):
+            raise ValueError
+
+        # 文字列として再保存
+        config.port_number = str(port_number)
+
+    except (NameError, ValueError, TypeError):
+        input(
+            '設定「port_number」に不正な値が設定されています。'
+            '0～65535のいずれかの整数を入力してください。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
+        sys.exit()
+
+    # ====================================================
+    # autosave_backup
+    # ====================================================
+
+    try:
+        autosave_backup = int(config.autosave_backup)
+
+        if autosave_backup <= 0:
+            raise ValueError
+
+    except (NameError, ValueError, TypeError):
+        input(
+            '設定「autosave_backup」に不正な値が設定されています。'
+            '1以上の整数を入力してください。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
+        sys.exit()
+
+    # ====================================================
+    # autosave_interval
+    # ====================================================
+
+    try:
+        autosave_interval = int(config.autosave_interval)
+
+        if autosave_interval < 60:
+            raise ValueError
+
+    except (NameError, ValueError, TypeError):
+        input(
+            '設定「autosave_interval」に不正な値が設定されています。'
+            '60以上の整数を入力してください。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
+        sys.exit()
+
+    # ====================================================
+    # player_x_pw
+    # ====================================================
+
+    for i in range(15):
+
+        try:
+            pw = getattr(config, f'player_{i}_pw')
+
+            # int / floatは禁止
+            # （'1' のような文字列は許可）
+            if isinstance(pw, (int, float)):
+                raise ValueError
+
+            # 文字列化
+            setattr(config, f'player_{i}_pw', str(pw))
+
+        except (NameError, ValueError, TypeError):
+            input(
+                f'設定「player_{i}_pw」に不正な値が設定されています。'
+                '文字列を入力してください。\n'
+                '（らくらくNS+を終了します。Enterキーを押してください。）'
+            )
+            sys.exit()
+
+    # ====================================================
+    # use_discord_bot
+    # ====================================================
+
+    if not hasattr(config, 'use_discord_bot'):
+        config.use_discord_bot = 0
+        print_with_date(
+            '設定「use_discord_bot」が定義されていません。'
+            'Discordのbotは使用しません。'
+        )
+
+    try:
+        use_discord_bot = int(config.use_discord_bot)
+
+        if use_discord_bot not in (0, 1, 2):
+            raise ValueError
+
+    except (NameError, ValueError, TypeError):
+        input(
+            '設定「use_discord_bot」に不正な値が設定されています。'
+            '0、1、2のいずれかを入力してください。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
+        sys.exit()
+
+    # ====================================================
+    # 各種パス・変数生成
+    # ====================================================
+
+    server_save = f'server{config.port_number}-network.sve'
+    launch_save = os.path.join(
+        '..',
+        f'server{config.port_number}-network.sve'
+    )
+
+    long_backup_folder_path = os.path.join(
+        server_folder_path,
+        'autosave',
+        'long-backup'
+    )
+
+    # Linux/macOS向けに / に統一
+    server_path = server_path.replace('\\', '/')
+    launch_save = launch_save.replace('\\', '/')
+    long_backup_folder_path = long_backup_folder_path.replace('\\', '/')
+
+    # ====================================================
+    # 初期変数
+    # ====================================================
+
+    start_code = 0
+    exit_code = 0
+    nettool_pw = 0
+
+    scheduler = sched.scheduler(time.time, time.sleep)
+    scheduler_running = False
+
+    server_ip = '127.0.0.1:'
+
+    root = None
+
+    intents = discord.Intents.default()
+    bot = discord.Client(intents=intents)
 
     print_with_date('設定に正常な値が入力されていることを確認しました。')
 

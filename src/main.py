@@ -512,13 +512,48 @@ def restart_server_threaded(set_code):
     thread.start()
 
 # 関数定義（Discord関連）
-async def send_notification(title, description, color=0x00ff00):
-    if config.use_discord_bot in (1, 2):
+async def send_notification(
+    title,
+    description,
+    color=0x00ff00
+):
+
+    if config.use_discord_bot not in (1, 2):
+        return
+
+    try:
+
         await bot.wait_until_ready()
-        channel = bot.get_channel(config.discord_channel)
-        if channel:
-            embed = discord.Embed(title=title, description=description, color=color)
-            await channel.send(embed=embed)
+
+        channel = bot.get_channel(
+            int(config.discord_channel)
+        )
+
+        # チャンネル取得失敗
+        if channel is None:
+
+            print_gui_log(
+                '指定されたDiscordのチャンネルはありません。'
+            )
+
+            return
+
+        embed = discord.Embed(
+            title=title,
+            description=description,
+            color=color
+        )
+
+        await channel.send(embed=embed)
+
+    except ValueError:
+        print_gui_log('設定「discord_channel」には整数を入力してください。')
+
+    except discord.errors.Forbidden:
+        print_gui_log('指定されたDiscordのチャンネルへの送信権限がありません。')
+
+    except Exception as e:
+        print_gui_log(f'Discordへの通知送信中にエラーが発生しました: {e}')
 
 def discord_post(title, description, color=0x00ff00):
     if config.use_discord_bot in (1, 2):
@@ -531,14 +566,37 @@ def discord_post(title, description, color=0x00ff00):
 
 # Bot用のスレッドターゲット
 def run_discord_bot():
-    if config.use_discord_bot in (1, 2):
+
+    if config.use_discord_bot not in (1, 2):
+        return
+
+    try:
         bot.run(config.discord_token)
 
-# Discord botが準備できたときの処理（任意）
+    except discord.errors.LoginFailure:
+
+        print_gui_log(
+            'Discordのbotのトークンが不正です。'
+            'Discordのbotを起動できませんでした。'
+        )
+
+    except Exception as e:
+
+        print_gui_log(
+            f'Discordのbotを起動中にエラーが発生しました: {e}'
+        )
+
 @bot.event
 async def on_ready():
     if config.use_discord_bot in (1, 2):
-        print_gui_log(f"DiscordのBotを起動しました。: {bot.user}")
+            print_gui_log(f'Discordのbotを起動しました。: {bot.user}')
+
+            channel = bot.get_channel(
+                int(config.discord_channel)
+            )
+
+            if channel is None:
+                print_gui_log('指定されたDiscordのチャンネルはありません。')
 
 # 関数定義（一般）
 

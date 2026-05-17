@@ -78,6 +78,20 @@ from tkinter import ttk
 import array
 import tempfile
 
+# こいつだけ変数定義の都合上こっちに書く
+if not hasattr(config, 'use_discord_bot'):
+
+    config.use_discord_bot = 0
+
+    date_time = datetime.datetime.now()
+
+    print(
+        date_time.strftime(
+            '[%Y/%m/%d %H:%M:%S] '
+            + '設定「use_discord_bot」が定義されていません。Discordのbotは使用しません。'
+        )
+    )
+
 # 変数定義
 root = None
 if config.server_folder_path.endswith('/') is True:
@@ -499,14 +513,15 @@ def restart_server_threaded(set_code):
 
 # 関数定義（Discord関連）
 async def send_notification(title, description, color=0x00ff00):
-    await bot.wait_until_ready()
-    channel = bot.get_channel(config.discord_channel)
-    if channel:
-        embed = discord.Embed(title=title, description=description, color=color)
-        await channel.send(embed=embed)
+    if config.use_discord_bot in (1, 2):
+        await bot.wait_until_ready()
+        channel = bot.get_channel(config.discord_channel)
+        if channel:
+            embed = discord.Embed(title=title, description=description, color=color)
+            await channel.send(embed=embed)
 
 def discord_post(title, description, color=0x00ff00):
-    if config.use_discord_bot == 1 or 2:
+    if config.use_discord_bot in (1, 2):
         coro = send_notification(title, description, color)
         future = asyncio.run_coroutine_threadsafe(coro, bot.loop)
         try:
@@ -516,13 +531,14 @@ def discord_post(title, description, color=0x00ff00):
 
 # Bot用のスレッドターゲット
 def run_discord_bot():
-    if config.use_discord_bot == 1 or 2:
+    if config.use_discord_bot in (1, 2):
         bot.run(config.discord_token)
 
 # Discord botが準備できたときの処理（任意）
 @bot.event
 async def on_ready():
-    print_gui_log(f"DiscordのBotを起動しました。: {bot.user}")
+    if config.use_discord_bot in (1, 2):
+        print_gui_log(f"DiscordのBotを起動しました。: {bot.user}")
 
 # 関数定義（一般）
 
@@ -530,7 +546,8 @@ def start_threads():
     threading.Thread(target=monitoring, daemon=True).start()
     threading.Thread(target=autosave, daemon=True).start()
     threading.Thread(target=auto_restart, daemon=True).start()
-    threading.Thread(target=run_discord_bot, daemon=True).start()
+    if config.use_discord_bot in (1, 2):
+        threading.Thread(target=run_discord_bot, daemon=True).start()
     threading.Thread(target=auto_long_backup, daemon=True).start()
 
 def resource_path(filename):

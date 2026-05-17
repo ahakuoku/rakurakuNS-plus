@@ -78,6 +78,10 @@ from tkinter import ttk
 import array
 import tempfile
 
+# 変数定義
+intents = discord.Intents.default()
+bot = discord.Client(intents=intents)
+
 # 関数定義（GUI系）
 class window_main(tk.Frame):
     def __init__(self, master):
@@ -627,7 +631,6 @@ def check_config():
     global scheduler_running
     global server_ip
     global intents
-    global bot
     global autosave_mode
     global long_backup_folder_path
     global long_backup_time
@@ -999,9 +1002,6 @@ def check_config():
     server_ip = '127.0.0.1:'
 
     root = None
-
-    intents = discord.Intents.default()
-    bot = discord.Client(intents=intents)
 
     print_with_date('設定に正常な値が入力されていることを確認しました。')
 

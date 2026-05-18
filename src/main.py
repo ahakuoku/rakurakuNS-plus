@@ -2,55 +2,85 @@
 
 import subprocess
 import sys
+import importlib.util
+import os
+
 try:
-    import config
-except ModuleNotFoundError:
-    keywait = input(f'config.template.pyをコピーし、config.pyにリネームして設定を行ってください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+
+    # exe起動時
+    if getattr(sys, 'frozen', False):
+        base_dir = os.path.dirname(sys.executable)
+
+    # 通常Python実行時
+    else:
+        base_dir = os.path.dirname(os.path.realpath(__file__))
+
+    config_path = os.path.join(base_dir, 'config.py')
+
+    # config.py 存在確認
+    if os.path.exists(config_path) is False:
+        raise FileNotFoundError
+
+    # 動的import
+    spec = importlib.util.spec_from_file_location("config", config_path)
+
+    if spec is None or spec.loader is None:
+        raise ImportError
+
+    config = importlib.util.module_from_spec(spec)
+
+    spec.loader.exec_module(config)
+
+except Exception:
+
+    keywait = input(
+        'config.template.pyをコピーし、config.pyにリネームして設定を行ってください。\n'
+        '（らくらくNS+を終了します。Enterキーを押してください。）'
+    )
+
     sys.exit()
+
 try:
     import psutil
 except ModuleNotFoundError:
-    keywait = input(f'必要なモジュールがインストールされていません。\nコマンド「pip install psutil schedule」を実行してからやりなおしてください。\n\nUbuntu環境の場合は、下記コマンドを実行してください。\npip3 install --break-system-packages psutil schedule\nsudo apt update\nsudo apt install python3-tk\n\n（らくらくNS+を終了します。Enterキーを押してください。）')
+    keywait = input(f'必要なモジュールがインストールされていません。\nコマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n\nUbuntu環境の場合は、下記コマンドを実行してください。\npip3 install --break-system-packages psutil schedule discord\nsudo apt update\nsudo apt install python3-tk\n\n（らくらくNS+を終了します。Enterキーを押してください。）')
     sys.exit()
+
 try:
     import schedule
 except ModuleNotFoundError:
-    keywait = input(f'必要なモジュールがインストールされていません。\nコマンド「pip install psutil schedule」を実行してからやりなおしてください。\n\nUbuntu環境の場合は、下記コマンドを実行してください。\npip3 install --break-system-packages psutil schedule\nsudo apt update\nsudo apt install python3-tk\n\n（らくらくNS+を終了します。Enterキーを押してください。）')
+    keywait = input(f'必要なモジュールがインストールされていません。\nコマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n\nUbuntu環境の場合は、下記コマンドを実行してください。\npip3 install --break-system-packages psutil schedule discord\nsudo apt update\nsudo apt install python3-tk\n\n（らくらくNS+を終了します。Enterキーを押してください。）')
     sys.exit()
+
 import time
+
+try:
+    import discord
+except ModuleNotFoundError:
+    keywait = input(f'必要なモジュールがインストールされていません。\nコマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n\nUbuntu環境の場合は、下記コマンドを実行してください。\npip3 install --break-system-packages psutil schedule discord\nsudo apt update\nsudo apt install python3-tk\n\n（らくらくNS+を終了します。Enterキーを押してください。）')
+    sys.exit()
+
 import re
 import datetime
 import platform
-import os
 import shutil
 import threading
 import sched
+import asyncio
+
 try:
     import tkinter as tk
 except ModuleNotFoundError:
-    keywait = input(f'必要なモジュールがインストールされていません。\nコマンド「pip install psutil schedule」を実行してからやりなおしてください。\n\nUbuntu環境の場合は、下記コマンドを実行してください。\npip3 install --break-system-packages psutil schedule\nsudo apt update\nsudo apt install python3-tk\n\n（らくらくNS+を終了します。Enterキーを押してください。）')
+    keywait = input(f'必要なモジュールがインストールされていません。\nコマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n\nUbuntu環境の場合は、下記コマンドを実行してください。\npip3 install --break-system-packages psutil schedule discord\nsudo apt update\nsudo apt install python3-tk\n\n（らくらくNS+を終了します。Enterキーを押してください。）')
     sys.exit()
+
 from tkinter import ttk
+import array
+import tempfile
 
 # 変数定義
-root = None
-if config.server_folder_path.endswith('/') is True:
-    server_folder_path = config.server_folder_path[:-1]
-else:
-    server_folder_path = config.server_folder_path
-server_path = server_folder_path + '/' + config.server_name
-server_path = server_path.replace('\\', '/')
-server_save = 'server' + config.port_number + '-network.sve'
-launch_save = '../server' + config.port_number + '-network.sve'
-start_code = 0
-exit_code = 0
-nettool_pw = 0
-scheduler = sched.scheduler(time.time, time.sleep)
-scheduler_running = False
-server_ip = '127.0.0.1:'
-# intents = discord.Intents.default()
-# intents.message_content = True
-# client = discord.Client(intents=intents)
+intents = discord.Intents.default()
+bot = discord.Client(intents=intents)
 
 # 関数定義（GUI系）
 class window_main(tk.Frame):
@@ -139,16 +169,39 @@ class window_main(tk.Frame):
         self.newWindow.grab_set()
         maintenance_check(self.newWindow, self)  # 自分自身を渡す
 
+    def update_maintenance_button(self):
+            if self.maintenance_mode == 0:
+                text = "メンテナンスモード"
+            elif self.maintenance_mode == 1:
+                text = "メンテナンス終了"
+            elif self.maintenance_mode == 2:
+                text = "サーバー再開"
+
+            self.maintenance_mode_button.config(text=text)
+            self.maintenance_mode_button.update_idletasks()
+
     def toggle_maintenance_mode(self):
-        # メンテナンスモードの切り替え
         global start_code
-        if self.maintenance_mode == 0:
+
+        # 手動再開モード
+        if self.maintenance_mode == 2:
+            start_code = 7
+            self.maintenance_mode = 0
+
+        # 通常 → メンテ
+        elif self.maintenance_mode == 0:
             start_code = 3
             self.maintenance_mode = 1
-            self.maintenance_mode_button["text"] = "メンテナンス終了"
-        else:
+
+        # メンテ → 通常
+        elif self.maintenance_mode == 1:
             self.maintenance_mode = 0
-            self.maintenance_mode_button["text"] = "メンテナンスモード"
+        
+        self.update_maintenance_button()
+
+    def set_manual_restart_mode(self):
+        self.maintenance_mode = 2
+        self.update_maintenance_button()
 
     def log_text_insert(self, content):
         # 他スレッドからも呼び出せる安全な方法
@@ -169,28 +222,62 @@ class maintenance_check(tk.Frame):
         self.main_window = main_window  # メインウィンドウの参照
         self.master.title("らくらくNS+")
         self.master.resizable(False, False)
-        self.master.geometry("350x120")
+        mode = self.main_window.maintenance_mode
+        os_system = platform.system()
+        if mode == 0 and os_system == 'Windows':
+            self.master.geometry("350x160")
+        elif mode == 0 and os_system in ('Linux', 'Darwin'):
+            self.master.geometry("350x175")
+        else:
+            self.master.geometry("350x120")
         self.master.protocol('WM_DELETE_WINDOW', self.close_window)
 
         self.create_widgets()
 
     def create_widgets(self):
-        # ダイアログのウィジェットを配置
-        if self.main_window.maintenance_mode == 0:
-            self.label = ttk.Label(self.master, text="サーバーを中断しメンテナンスモードに入ります。\nよろしいですか？")
-        else:
-            self.label = ttk.Label(self.master, text="メンテナンスモードを終了しサーバーを再開します。\nよろしいですか？")
+        mode = self.main_window.maintenance_mode
 
+        # 状態ごとにメッセージを変更
+        if mode == 0:
+            text = "サーバーを中断しメンテナンスモードに入ります。\nよろしいですか？"
+
+        elif mode == 1:
+            text = "メンテナンスモードを終了しサーバーを再開します。\nよろしいですか？"
+
+        elif mode == 2:
+            text = "サーバーを再開します。\nよろしいですか？"
+
+        self.label = ttk.Label(self.master, text=text)
         self.label.pack(padx=10, pady=10, fill="both", expand=True)
 
         button_frame = ttk.Frame(self.master)
         button_frame.pack(pady=10, fill="x")
 
-        self.exit_button = ttk.Button(button_frame, text="はい", style='Accent.TButton', command=self.maintenance_mode_check)
+        self.exit_button = ttk.Button(
+            button_frame,
+            text="はい",
+            style='Accent.TButton',
+            command=self.maintenance_mode_check
+        )
         self.exit_button.pack(side="left", padx=5, expand=True)
 
-        self.cancel_button = ttk.Button(button_frame, text="いいえ", command=self.close_window)
+        self.cancel_button = ttk.Button(
+            button_frame,
+            text="いいえ",
+            command=self.close_window
+        )
         self.cancel_button.pack(side="right", padx=5, expand=True)
+
+        # 長期バックアップ用スイッチ（メンテ開始時以外は出さない）
+        self.long_backup_var = tk.IntVar(value=0)
+        if mode == 0:
+            self.switch = ttk.Checkbutton(
+                self.master,
+                text="メンテナンス開始時点のデータを\n長期バックアップする",
+                style="Switch.TCheckbutton",
+                variable=self.long_backup_var
+            )
+            self.switch.pack(padx=10, pady=(0, 10), anchor="w")
 
     def close_window(self):
         # ダイアログを閉じる
@@ -199,17 +286,32 @@ class maintenance_check(tk.Frame):
     def maintenance_mode_check(self):
         # メンテナンスモードかどうかをチェックし、メンテナンスモードの実行/解除
         global start_code
-        if start_code == 3:
-            start_code = 4
-        else:
-            maintenance_thread = threading.Thread(target=self.server_stop_thread, args=(3,))
+        mode = self.main_window.maintenance_mode
+
+        # スイッチ状態取得（ON=1 / OFF=0）
+        long_backup_code = self.long_backup_var.get()
+
+        # 通常 → メンテナンス
+        if mode == 0:
+            maintenance_thread = threading.Thread(
+                target=self.server_stop_thread,
+                args=(3, long_backup_code)
+            )
             maintenance_thread.start()
+
+        # メンテ終了 → サーバー起動
+        elif mode == 1:
+            start_code = 2  # サーバー起動コード
+
+        # 手動再開待ち → サーバー起動
+        elif mode == 2:
+            start_code = 7
         self.main_window.toggle_maintenance_mode()  # メインウィンドウのボタンを更新
         self.master.destroy()  # ダイアログを閉じる
 
-    def server_stop_thread(self, set_code):
+    def server_stop_thread(self, set_code, long_backup_code):
         # サーバー終了処理をバックグラウンドで実行
-        server_stop(set_code)
+        server_stop(set_code, long_backup_code)
 
 class exit_check(tk.Frame):
     # 確認ダイアログウィンドウ
@@ -284,7 +386,7 @@ class server_close_check(tk.Frame):
 
     def server_stop_thread(self, set_code):
         # サーバー終了処理をバックグラウンドで実行
-        server_stop(set_code)
+        server_stop(set_code, 0)
         self.master.after(0, self.close_main_window)
 
     def close_main_window(self):
@@ -329,16 +431,41 @@ class server_restart_check(tk.Frame):
 
 def gui_main():
     global app
+
     root = tk.Tk()
-    root.tk.call("source", "azure.tcl")
+
+    os_system = platform.system()
+
+    # Windows
+    if os_system == 'Windows':
+
+        # タスクバー・Explorer用
+        try:
+            root.iconbitmap(resource_path("icon.ico"))
+        except Exception:
+            pass
+
+    # 共通アイコン設定（Win/Mac/Linux）
+    try:
+        icon_image = tk.PhotoImage(file=resource_path("icon.png"))
+        root.iconphoto(True, icon_image)
+
+        # ガベージコレクション対策
+        root.icon_image = icon_image
+
+    except Exception:
+        pass
+
+    # テーマ読み込み
+    root.tk.call("source", resource_path("azure.tcl"))
     root.tk.call("set_theme", "light")
 
     root.grid_rowconfigure(0, weight=1)
     root.grid_columnconfigure(0, weight=1)
 
     app = window_main(master=root)
-    app.mainloop()
-    return None
+
+    return root
 
 def print_gui_log(content):
     # GUIのログに追記
@@ -348,21 +475,137 @@ def print_gui_log(content):
     return None
 
 def restart_server_threaded(set_code):
-    thread = threading.Thread(target=server_stop, args=(set_code,))
+    thread = threading.Thread(target=server_stop, args=(set_code, 0))
     thread.start()
 
-# 関数定義（GUI系以外）
+# 関数定義（Discord関連）
+async def send_notification(
+    title,
+    description,
+    color=0x00ff00
+):
+
+    if config.use_discord_bot not in (1, 2):
+        return
+
+    try:
+
+        await bot.wait_until_ready()
+
+        channel = bot.get_channel(
+            int(config.discord_channel)
+        )
+
+        # チャンネル取得失敗
+        if channel is None:
+
+            print_gui_log(
+                '指定されたDiscordのチャンネルはありません。'
+            )
+
+            return
+
+        embed = discord.Embed(
+            title=title,
+            description=description,
+            color=color
+        )
+
+        await channel.send(embed=embed)
+
+    except ValueError:
+        print_gui_log('設定「discord_channel」には整数を入力してください。')
+
+    except discord.errors.Forbidden:
+        print_gui_log('指定されたDiscordのチャンネルへの送信権限がありません。')
+
+    except Exception as e:
+        print_gui_log(f'Discordへの通知送信中にエラーが発生しました: {e}')
+
+def discord_post(title, description, color=0x00ff00):
+    if config.use_discord_bot in (1, 2):
+        coro = send_notification(title, description, color)
+        future = asyncio.run_coroutine_threadsafe(coro, bot.loop)
+        try:
+            future.result(timeout=10)
+        except Exception as e:
+            print_with_date(f"通知送信エラー: {e}")
+
+# Bot用のスレッドターゲット
+def run_discord_bot():
+
+    if config.use_discord_bot not in (1, 2):
+        return
+
+    try:
+        bot.run(config.discord_token)
+
+    except discord.errors.LoginFailure:
+
+        print_gui_log(
+            'Discordのbotのトークンが不正です。'
+            'Discordのbotを起動できませんでした。'
+        )
+
+    except Exception as e:
+
+        print_gui_log(
+            f'Discordのbotを起動中にエラーが発生しました: {e}'
+        )
+
+@bot.event
+async def on_ready():
+    if config.use_discord_bot in (1, 2):
+            print_gui_log(f'Discordのbotを起動しました。: {bot.user}')
+
+            channel = bot.get_channel(
+                int(config.discord_channel)
+            )
+
+            if channel is None:
+                print_gui_log('指定されたDiscordのチャンネルはありません。')
+
+# 関数定義（一般）
+
+def start_threads():
+    threading.Thread(target=monitoring, daemon=True).start()
+    threading.Thread(target=autosave, daemon=True).start()
+    threading.Thread(target=auto_restart, daemon=True).start()
+    if config.use_discord_bot in (1, 2):
+        threading.Thread(target=run_discord_bot, daemon=True).start()
+    threading.Thread(target=auto_long_backup, daemon=True).start()
+
+def resource_path(filename):
+    # pyinstaller対策
+    if getattr(sys, 'frozen', False):
+        base_dir = sys._MEIPASS
+    else:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+
+    return os.path.join(base_dir, filename)
+
 def check_nettool():
     # nettoolの存在確認
+
     try:
-        subprocess.run(['nettool'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except FileNotFoundError:
-        keywait = input(f'nettoolの認識に失敗しました。\nWindowsの場合は、nettool.exeをらくらくNS+の実行ファイルと同じフォルダに置いてからやり直してください。\nその他のOSの場合は、nettoolにPATHを通してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+
+        nettool_path = run_nettool()
+
+        subprocess.run(
+            [nettool_path],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+
+    except Exception:
+        keywait = input(
+            'nettoolの認識に失敗しました。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
         sys.exit()
-    except subprocess.CalledProcessError:
-        keywait = input(f'nettoolの認識に失敗しました。\nWindowsの場合は、nettool.exeをらくらくNS+の実行ファイルと同じフォルダに置いてからやり直してください。\nその他のOSの場合は、nettoolにPATHを通してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
-        sys.exit()
+
     print_with_date('nettoolの認識に成功しました。')
+
     return None
 
 def check_os():
@@ -375,19 +618,418 @@ def check_os():
         sys.exit()
     return os_system
 
+# 初期化・設定チェック
 def check_config():
-    # 設定チェック
-    try:
-        hour = int(config.restart_time)
-        if hour == -1 or 0 <= hour <= 24:
-            pass
-        else:
-            keywait = input(f'設定「restart_time」に不正な値が入力されています。-1、0～24のいずれかの整数を入力してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+    global server_folder_path
+    global server_path
+    global server_save
+    global launch_save
+    global start_code
+    global exit_code
+    global nettool_pw
+    global scheduler
+    global scheduler_running
+    global server_ip
+    global intents
+    global autosave_mode
+    global long_backup_folder_path
+    global long_backup_time
+    global long_backup_keep
+    global restart_time
+    global root
+
+    # ====================================================
+    # 必須設定
+    # ====================================================
+
+    required_settings = (
+        'server_folder_path',
+        'server_name',
+    )
+
+    for setting in required_settings:
+        if not hasattr(config, setting):
+            input(
+                f'設定「{setting}」が定義されていません。設定をしてください。\n'
+                '（らくらくNS+を終了します。Enterキーを押してください。）'
+            )
             sys.exit()
-    except ValueError:
-        keywait = input(f'設定「restart_time」に不正な値が入力されています。-1、0～24のいずれかの整数を入力してください。\n（らくらくNS+を終了します。Enterキーを押してください。）')
+
+    # ====================================================
+    # デフォルト値
+    # ====================================================
+
+    default_settings = {
+        'port_number': (
+            '13353',
+            '設定「port_number」が定義されていません。'
+            'ポート13353でサーバーを開始します。'
+        ),
+
+        'autosave_mode': (
+            0,
+            '設定「autosave_mode」が定義されていません。'
+            '一定間隔でオートセーブを行います。'
+        ),
+
+        'autosave_backup': (
+            80,
+            '設定「autosave_backup」が定義されていません。'
+            'バックアップは80個取ります。'
+        ),
+
+        'autosave_interval': (
+            20,
+            '設定「autosave_interval」が定義されていません。'
+            'オートセーブは20分間隔、もしくは最後のロードから20分後に行います。'
+        ),
+
+        'long_backup_keep': (
+            0,
+            '設定「long_backup_keep」が定義されていません。'
+            '自動長期バックアップは行いません。'
+        ),
+
+        'long_backup_time': (
+            5,
+            '設定「long_backup_time」が定義されていません。'
+            '自動長期バックアップが有効な場合、午前5時に行います。'
+        ),
+
+        'restart_time': (
+            -1,
+            '設定「restart_time」が定義されていません。'
+            '自動再起動は行いません。'
+        ),
+    }
+
+    for setting, (default_value, message) in default_settings.items():
+        if not hasattr(config, setting):
+            setattr(config, setting, default_value)
+            print_with_date(message)
+
+    # ====================================================
+    # プレイヤーパスワード
+    # ====================================================
+
+    for i in range(15):
+        attr_name = f'player_{i}_pw'
+
+        if not hasattr(config, attr_name):
+            setattr(config, attr_name, '')
+            print_with_date(
+                f'設定「{attr_name}」が定義されていません。'
+                f'プレイヤー{i}にパスワードはかけません。'
+            )
+
+    # ====================================================
+    # server_folder_path
+    # ====================================================
+
+    try:
+        server_folder_path = os.path.normpath(
+            str(config.server_folder_path)
+        )
+
+        if not os.path.isdir(server_folder_path):
+            raise FileNotFoundError
+
+    except (NameError, TypeError, ValueError):
+        input(
+            '設定「server_folder_path」に不正な値が設定されています。'
+            '存在するフォルダを入力してください。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
+        sys.exit()
+
+    except FileNotFoundError:
+        input(
+            '設定「server_folder_path」で設定されたフォルダは存在しません。'
+            '存在するフォルダを入力してください。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
+        sys.exit()
+
+    # ====================================================
+    # server_name
+    # ====================================================
+
+    try:
+        server_name = str(config.server_name).strip()
+
+        if server_name == '':
+            raise ValueError
+
+        # server_path生成
+        server_path = os.path.normpath(
+            os.path.join(server_folder_path, server_name)
+        )
+
+        # Linux/macOS向けに / に統一
+        server_path = server_path.replace('\\', '/')
+
+        # 存在確認
+        if not os.path.exists(server_path):
+            raise FileNotFoundError
+
+    except (NameError, TypeError, ValueError):
+        input(
+            '設定「server_name」に不正な値が設定されています。'
+            '正しいサーバー名を入力してください。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
+        sys.exit()
+
+    except FileNotFoundError:
+        input(
+            '設定「server_name」で設定されたサーバーファイルが存在しません。'
+            '設定を確認してください。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
+        sys.exit()
+
+    # ====================================================
+    # autosave_mode
+    # ====================================================
+
+    try:
+        autosave_mode = int(config.autosave_mode)
+
+        if autosave_mode not in (0, 1):
+            raise ValueError
+
+    except (NameError, ValueError, TypeError):
+        input(
+            '設定「autosave_mode」に不正な値が設定されています。'
+            '0か1いずれかの値を入力してください。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
+        sys.exit()
+
+    # ====================================================
+    # restart_time
+    # ====================================================
+
+    try:
+        restart_time = int(config.restart_time)
+
+        if restart_time != -1 and not (0 <= restart_time <= 24):
+            raise ValueError
+
+    except (NameError, ValueError, TypeError):
+        input(
+            '設定「restart_time」に不正な値が設定されています。'
+            '-1、0～24のいずれかの整数を入力してください。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
+        sys.exit()
+
+    # ====================================================
+    # long_backup_keep
+    # ====================================================
+
+    try:
+        long_backup_keep = int(config.long_backup_keep)
+
+        if long_backup_keep < -1:
+            raise ValueError
+
+    except (NameError, ValueError, TypeError):
+        input(
+            '設定「long_backup_keep」に不正な値が設定されています。'
+            '-1以上の整数を入力してください。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
+        sys.exit()
+
+    # ====================================================
+    # long_backup_time
+    # ====================================================
+
+    try:
+        long_backup_time = int(config.long_backup_time)
+
+        if not (0 <= long_backup_time <= 24):
+            raise ValueError
+
+    except (NameError, ValueError, TypeError):
+        input(
+            '設定「long_backup_time」に不正な値が設定されています。'
+            '0～24のいずれかの整数を入力してください。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
+        sys.exit()
+
+    # ====================================================
+    # port_number
+    # ====================================================
+
+    try:
+        port_number = int(config.port_number)
+
+        if not (0 <= port_number <= 65535):
+            raise ValueError
+
+        # 文字列として再保存
+        config.port_number = str(port_number)
+
+    except (NameError, ValueError, TypeError):
+        input(
+            '設定「port_number」に不正な値が設定されています。'
+            '0～65535のいずれかの整数を入力してください。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
+        sys.exit()
+
+    # ====================================================
+    # autosave_backup
+    # ====================================================
+
+    try:
+        autosave_backup = int(config.autosave_backup)
+
+        if autosave_backup <= 0:
+            raise ValueError
+
+    except (NameError, ValueError, TypeError):
+        input(
+            '設定「autosave_backup」に不正な値が設定されています。'
+            '1以上の整数を入力してください。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
+        sys.exit()
+
+    # ====================================================
+    # autosave_interval
+    # ====================================================
+
+    try:
+        autosave_interval = int(config.autosave_interval)
+
+        if autosave_interval < 60:
+            raise ValueError
+
+    except (NameError, ValueError, TypeError):
+        input(
+            '設定「autosave_interval」に不正な値が設定されています。'
+            '60以上の整数を入力してください。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
+        sys.exit()
+
+    # ====================================================
+    # player_x_pw
+    # ====================================================
+
+    for i in range(15):
+
+        try:
+            pw = getattr(config, f'player_{i}_pw')
+
+            # int / floatは禁止
+            # （'1' のような文字列は許可）
+            if isinstance(pw, (int, float)):
+                raise ValueError
+
+            # 文字列化
+            setattr(config, f'player_{i}_pw', str(pw))
+
+        except (NameError, ValueError, TypeError):
+            input(
+                f'設定「player_{i}_pw」に不正な値が設定されています。'
+                '文字列を入力してください。\n'
+                '（らくらくNS+を終了します。Enterキーを押してください。）'
+            )
+            sys.exit()
+
+    # ====================================================
+    # use_discord_bot
+    # ====================================================
+
+    if not hasattr(config, 'use_discord_bot'):
+        config.use_discord_bot = 0
+        print_with_date(
+            '設定「use_discord_bot」が定義されていません。'
+            'Discordのbotは使用しません。'
+        )
+
+    try:
+        use_discord_bot = int(config.use_discord_bot)
+
+        if use_discord_bot not in (0, 1, 2):
+            raise ValueError
+
+    except (NameError, ValueError, TypeError):
+        input(
+            '設定「use_discord_bot」に不正な値が設定されています。'
+            '0、1、2のいずれかを入力してください。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
+        sys.exit()
+
+    # ====================================================
+    # 各種パス・変数生成
+    # ====================================================
+
+    server_save = f'server{config.port_number}-network.sve'
+    launch_save = os.path.join(
+        '..',
+        f'server{config.port_number}-network.sve'
+    )
+
+    long_backup_folder_path = os.path.join(
+        server_folder_path,
+        'autosave',
+        'long-backup'
+    )
+
+    # Linux/macOS向けに / に統一
+    server_path = server_path.replace('\\', '/')
+    launch_save = launch_save.replace('\\', '/')
+    long_backup_folder_path = long_backup_folder_path.replace('\\', '/')
+
+    # ====================================================
+    # 初期変数
+    # ====================================================
+
+    start_code = 0
+    exit_code = 0
+    nettool_pw = 0
+
+    scheduler = sched.scheduler(time.time, time.sleep)
+    scheduler_running = False
+
+    server_ip = '127.0.0.1:'
+
+    root = None
+
     print_with_date('設定に正常な値が入力されていることを確認しました。')
+
     return None
+
+def get_savefile_timestamp(type):
+    # typeが0なら文字列分単位、1なら文字列秒単位、2なら配列で取得する
+    pt = server_folder_path + '/' + server_save
+    if os.path.isfile(pt) == True:
+        unix_time = os.path.getctime(pt)
+        dt = datetime.datetime.fromtimestamp(int(unix_time))
+        if type == 0:
+            final_time = dt.strftime("%H:%M")
+        elif type == 1:
+            final_time = dt.strftime("%H:%M:%S")
+        elif type == 2:
+            for_hour = dt.hour
+            for_minute = dt.minute
+            for_second = dt.second
+            final_time = array.array('i', [for_hour, for_minute, for_second])
+    else:
+        if type == 0:
+            final_time = "99:99"
+        elif type == 1:
+            final_time = "99:99:99"
+        elif type == 2:
+            final_time = array.array('i', [99, 99, 99])
+    return final_time
 
 def convert_to_time(hour):
     if hour == -1:
@@ -398,16 +1040,31 @@ def convert_to_time(hour):
         return time(hour, 0, 0)
     return time(0, 0, 0)
 
-def schedule_event(hour, minute, second, action):
-    # 関数を予約する
-    now = datetime.datetime.now()
-    run_time = now.replace(hour=hour, minute=minute, second=second, microsecond=0)
-    if run_time <= now:
-        run_time += datetime.timedelta(days=1)
-    delay = (run_time - now).total_seconds()
-    scheduler.enter(delay, 1, action)
-    if not scheduler.empty():
-        scheduler.run()
+def run_nettool():
+    # Windows
+    if platform.system() == 'Windows':
+
+        # PyInstaller実行時
+        if getattr(sys, 'frozen', False):
+
+            internal_path = resource_path('nettool.exe')
+
+            # 一時フォルダへコピー
+            temp_dir = tempfile.gettempdir()
+            external_path = os.path.join(temp_dir, 'nettool.exe')
+
+            # 上書きコピー
+            shutil.copy2(internal_path, external_path)
+
+            return external_path
+
+        # 通常Python実行時
+        else:
+            return resource_path('nettool.exe')
+
+    # Linux/macOS
+    else:
+        return 'nettool'
 
 def get_nettool_pw(output):
     # simuconf.tabを開き、「server_admin_pw」から始まる行を検索
@@ -475,10 +1132,10 @@ def set_company_pw():
     for company_pw in company_pws:
         # クラッシュ対策（存在しない会社にパスワードをかけるとクラッシュする）
         company_id = str(i)
-        result = subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'info-company', company_id], capture_output=True, text=True, encoding='utf-8')
+        result = subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'info-company', company_id], capture_output=True, text=True, encoding='utf-8')
         # Nothing received.の後は改行が必要
         if result.stdout != 'Nothing received.\n' and company_pw != '':
-            subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'lock-company', company_id, company_pw], capture_output=True, text=True)
+            subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'lock-company', company_id, company_pw], capture_output=True, text=True)
         i += 1
     print_gui_log('会社にパスワードを設定しました。')
 
@@ -491,24 +1148,10 @@ def app_start():
     elif os_system == 'Linux' or os_system == 'Darwin':
         return subprocess.Popen([server_path, '-server', config.port_number, '-fps', '30', '-nomidi', '-nosound', '-load', launch_save], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
 
-def swm_discord_post(title, description, color):
-    # Simutrans World Monitorを利用してDiscordに書き込み
-    discord_io_file_plain = server_folder_path + '/file_io/out.txt'
-    discord_io_file_embed = server_folder_path + '/file_io/out_embed.json'
-    if config.use_discord_bot == 1:
-        f = open(discord_io_file_plain, 'w', encoding='utf-8')
-        f.write('# ' + title + '\n' + description + '\n')
-        f.close()
-    elif config.use_discord_bot == 2:
-        title = title.replace('\n', '\\n')
-        description = description.replace('\n', '\\n')
-        f = open(discord_io_file_embed, 'w', encoding='utf-8')
-        f.write('{"description":"' + description + '","fields":null,"title":"' + title + '","color":' + color + ',"footer":null}')
-
 def nettool_say(content):
     # contentにはASCII文字以外を入れないこと（文字化け対策）
     global nettool_pw
-    subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'say', content], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'say', content], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return None
 
 def wait_simutrans_responce():
@@ -516,7 +1159,7 @@ def wait_simutrans_responce():
     global nettool_pw
     print_gui_log('Simutransの応答を待っています。しばらくお待ちください。')
     while True:
-        result = subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'clients'], encoding='utf-8', stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        result = subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'clients'], encoding='utf-8', stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
         if result.returncode == 0:
             print_gui_log('Simutransが応答しました。処理を再開します。')
             break
@@ -525,9 +1168,50 @@ def wait_simutrans_responce():
 def nettool_forcesync():
     # ロード処理
     global nettool_pw
-    subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'force-sync'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'force-sync'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     wait_simutrans_responce()
     save_backup()
+
+def delete_old_long_backup_files():
+    # 指定日数を超えたファイルを削除する
+
+    print_gui_log('古い長期バックアップのデータを削除します。')
+
+    # -1なら無期限保管
+    if long_backup_keep == -1:
+        print_gui_log('長期バックアップは無期限保管設定のため削除をスキップします。')
+        return
+
+    # 現在時刻
+    now = time.time()
+
+    # 日数 → 秒に変換
+    limit_seconds = long_backup_keep * 24 * 60 * 60
+
+    # フォルダ内を走査
+    for filename in os.listdir(long_backup_folder_path):
+        file_path = os.path.join(long_backup_folder_path, filename)
+
+        # ファイルのみ対象
+        if os.path.isfile(file_path):
+
+            # 最終更新時刻を取得
+            modified_time = os.path.getmtime(file_path)
+
+            # 経過時間
+            elapsed = now - modified_time
+
+            # 指定日数を超えていたら削除
+            if elapsed > limit_seconds:
+                try:
+                    # print_gui_log(f'削除: {file_path}')
+                    os.remove(file_path)
+
+                except Exception as e:
+                    # print_gui_log(f'削除失敗: {e}')
+                    pass
+
+    print_gui_log('古い長期バックアップのデータを削除しました。')
 
 def save_backup():
     # バックアップ
@@ -560,7 +1244,54 @@ def save_backup():
     print_gui_log('バックアップ処理が終了しました。')
     return None
 
-def server_stop(set_code):
+def long_backup(force_backup):
+    # 0なら長期バックアップ無効
+    if long_backup_keep == 0 and force_backup == 0:
+        print_gui_log('長期バックアップは無効化されています。')
+        return
+    print_gui_log('長期バックアップを作成します。')
+
+    try:
+        # フォルダ作成
+        os.makedirs(long_backup_folder_path, exist_ok=True)
+
+        dt = datetime.datetime.now()
+        nowdate = dt.strftime('%Y%m%d%H%M')
+
+        src = os.path.join(server_folder_path, server_save)
+        dst = os.path.join(
+            long_backup_folder_path,
+            f'backup-{nowdate}.sve'
+        )
+
+        # デバッグ用
+        # print_gui_log(f'コピー元: {src}')
+        # print_gui_log(f'コピー先: {dst}')
+
+        shutil.copy(src, dst)
+
+        # 本当に存在するか確認
+        if os.path.exists(dst):
+            print_gui_log('長期バックアップを作成しました。')
+        else:
+            print_gui_log('バックアップファイルが存在しません。')
+
+        delete_old_long_backup_files()
+
+    except Exception as e:
+        print_gui_log(f'長期バックアップの作成に失敗しました。: {e}')
+
+def auto_long_backup():
+    # 指定の時間に長期バックアップする
+    # long_backup_keepが0の場合はバックアップしない
+    if long_backup_keep != 0:
+        schedule.every().days.at(f'{long_backup_time:02}:00:00').do(long_backup, 0)
+        while True:
+            schedule.run_pending()
+            time.sleep(1)
+    return None
+
+def server_stop(set_code, long_backup_code):
     # サーバーを止める機能
     global nettool_pw
     global start_code
@@ -569,35 +1300,32 @@ def server_stop(set_code):
             return None
         nettool_say('Server restart soon.')
         print_gui_log('再起動予告メッセージを送信しました。')
-        swm_discord_post('まもなく再起動を行います。', 'これからのログインはおやめください。', '16760576')
+        discord_post('まもなく再起動を行います。', 'これからのログインはおやめください。', 0xffbf00)
     elif set_code == 3:
         nettool_say('Maintenance soon.')
         print_gui_log('メンテナンス予告メッセージを送信しました。')
-        swm_discord_post('まもなくメンテナンスです。', 'これからのログインはおやめください。', '16760576')
+        discord_post('まもなくメンテナンスです。', 'これからのログインはおやめください。', 0xffbf00)
     elif set_code == 5:
         nettool_say('Server close soon.')
         print_gui_log('サーバー終了予告メッセージを送信しました。')
-        swm_discord_post('まもなくサーバーを終了します。', 'これからのログインはおやめください。', '16760576')
+        discord_post('まもなくサーバーを終了します。', 'これからのログインはおやめください。', 0xffbf00)
     time.sleep(30)
     nettool_forcesync()
+    if long_backup_code == 1:
+        long_backup(1)
     if set_code == 2:
         nettool_say('Server is restarting.')
         print_gui_log('再起動中告知メッセージを送信しました。')
     elif set_code == 3:
         nettool_say('Maintenance start.')
         print_gui_log('メンテナンス告知メッセージを送信しました。')
-        swm_discord_post('ただいまメンテナンス中です。', 'メンテナンス中でもサーバーに入れる場合がありますが、許可なく入らないでください。', '16760576')
+        discord_post('ただいまメンテナンス中です。', 'メンテナンス中でもサーバーに入れる場合がありますが、許可なく入らないでください。', 0xffbf00)
     elif set_code == 5:
         nettool_say('Server is close. Thank you for playing!')
         print_gui_log('サーバー終了告知メッセージを送信しました。')
-        swm_discord_post('サーバーは終了しました。', '皆様のご参加ありがとうございました。', '65280')
+        discord_post('サーバーは終了しました。', '皆様のご参加ありがとうございました。', 0x00ff00)
     start_code = set_code
-    subprocess.run(['nettool', '-p', nettool_pw, '-s', server_ip + config.port_number, 'shutdown'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    # if config.restart_time == 0:
-    #     restart_time = 23
-    # else:
-    #     restart_time = config.restart_time - 1
-    # schedule_event(restart_time, 59, 30, lambda: server_stop(2))
+    subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'shutdown'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return None
 
 def auto_restart():
@@ -609,11 +1337,10 @@ def auto_restart():
             restart_time = 23
         else:
             restart_time = config.restart_time - 1
-        schedule.every().days.at(restart_time + ":59:30").do(server_stop(2))
+        schedule.every().days.at(restart_time + ":59:30").do(server_stop(2, 0))
         while True:
             schedule.run_pending()
             time.sleep(1)
-        # schedule_event(restart_time, 59, 30, lambda: server_stop(2))
     return None
 
 def monitoring():
@@ -625,68 +1352,290 @@ def monitoring():
         print_gui_log('サーバーは起動済みです。')
         start_code = 1
     while True:
-        # start_codeが3（メンテナンス中）であれば処理を行わない
-        if not start_code == 3:
+        # start_codeが3（メンテナンス中）または6（復旧待ち）であれば処理を行わない
+        if start_code not in (3, 6):
             # PIDを取得し、Noneなら起動する
             server_pid = get_pid(config.server_name)
             if server_pid is None:
-                app_process = app_start()
                 # 初回起動時とそれ以外で表示メッセージを変える
                 if start_code == 0:
+                    # 初回起動時
+                    app_start()
                     print_gui_log('サーバーを起動します。')
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
                     set_company_pw()
                     start_code = 1
                 elif start_code == 1:
-                    print_gui_log('サーバーダウンを検出しました。再起動します。')
-                    swm_discord_post('サーバーダウンを検出しました。', '現在復旧中です。しばらくお待ちください。', '16711680')
+                    # サーバーダウン時
+                    save_timestamp = get_savefile_timestamp(0)
+                    if save_timestamp == "99:99":
+                        # サーバーダウン（手動復旧必要時）
+                        print_gui_log('サーバーダウンを検出しました。復旧用のデータを配置し手動で復旧してください。')
+                        discord_post('サーバーがダウンしました。', '復旧用のデータがないため、今回は自動復旧できません。\nご迷惑をおかけしますが、復旧までしばらくお待ちください。', 0xff0000)
+                        start_code = 6
+                        app.after(0,app.set_manual_restart_mode)
+                        while start_code == 6:
+                            time.sleep(1)
+                        continue
+                    else:
+                        # サーバーダウン（自動復旧時）
+                        app_start()
+                        print_gui_log('サーバーダウンを検出しました。再起動します。')
+                        discord_post('サーバーがダウンしました。', '自動で復帰します。しばらくお待ちください。\nこれに伴い、' + save_timestamp + 'までデータが巻き戻ります。', 0xff0000)
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
                     set_company_pw()
                     print_gui_log('サーバーを再起動しました。')
-                    swm_discord_post('サーバーが復旧しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', '65280')
+                    discord_post('サーバーが復旧しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', 0x00ff00)
                 elif start_code == 2:
+                    # 再起動した場合
+                    app_start()
                     print_gui_log('サーバーを起動します。')
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
                     set_company_pw()
                     print_gui_log('サーバーを起動しました。')
-                    swm_discord_post('サーバーを再起動しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', '65280')
+                    discord_post('サーバーを再起動しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', 0x00ff00)
+                    start_code = 1
                 elif start_code == 4:
+                    # メンテナンス終了時
+                    app_start()
                     print_gui_log('サーバーを再開します。')
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
                     set_company_pw()
                     print_gui_log('サーバーを再開しました。')
-                    swm_discord_post('メンテナンスを終了しました。', '皆様のご協力ありがとうございました。', '65280')
+                    discord_post('メンテナンスを終了しました。', '皆様のご協力ありがとうございました。', 0x00ff00)
+                    start_code = 1
+                elif start_code == 7:
+                    # サーバー手動再開時
+                    app_start()
+                    print_gui_log('サーバーを再開します。')
+                    nettool_pw = get_nettool_pw(1)
+                    wait_simutrans_responce()
+                    set_company_pw()
+                    print_gui_log('サーバーを再開しました。')
+                    discord_post('サーバーを再開しました。', '大変お待たせしました。', 0x00ff00)
                     start_code = 1
                 elif start_code == 5:
+                    app_start()
                     break
         time.sleep(1)
     return None
 
 def autosave():
-    # オートセーブ処理
-    autosave_interval = config.autosave_interval - 30
-    time.sleep(autosave_interval)
-    while True:
-        nettool_say('Autosave soon.')
-        print_gui_log('オートセーブ予告メッセージを送信しました。')
-        time.sleep(30)
-        start_time = time.time()
-        print_gui_log('オートセーブ中です。')
-        nettool_forcesync()
-        set_company_pw()
-        print_gui_log('オートセーブ処理が完了しました。')
-        end_time = time.time()
-        time_diff = end_time - start_time
+
+    pt = server_folder_path + '/' + server_save
+
+    # ====================================================
+    # 従来タイマー方式
+    # ====================================================
+    if autosave_mode == 0:
+
         autosave_interval = config.autosave_interval - 30
-        next_autosave_in = autosave_interval - time_diff
-        if next_autosave_in > 0:
-            time.sleep(next_autosave_in)
+
+        # backup用タイマー
+        last_backup_time = time.time()
+
+        if autosave_interval > 0:
+            time.sleep(autosave_interval)
+
+        while True:
+
+            # ----------------------------------------
+            # autosave予告
+            # ----------------------------------------
+            nettool_say('Autosave soon.')
+            print_gui_log('オートセーブ予告メッセージを送信しました。')
+
+            time.sleep(30)
+
+            # ----------------------------------------
+            # autosave
+            # ----------------------------------------
+            print_gui_log('オートセーブ中です。')
+
+            start_time = time.time()
+
+            nettool_forcesync()
+            set_company_pw()
+
+            end_time = time.time()
+
+            print_gui_log('オートセーブ処理が完了しました。')
+
+            last_backup_time = time.time()
+
+            # ----------------------------------------
+            # 次回autosave待機
+            # ----------------------------------------
+            process_time = end_time - start_time
+
+            next_autosave = (
+                config.autosave_interval
+                - 30
+                - process_time
+            )
+
+            # autosave待機中に
+            # backupだけ実行する可能性あり
+            while next_autosave > 0:
+
+                now_time = time.time()
+
+                # backup単独判定
+                if (
+                    now_time - last_backup_time
+                    >= config.autosave_interval
+                ):
+
+                    print_gui_log('定期バックアップを実行します。')
+
+                    save_backup()
+
+                    print_gui_log('定期バックアップ処理が完了しました。')
+
+                    last_backup_time = time.time()
+
+                sleep_time = min(1, next_autosave)
+
+                time.sleep(sleep_time)
+
+                next_autosave -= sleep_time
+
+        return None
+
+    # ====================================================
+    # savefile timestamp方式
+    # ====================================================
+    now_time = time.time()
+
+    # 最後のsave activity時刻
+    last_save_activity_time = now_time
+
+    # 最後のbackup時刻
+    last_backup_time = now_time
+
+    # autosave予告済みフラグ
+    autosave_warned = False
+
+    while True:
+
+        now_time = time.time()
+
+        # ------------------------------------------------
+        # セーブファイル存在確認
+        # ------------------------------------------------
+        if os.path.isfile(pt):
+
+            current_save_time = os.path.getctime(pt)
+
+            # save更新検知
+            if current_save_time > last_save_activity_time:
+
+                last_save_activity_time = current_save_time
+
+                # save更新があったので予告リセット
+                autosave_warned = False
+
         else:
+
+            # ファイルがない場合は従来タイマー方式
+            current_save_time = now_time
+
+        # ------------------------------------------------
+        # autosave予告判定
+        # ------------------------------------------------
+        autosave_warn_time = (
+            last_save_activity_time
+            + config.autosave_interval
+            - 30
+        )
+
+        if (
+            autosave_warned == False
+            and now_time >= autosave_warn_time
+        ):
+
+            nettool_say('Autosave soon.')
+            print_gui_log('オートセーブ予告メッセージを送信しました。')
+
+            autosave_warned = True
+
+        # ------------------------------------------------
+        # autosave判定
+        # ------------------------------------------------
+        autosave_execute_time = (
+            last_save_activity_time
+            + config.autosave_interval
+        )
+
+        if now_time >= autosave_execute_time:
+
+            # 予告後に手動saveされた可能性を再確認
+            if os.path.isfile(pt):
+
+                latest_save_time = os.path.getctime(pt)
+
+                if latest_save_time > last_save_activity_time:
+
+                    last_save_activity_time = latest_save_time
+                    autosave_warned = False
+
+                    time.sleep(1)
+                    continue
+
+            # ----------------------------------------
+            # autosave
+            # ----------------------------------------
+            print_gui_log('オートセーブ中です。')
+
+            nettool_forcesync()
+            set_company_pw()
+
+            print_gui_log('オートセーブ処理が完了しました。')
+
+            # autosave後のsave時刻取得
+            if os.path.isfile(pt):
+
+                last_save_activity_time = os.path.getctime(pt)
+
+            else:
+
+                last_save_activity_time = time.time()
+
+            # backupタイマー更新
+            last_backup_time = time.time()
+
+            # 次回予告用
+            autosave_warned = False
+
             time.sleep(1)
+            continue
+
+        # ------------------------------------------------
+        # backup単独判定
+        # ------------------------------------------------
+        backup_execute_time = (
+            last_backup_time
+            + config.autosave_interval
+        )
+
+        if now_time >= backup_execute_time:
+
+            print_gui_log('定期バックアップを実行します。')
+
+            save_backup()
+
+            print_gui_log('定期バックアップ処理が完了しました。')
+
+            # backupタイマー更新
+            last_backup_time = time.time()
+
+        # CPU負荷軽減
+        time.sleep(1)
+
     return None
 
 if __name__ == "__main__":
@@ -695,20 +1644,8 @@ if __name__ == "__main__":
     check_nettool()
     nettool_pw = get_nettool_pw(0)
 
-    thread_1 = threading.Thread(target=gui_main)
-    thread_1.start()
+    root = gui_main()
 
-    time.sleep(1)
+    root.after(100, start_threads)
 
-    thread_2 = threading.Thread(target=monitoring, daemon=True)
-    thread_2.start()
-
-    thread_3 = threading.Thread(target=autosave, daemon=True)
-    thread_3.start()
-
-    thread_4 = threading.Thread(target=auto_restart, daemon=True)
-    thread_4.start()
-
-    thread_1.join()
-
-    # client.run(config.discord_token)
+    root.mainloop()

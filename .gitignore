@@ -3,3 +3,6 @@
 src/config.py
 /distribution
 /src/command_file
+/src/build
+src/RakurakuNS-Plus.spec
+/src/dist

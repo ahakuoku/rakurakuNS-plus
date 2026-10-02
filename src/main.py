@@ -1415,6 +1415,7 @@ def monitoring():
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
                     set_company_pw()
+                    set_ban_user()
                     start_code = 1
                 elif start_code == 1:
                     # サーバーダウン時
@@ -1436,6 +1437,7 @@ def monitoring():
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
                     set_company_pw()
+                    set_ban_user()
                     print_gui_log('サーバーを再起動しました。')
                     discord_post('サーバーが復旧しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', 0x00ff00)
                 elif start_code == 2:
@@ -1445,6 +1447,7 @@ def monitoring():
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
                     set_company_pw()
+                    set_ban_user()
                     print_gui_log('サーバーを起動しました。')
                     discord_post('サーバーを再起動しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', 0x00ff00)
                     start_code = 1
@@ -1455,6 +1458,7 @@ def monitoring():
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
                     set_company_pw()
+                    set_ban_user()
                     print_gui_log('サーバーを再開しました。')
                     discord_post('メンテナンスを終了しました。', '皆様のご協力ありがとうございました。', 0x00ff00)
                     start_code = 1
@@ -1465,13 +1469,13 @@ def monitoring():
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
                     set_company_pw()
+                    set_ban_user()
                     print_gui_log('サーバーを再開しました。')
                     discord_post('サーバーを再開しました。', '大変お待たせしました。', 0x00ff00)
                     start_code = 1
                 elif start_code == 5:
                     app_start()
                     break
-            set_ban_user()
         time.sleep(1)
     return None
 

@@ -1154,7 +1154,7 @@ def nettool_say(content):
     while result == 0:
         result = subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'say', content], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if result != 0:
-            print_gui_log('メッセージ送信に失敗しました。やり直します。')
+            print_gui_log('メッセージ送信に失敗しました。やり直します。コード: ' + result)
             time.sleep(1)
     return None
 
@@ -1175,7 +1175,7 @@ def nettool_forcesync():
     while result == 0:
         result = subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'force-sync'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if result != 0:
-            print_gui_log('オートセーブに失敗しました。やり直します。')
+            print_gui_log('オートセーブに失敗しました。やり直します。コード: ' + result)
             time.sleep(1)
     wait_simutrans_responce()
     save_backup()

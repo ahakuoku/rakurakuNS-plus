@@ -717,11 +717,10 @@ def check_config():
 
         if not hasattr(config, attr_name):
             setattr(config, attr_name, '')
-            if i < 15:
-                print_with_date(
-                    f'設定「{attr_name}」が定義されていません。'
-                    f'プレイヤー{i}にパスワードはかけません。'
-                )
+            print_with_date(
+                f'設定「{attr_name}」が定義されていません。'
+                f'プレイヤー{i}にパスワードはかけません。'
+            )
 
     # ====================================================
     # IPBANユーザー

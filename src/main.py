@@ -119,11 +119,11 @@ class window_main(tk.Frame):
 
         # メンテナンスモードボタン
         self.maintenance_mode_button = ttk.Button(
-            self, text="メンテナンスモード", command=self.maintenance_check_start
+            self, text="サーバーを一時停止", command=self.maintenance_check_start
         )
         self.maintenance_mode_button.grid(row=2, column=1, padx=5, pady=10, sticky="w")
 
-        self.server_stop_button = ttk.Button(self, text="サーバー終了", command=self.server_close_check_start)
+        self.server_stop_button = ttk.Button(self, text="会期終了", command=self.server_close_check_start)
         self.server_stop_button.grid(row=2, column=2, padx=5, pady=10, sticky="w")
 
         self.exit_button = ttk.Button(self, text="らくらくNS+を終了", style='Accent.TButton', command=self.exit_check_start)
@@ -171,11 +171,11 @@ class window_main(tk.Frame):
 
     def update_maintenance_button(self):
             if self.maintenance_mode == 0:
-                text = "メンテナンスモード"
+                text = "サーバーを一時停止"
             elif self.maintenance_mode == 1:
-                text = "メンテナンス終了"
+                text = "サーバーを再開"
             elif self.maintenance_mode == 2:
-                text = "サーバー再開"
+                text = "サーバーを再開"
 
             self.maintenance_mode_button.config(text=text)
             self.maintenance_mode_button.update_idletasks()
@@ -239,10 +239,10 @@ class maintenance_check(tk.Frame):
 
         # 状態ごとにメッセージを変更
         if mode == 0:
-            text = "サーバーを中断しメンテナンスモードに入ります。\nよろしいですか？"
+            text = "サーバーを一時中断します。\nよろしいですか？"
 
         elif mode == 1:
-            text = "メンテナンスモードを終了しサーバーを再開します。\nよろしいですか？"
+            text = "サーバーを再開します。\nよろしいですか？"
 
         elif mode == 2:
             text = "サーバーを再開します。\nよろしいですか？"
@@ -362,7 +362,7 @@ class server_close_check(tk.Frame):
 
     def create_widgets(self):
         # ダイアログのウィジェットを配置
-        self.label = ttk.Label(self.master, text="サーバーを終了し、らくらくNS+を終了します。\nよろしいですか？")
+        self.label = ttk.Label(self.master, text="サーバー会期を終了し、らくらくNS+を終了します。\nよろしいですか？")
         self.label.pack(padx=10, pady=10, fill="both", expand=True)
 
         button_frame = ttk.Frame(self.master)
@@ -712,7 +712,7 @@ def check_config():
     # プレイヤーパスワード
     # ====================================================
 
-    for i in range(15):
+    for i in range(63):
         attr_name = f'player_{i}_pw'
 
         if not hasattr(config, attr_name):
@@ -721,6 +721,16 @@ def check_config():
                 f'設定「{attr_name}」が定義されていません。'
                 f'プレイヤー{i}にパスワードはかけません。'
             )
+
+    # ====================================================
+    # IPBANユーザー
+    # ====================================================
+
+    for i in range(63):
+        attr_name = f'banip_{i}'
+
+        if not hasattr(config, attr_name):
+            setattr(config, attr_name, '')
 
     # ====================================================
     # server_folder_path
@@ -921,7 +931,7 @@ def check_config():
     # player_x_pw
     # ====================================================
 
-    for i in range(15):
+    for i in range(63):
 
         try:
             pw = getattr(config, f'player_{i}_pw')
@@ -937,6 +947,31 @@ def check_config():
         except (NameError, ValueError, TypeError):
             input(
                 f'設定「player_{i}_pw」に不正な値が設定されています。'
+                '文字列を入力してください。\n'
+                '（らくらくNS+を終了します。Enterキーを押してください。）'
+            )
+            sys.exit()
+
+    # ====================================================
+    # banip_x
+    # ====================================================
+
+    for i in range(63):
+
+        try:
+            ip = getattr(config, f'banip_{i}')
+
+            # int / floatは禁止
+            # （'1' のような文字列は許可）
+            if isinstance(ip, (int, float)):
+                raise ValueError
+
+            # 文字列化
+            setattr(config, f'banip_{i}', str(ip))
+
+        except (NameError, ValueError, TypeError):
+            input(
+                f'設定「banip_{i}」に不正な値が設定されています。'
                 '文字列を入力してください。\n'
                 '（らくらくNS+を終了します。Enterキーを押してください。）'
             )
@@ -1127,16 +1162,10 @@ def get_pid(target_name):
 def set_company_pw():
     # パスワードを設定する
     global nettool_pw
-    company_pws = [config.player_0_pw, config.player_1_pw, config.player_2_pw, config.player_3_pw, config.player_4_pw, config.player_5_pw, config.player_6_pw, config.player_7_pw, config.player_8_pw, config.player_9_pw, config.player_10_pw, config.player_11_pw, config.player_12_pw, config.player_13_pw, config.player_14_pw]
-    i = 0
-    for company_pw in company_pws:
-        # クラッシュ対策（存在しない会社にパスワードをかけるとクラッシュする）
+    for i in range(63):
         company_id = str(i)
-        result = subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'info-company', company_id], capture_output=True, text=True, encoding='utf-8')
-        # Nothing received.の後は改行が必要
-        if result.stdout != 'Nothing received.\n' and company_pw != '':
-            subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'lock-company', company_id, company_pw], capture_output=True, text=True)
-        i += 1
+        company_pw = getattr(config, f'player_{i}_pw', '')
+        nettool_lockcompany(company_id, company_pw)
     print_gui_log('会社にパスワードを設定しました。')
 
 def app_start():
@@ -1165,12 +1194,32 @@ def wait_simutrans_responce():
             break
         time.sleep(1)
 
+def nettool_lockcompany(company_id, company_pw):
+    # クラッシュ対策（存在しない会社にパスワードをかけるとクラッシュする）
+    result = subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'info-company', company_id], capture_output=True, text=True, encoding='utf-8')
+    # Nothing received.の後は改行が必要
+    if result.stdout != 'Nothing received.\n' and company_pw != '':
+        subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'lock-company', company_id, company_pw], capture_output=True, text=True)
+
 def nettool_forcesync():
     # ロード処理
     global nettool_pw
     subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'force-sync'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     wait_simutrans_responce()
     save_backup()
+
+def nettool_banip(banip):
+    # IPBANユーザーを設定する
+    global nettool_pw
+    if banip != '':
+        subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'ban-ip', banip])
+
+def set_ban_user():
+    # IPBANユーザーを設定する
+    for i in range(63):
+        banip = getattr(config, f'banip_{i}', '')
+        nettool_banip(banip)
+    print_gui_log('BANユーザーを設定しました。')
 
 def delete_old_long_backup_files():
     # 指定日数を超えたファイルを削除する
@@ -1321,7 +1370,7 @@ def server_stop(set_code, long_backup_code):
         print_gui_log('メンテナンス告知メッセージを送信しました。')
         discord_post('ただいまメンテナンス中です。', 'メンテナンス中でもサーバーに入れる場合がありますが、許可なく入らないでください。', 0xffbf00)
     elif set_code == 5:
-        nettool_say('Server is close. Thank you for playing!')
+        nettool_say('Server closed. Thank you for playing!')
         print_gui_log('サーバー終了告知メッセージを送信しました。')
         discord_post('サーバーは終了しました。', '皆様のご参加ありがとうございました。', 0x00ff00)
     start_code = set_code
@@ -1350,6 +1399,7 @@ def monitoring():
     if not server_pid is None:
         # 初回起動時、サーバー起動済みであった場合の処理
         print_gui_log('サーバーは起動済みです。')
+        set_ban_user()
         start_code = 1
     while True:
         # start_codeが3（メンテナンス中）または6（復旧待ち）であれば処理を行わない
@@ -1421,6 +1471,7 @@ def monitoring():
                 elif start_code == 5:
                     app_start()
                     break
+            set_ban_user()
         time.sleep(1)
     return None
 

@@ -723,6 +723,16 @@ def check_config():
             )
 
     # ====================================================
+    # IPBANユーザー
+    # ====================================================
+
+    for i in range(63):
+        attr_name = f'banip_{i}'
+
+        if not hasattr(config, attr_name):
+            setattr(config, attr_name, '')
+
+    # ====================================================
     # server_folder_path
     # ====================================================
 
@@ -937,6 +947,31 @@ def check_config():
         except (NameError, ValueError, TypeError):
             input(
                 f'設定「player_{i}_pw」に不正な値が設定されています。'
+                '文字列を入力してください。\n'
+                '（らくらくNS+を終了します。Enterキーを押してください。）'
+            )
+            sys.exit()
+
+    # ====================================================
+    # banip_x
+    # ====================================================
+
+    for i in range(63):
+
+        try:
+            ip = getattr(config, f'banip_{i}')
+
+            # int / floatは禁止
+            # （'1' のような文字列は許可）
+            if isinstance(ip, (int, float)):
+                raise ValueError
+
+            # 文字列化
+            setattr(config, f'banip_{i}', str(ip))
+
+        except (NameError, ValueError, TypeError):
+            input(
+                f'設定「banip_{i}」に不正な値が設定されています。'
                 '文字列を入力してください。\n'
                 '（らくらくNS+を終了します。Enterキーを押してください。）'
             )
@@ -1170,6 +1205,19 @@ def nettool_forcesync():
     wait_simutrans_responce()
     save_backup()
 
+def nettool_banip(banip):
+    # IPBANユーザーを設定する
+    global nettool_pw
+    if banip != '':
+        subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'ban-ip', banip])
+
+def set_ban_user():
+    # IPBANユーザーを設定する
+    for i in range(63):
+        banip = getattr(config, f'banip_{i}', '')
+        nettool_banip(banip)
+    print_gui_log('BANユーザーを設定しました。')
+
 def delete_old_long_backup_files():
     # 指定日数を超えたファイルを削除する
 
@@ -1348,6 +1396,7 @@ def monitoring():
     if not server_pid is None:
         # 初回起動時、サーバー起動済みであった場合の処理
         print_gui_log('サーバーは起動済みです。')
+        set_ban_user()
         start_code = 1
     while True:
         # start_codeが3（メンテナンス中）または6（復旧待ち）であれば処理を行わない
@@ -1419,6 +1468,7 @@ def monitoring():
                 elif start_code == 5:
                     app_start()
                     break
+            set_ban_user()
         time.sleep(1)
     return None
 

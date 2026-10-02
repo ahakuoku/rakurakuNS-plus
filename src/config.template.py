@@ -49,6 +49,6 @@ player_12_pw       = ''
 player_13_pw       = ''
 player_14_pw       = ''
 restart_time       = -1
-use_discord_bot    = 1
+use_discord_bot    = 0
 discord_token      = r'aiueo'
 discord_channel    = 1234567890

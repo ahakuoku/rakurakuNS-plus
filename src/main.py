@@ -6,6 +6,16 @@ import importlib.util
 import os
 
 try:
+    import yaml
+except ModuleNotFoundError:
+    input(
+        '必要なモジュールがインストールされていません。\n'
+        'コマンド「pip install psutil schedule discord PyYAML」を実行してからやりなおしてください。\n'
+        '（らくらくNS+を終了します。Enterキーを押してください。）'
+    )
+    sys.exit()
+
+try:
 
     # exe起動時
     if getattr(sys, 'frozen', False):
@@ -15,26 +25,18 @@ try:
     else:
         base_dir = os.path.dirname(os.path.realpath(__file__))
 
-    config_path = os.path.join(base_dir, 'config.py')
+    config_path = os.path.join(base_dir, 'config.yaml')
 
-    # config.py 存在確認
-    if os.path.exists(config_path) is False:
-        raise FileNotFoundError
-
-    # 動的import
-    spec = importlib.util.spec_from_file_location("config", config_path)
-
-    if spec is None or spec.loader is None:
-        raise ImportError
-
-    config = importlib.util.module_from_spec(spec)
-
-    spec.loader.exec_module(config)
+    if os.path.exists(config_path):
+        with open(config_path, 'r', encoding='utf-8') as config_file:
+            config_data = yaml.safe_load(config_file) or {}
+    else:
+        config_data = {}
 
 except Exception:
 
     keywait = input(
-        'config.template.pyをコピーし、config.pyにリネームして設定を行ってください。\n'
+        '設定ファイルの読み込みに失敗しました。設定画面から設定してください。\n'
         '（らくらくNS+を終了します。Enterキーを押してください。）'
     )
 
@@ -43,13 +45,21 @@ except Exception:
 try:
     import psutil
 except ModuleNotFoundError:
-    keywait = input(f'必要なモジュールがインストールされていません。\nコマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n\nUbuntu環境の場合は、下記コマンドを実行してください。\npip3 install --break-system-packages psutil schedule discord\nsudo apt update\nsudo apt install python3-tk\n\n（らくらくNS+を終了します。Enterキーを押してください。）')
+    input(
+        '必要なモジュールがインストールされていません。\n'
+        'コマンド「pip install psutil schedule discord PyYAML」を実行してからやりなおしてください。\n'
+        '（らくらくNS+を終了します。Enterキーを押してください。）'
+    )
     sys.exit()
 
 try:
     import schedule
 except ModuleNotFoundError:
-    keywait = input(f'必要なモジュールがインストールされていません。\nコマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n\nUbuntu環境の場合は、下記コマンドを実行してください。\npip3 install --break-system-packages psutil schedule discord\nsudo apt update\nsudo apt install python3-tk\n\n（らくらくNS+を終了します。Enterキーを押してください。）')
+    input(
+        '必要なモジュールがインストールされていません。\n'
+        'コマンド「pip install psutil schedule discord PyYAML」を実行してからやりなおしてください。\n'
+        '（らくらくNS+を終了します。Enterキーを押してください。）'
+    )
     sys.exit()
 
 import time
@@ -57,7 +67,11 @@ import time
 try:
     import discord
 except ModuleNotFoundError:
-    keywait = input(f'必要なモジュールがインストールされていません。\nコマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n\nUbuntu環境の場合は、下記コマンドを実行してください。\npip3 install --break-system-packages psutil schedule discord\nsudo apt update\nsudo apt install python3-tk\n\n（らくらくNS+を終了します。Enterキーを押してください。）')
+    input(
+        '必要なモジュールがインストールされていません。\n'
+        'コマンド「pip install psutil schedule discord PyYAML」を実行してからやりなおしてください。\n'
+        '（らくらくNS+を終了します。Enterキーを押してください。）'
+    )
     sys.exit()
 
 import re
@@ -71,7 +85,11 @@ import asyncio
 try:
     import tkinter as tk
 except ModuleNotFoundError:
-    keywait = input(f'必要なモジュールがインストールされていません。\nコマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n\nUbuntu環境の場合は、下記コマンドを実行してください。\npip3 install --break-system-packages psutil schedule discord\nsudo apt update\nsudo apt install python3-tk\n\n（らくらくNS+を終了します。Enterキーを押してください。）')
+    input(
+        '必要なモジュールがインストールされていません。\n'
+        'コマンド「pip install psutil schedule discord PyYAML」を実行してからやりなおしてください。\n'
+        '（らくらくNS+を終了します。Enterキーを押してください。）'
+    )
     sys.exit()
 
 from tkinter import ttk, filedialog, messagebox
@@ -82,6 +100,211 @@ import tempfile
 intents = discord.Intents.default()
 bot = discord.Client(intents=intents)
 
+def load_config():
+    global config, config_data
+    with open(config_path, 'r', encoding='utf-8') as config_file:
+        config_data = yaml.safe_load(config_file) or {}
+    config = type('Config', (), {})()
+    server = config_data.get('server', {})
+    config.server_folder_path = server.get('folder_path')
+    config.server_name = server.get('name')
+    config.port_number = server.get('port')
+    config.restart_time = server.get('restart_time')
+    autosave = config_data.get('autosave', {})
+    config.autosave_mode = autosave.get('mode')
+    config.autosave_backup = autosave.get('backup_count')
+    config.autosave_interval = autosave.get('interval')
+    backup = config_data.get('backup', {})
+    config.long_backup_keep = backup.get('long_term_keep_days')
+    config.long_backup_time = backup.get('long_term_time')
+    players = config_data.get('players', {}).get('passwords', {})
+    ban_ips = config_data.get('network', {}).get('ban_ips', {})
+    for i in range(63):
+        setattr(config, f'player_{i}_pw', players.get(i, players.get(str(i), '')))
+        setattr(config, f'banip_{i}', ban_ips.get(i, ban_ips.get(str(i), '')))
+    discord_settings = config_data.get('discord', {})
+    config.use_discord_bot = discord_settings.get('enabled', 0)
+    config.discord_token = discord_settings.get('token', '')
+    config.discord_channel = discord_settings.get('channel', '')
+
+def default_config_data():
+    return {
+        'server': {'folder_path': '', 'name': '', 'port': '13353', 'restart_time': -1},
+        'autosave': {'mode': 0, 'backup_count': 80, 'interval': 1200},
+        'backup': {'long_term_keep_days': 0, 'long_term_time': 5},
+        'players': {'passwords': {i: '' for i in range(63)}},
+        'network': {'ban_ips': {i: '' for i in range(63)}},
+        'discord': {'enabled': 0, 'token': '', 'channel': ''},
+    }
+
+class config_window:
+    def __init__(self, master, first_run=False):
+        self.master = master
+        self.first_run = first_run
+        self.window = tk.Toplevel(master)
+        self.window.title('設定')
+        self.window.geometry('980x620')
+        self.window.protocol('WM_DELETE_WINDOW', self.close)
+        self.fields = {}
+        data = config_data if config_data else default_config_data()
+        notebook = ttk.Notebook(self.window)
+        notebook.pack(fill='both', expand=True, padx=8, pady=8)
+        self.add_tab(notebook, 'サーバー', [('folder_path', 'サーバーフォルダ'), ('name', 'サーバー名'), ('port', 'ポート'), ('restart_time', '自動再起動時刻')], data.get('server', {}))
+        self.add_tab(notebook, 'オートセーブ', [('mode', 'モード'), ('backup_count', 'バックアップ数'), ('interval', '間隔（秒）')], data.get('autosave', {}))
+        self.add_tab(notebook, 'バックアップ', [('long_term_keep_days', '長期保存日数'), ('long_term_time', '実行時刻')], data.get('backup', {}))
+        self.add_tab(notebook, 'Discord', [('enabled', '使用（0/1/2）'), ('token', 'トークン'), ('channel', 'チャンネル')], data.get('discord', {}))
+        self.add_password_tab(notebook, data.get('players', {}).get('passwords', {}))
+        self.add_multiline_tab(notebook, 'BAN IP', 'ban_ips', data.get('network', {}).get('ban_ips', {}))
+        button_frame = ttk.Frame(self.window)
+        button_frame.pack(fill='x', padx=8, pady=(0, 8))
+        ttk.Button(button_frame, text='config.pyをインポート', command=self.import_legacy_config).pack(side='left')
+        ttk.Button(button_frame, text='保存', style='Accent.TButton', command=self.save).pack(side='right', padx=(8, 0))
+        ttk.Button(button_frame, text='キャンセル', command=self.close).pack(side='right')
+        self.window.transient(master)
+        self.window.grab_set()
+
+    def add_tab(self, notebook, title, fields, values):
+        frame = ttk.Frame(notebook)
+        notebook.add(frame, text=title)
+        for row, (key, label) in enumerate(fields):
+            ttk.Label(frame, text=label).grid(row=row, column=0, sticky='w', padx=10, pady=8)
+            entry = ttk.Entry(frame, width=48, show='*' if key == 'token' else '')
+            entry.insert(0, str(values.get(key, '')))
+            entry.grid(row=row, column=1, sticky='ew', padx=10, pady=8)
+            ttk.Button(frame, text='説明', command=lambda k=key: self.show_help(k)).grid(row=row, column=2, padx=5, pady=8)
+            self.fields[key] = entry
+
+    def add_multiline_tab(self, notebook, title, key, values):
+        frame = ttk.Frame(notebook)
+        notebook.add(frame, text=title)
+        ttk.Label(frame, text='番号=値（1行に1件）').pack(anchor='w', padx=10, pady=8)
+        ttk.Button(frame, text='説明', command=lambda k=key: self.show_help(k)).pack(anchor='e', padx=10)
+        text = tk.Text(frame, width=65, height=25)
+        text.pack(fill='both', expand=True, padx=10, pady=5)
+        for i in range(63):
+            value = values.get(i, values.get(str(i), ''))
+            if value not in (None, ''):
+                text.insert('end', f'{i}={value}\n')
+        self.fields[key] = text
+
+    def add_password_tab(self, notebook, values):
+        frame = ttk.Frame(notebook)
+        notebook.add(frame, text='プレイヤー')
+        frame.grid_rowconfigure(1, weight=1)
+        frame.grid_columnconfigure(0, weight=1)
+        ttk.Label(frame, text='会社ごとのパスワード').grid(row=0, column=0, sticky='w', padx=10, pady=8)
+        canvas_frame = ttk.Frame(frame)
+        canvas_frame.grid(row=1, column=0, sticky='nsew', padx=5)
+        canvas_frame.grid_rowconfigure(0, weight=1)
+        canvas_frame.grid_columnconfigure(0, weight=1)
+        canvas = tk.Canvas(canvas_frame, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(canvas_frame, orient='vertical', command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.grid(row=0, column=0, sticky='nsew')
+        scrollbar.grid(row=0, column=1, sticky='ns')
+        contents = ttk.Frame(canvas)
+        canvas_window = canvas.create_window((0, 0), window=contents, anchor='nw')
+        contents.bind('<Configure>', lambda event: canvas.configure(scrollregion=canvas.bbox('all')))
+        canvas.bind('<Configure>', lambda event: canvas.itemconfigure(canvas_window, width=event.width))
+        password_fields = {}
+        for i in range(63):
+            column = (i // 21) * 2
+            row = (i % 21) + 1
+            ttk.Label(contents, text=f'会社 {i}').grid(row=row, column=column, sticky='w', padx=(10, 4), pady=3)
+            entry = ttk.Entry(contents, width=22, show='*')
+            value = values.get(i, values.get(str(i), ''))
+            entry.insert(0, str(value or ''))
+            entry.grid(row=row, column=column + 1, sticky='w', padx=(0, 18), pady=3)
+            password_fields[i] = entry
+        ttk.Button(frame, text='説明', command=lambda: self.show_help('passwords')).grid(row=2, column=0, padx=10, pady=8, sticky='w')
+        self.fields['passwords'] = password_fields
+
+    def show_help(self, key):
+        descriptions = {
+            'folder_path': 'Simutransのサーバーフォルダを指定します。',
+            'name': '起動するSimutransサーバーの実行ファイル名を指定します。',
+            'port': 'サーバーが使用するポート番号を指定します。',
+            'restart_time': '毎日自動再起動する時刻を0～24で指定します。-1で無効です。',
+            'mode': 'オートセーブのモードです。0は一定間隔、1は最後のロードからの経過時間です。',
+            'backup_count': 'オートセーブのバックアップ保存数を指定します。',
+            'interval': 'オートセーブの間隔を秒で指定します。60以上を指定してください。',
+            'long_term_keep_days': '長期バックアップの保存日数です。0で無効、-1で無期限です。',
+            'long_term_time': '長期バックアップを実行する時刻を0～24で指定します。',
+            'enabled': 'Discord botを使用するか指定します。0は無効、1または2は有効です。',
+            'token': 'Discord botのトークンを指定します。',
+            'channel': 'Discord botが書き込むチャンネルIDを指定します。',
+            'passwords': '会社番号ごとのパスワードを入力します。空欄の会社にはパスワードを設定しません。',
+            'ban_ips': '番号=IPアドレスの形式で入力します。1行に1件、番号は0～62です。',
+        }
+        messagebox.showinfo('設定項目の説明', descriptions.get(key, 'この項目の説明はありません。'), parent=self.window)
+
+    def import_legacy_config(self):
+        path = filedialog.askopenfilename(
+            title='インポートするconfig.pyを選択',
+            filetypes=[('Python設定ファイル', 'config.py'), ('Pythonファイル', '*.py')],
+            parent=self.window,
+        )
+        if not path:
+            return
+        try:
+            spec = importlib.util.spec_from_file_location('legacy_config', path)
+            legacy = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(legacy)
+            values = {
+                'folder_path': getattr(legacy, 'server_folder_path', ''),
+                'name': getattr(legacy, 'server_name', ''),
+                'port': getattr(legacy, 'port_number', '13353'),
+                'restart_time': getattr(legacy, 'restart_time', -1),
+                'mode': getattr(legacy, 'autosave_mode', 0),
+                'backup_count': getattr(legacy, 'autosave_backup', 80),
+                'interval': getattr(legacy, 'autosave_interval', 1200),
+                'long_term_keep_days': getattr(legacy, 'long_backup_keep', 0),
+                'long_term_time': getattr(legacy, 'long_backup_time', 5),
+                'enabled': getattr(legacy, 'use_discord_bot', 0),
+                'token': getattr(legacy, 'discord_token', ''),
+                'channel': getattr(legacy, 'discord_channel', ''),
+            }
+            for key, value in values.items():
+                self.fields[key].delete(0, 'end')
+                self.fields[key].insert(0, str(value))
+            for i in range(63):
+                value = getattr(legacy, f'player_{i}_pw', '')
+                self.fields['passwords'][i].delete(0, 'end')
+                self.fields['passwords'][i].insert(0, str(value or ''))
+            text = self.fields['ban_ips']
+            text.delete('1.0', 'end')
+            for i in range(63):
+                value = getattr(legacy, f'banip_{i}', '')
+                if value not in ('', None):
+                    text.insert('end', f'{i}={value}\n')
+            messagebox.showinfo('インポート完了', 'config.pyの設定を画面に反映しました。保存するとconfig.yamlが作成されます。', parent=self.window)
+        except Exception as error:
+            messagebox.showerror('インポート失敗', f'config.pyを読み込めませんでした。\n{error}', parent=self.window)
+
+    def save(self):
+        data = default_config_data()
+        for key in ('server', 'autosave', 'backup', 'discord'):
+            for name in data[key]:
+                data[key][name] = self.fields[name].get()
+        for i, entry in self.fields['passwords'].items():
+            data['players']['passwords'][i] = entry.get()
+        for line in self.fields['ban_ips'].get('1.0', 'end').splitlines():
+            if '=' in line:
+                index, value = line.split('=', 1)
+                if index.strip().isdigit() and 0 <= int(index) < 63:
+                    data['network']['ban_ips'][int(index)] = value
+        with open(config_path, 'w', encoding='utf-8') as config_file:
+            yaml.safe_dump(data, config_file, allow_unicode=True, sort_keys=False)
+        self.close()
+        load_config()
+        if not self.first_run:
+            check_config()
+            app.server_name_label.config(text='管理対象のサーバー：' + config.server_name)
+
+    def close(self):
+        self.window.grab_release()
+        self.window.destroy()
+
 # 関数定義（GUI系）
 class window_main(tk.Frame):
     def __init__(self, master):
@@ -91,9 +314,9 @@ class window_main(tk.Frame):
         self.master.title("らくらくNS+")
         self.master.resizable(False, False)
         if os_type == "Linux":
-            self.master.geometry("550x330")
+            self.master.geometry("550x370")
         else:
-            self.master.geometry("550x290")
+            self.master.geometry("550x330")
         self.maintenance_mode = 0  # メンテナンスモードの状態（0:通常, 1:メンテナンス中）
         self.create_widgets()
 
@@ -132,7 +355,16 @@ class window_main(tk.Frame):
         self.update_schedule_button = ttk.Button(
             self, text="本体・Pakの更新をスケジュール", command=self.update_schedule_start
         )
-        self.update_schedule_button.grid(row=3, column=0, columnspan=4, padx=5, pady=(0, 10), sticky="ew")
+        self.update_schedule_button.grid(row=3, column=0, columnspan=3, padx=5, pady=(0, 10), sticky="ew")
+
+        self.settings_button = ttk.Button(self, text="設定", command=self.open_settings)
+        self.settings_button.grid(row=3, column=3, padx=5, pady=(0, 10), sticky="ew")
+
+    def open_settings(self):
+        if hasattr(self, "newWindow") and self.newWindow.winfo_exists():
+            self.newWindow.lift()
+            return
+        self.newWindow = config_window(self.master).window
 
     def update_schedule_start(self):
         if hasattr(self, "newWindow") and self.newWindow.winfo_exists():
@@ -543,7 +775,7 @@ class server_restart_check(tk.Frame):
         restart_server_threaded(2)
         self.master.destroy()  # ダイアログを閉じる
 
-def gui_main():
+def gui_main(create_app=True):
     global app
 
     root = tk.Tk()
@@ -577,7 +809,8 @@ def gui_main():
     root.grid_rowconfigure(0, weight=1)
     root.grid_columnconfigure(0, weight=1)
 
-    app = window_main(master=root)
+    if create_app:
+        app = window_main(master=root)
 
     return root
 
@@ -820,7 +1053,6 @@ def check_config():
     global long_backup_time
     global long_backup_keep
     global restart_time
-    global root
 
     # ====================================================
     # 必須設定
@@ -1000,6 +1232,7 @@ def check_config():
             '（らくらくNS+を終了します。Enterキーを押してください。）'
         )
         sys.exit()
+    config.autosave_mode = autosave_mode
 
     # ====================================================
     # restart_time
@@ -1018,6 +1251,7 @@ def check_config():
             '（らくらくNS+を終了します。Enterキーを押してください。）'
         )
         sys.exit()
+    config.restart_time = restart_time
 
     # ====================================================
     # long_backup_keep
@@ -1036,6 +1270,7 @@ def check_config():
             '（らくらくNS+を終了します。Enterキーを押してください。）'
         )
         sys.exit()
+    config.long_backup_keep = long_backup_keep
 
     # ====================================================
     # long_backup_time
@@ -1054,6 +1289,7 @@ def check_config():
             '（らくらくNS+を終了します。Enterキーを押してください。）'
         )
         sys.exit()
+    config.long_backup_time = long_backup_time
 
     # ====================================================
     # port_number
@@ -1093,6 +1329,7 @@ def check_config():
             '（らくらくNS+を終了します。Enterキーを押してください。）'
         )
         sys.exit()
+    config.autosave_backup = autosave_backup
 
     # ====================================================
     # autosave_interval
@@ -1111,6 +1348,7 @@ def check_config():
             '（らくらくNS+を終了します。Enterキーを押してください。）'
         )
         sys.exit()
+    config.autosave_interval = autosave_interval
 
     # ====================================================
     # player_x_pw
@@ -1186,6 +1424,7 @@ def check_config():
             '（らくらくNS+を終了します。Enterキーを押してください。）'
         )
         sys.exit()
+    config.use_discord_bot = use_discord_bot
 
     # ====================================================
     # 各種パス・変数生成
@@ -1220,8 +1459,6 @@ def check_config():
     scheduler_running = False
 
     server_ip = '127.0.0.1:'
-
-    root = None
 
     print_with_date('設定に正常な値が入力されていることを確認しました。')
 
@@ -1880,13 +2117,22 @@ def autosave():
 
 if __name__ == "__main__":
     os_type = check_os()
+    root = gui_main(create_app=False)
+    # GUI初期化関数の戻り値が失われた場合でも、以降の初期設定画面を表示できるようにする。
+    if root is None:
+        root = tk.Tk()
+    if not os.path.exists(config_path):
+        dialog = config_window(root, first_run=True)
+        root.wait_window(dialog.window)
+        if not os.path.exists(config_path):
+            root.destroy()
+            sys.exit()
+    load_config()
     check_config()
     check_nettool()
     nettool_pw = get_nettool_pw(0)
-
-    root = gui_main()
+    app = window_main(master=root)
 
     root.after(100, start_threads)
 
     root.mainloop()
-    

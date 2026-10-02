@@ -1321,7 +1321,7 @@ def server_stop(set_code, long_backup_code):
         print_gui_log('メンテナンス告知メッセージを送信しました。')
         discord_post('ただいまメンテナンス中です。', 'メンテナンス中でもサーバーに入れる場合がありますが、許可なく入らないでください。', 0xffbf00)
     elif set_code == 5:
-        nettool_say('Server is close. Thank you for playing!')
+        nettool_say('Server closed. Thank you for playing!')
         print_gui_log('サーバー終了告知メッセージを送信しました。')
         discord_post('サーバーは終了しました。', '皆様のご参加ありがとうございました。', 0x00ff00)
     start_code = set_code

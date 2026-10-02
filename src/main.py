@@ -712,7 +712,7 @@ def check_config():
     # プレイヤーパスワード
     # ====================================================
 
-    for i in range(15):
+    for i in range(63):
         attr_name = f'player_{i}_pw'
 
         if not hasattr(config, attr_name):
@@ -921,7 +921,7 @@ def check_config():
     # player_x_pw
     # ====================================================
 
-    for i in range(15):
+    for i in range(63):
 
         try:
             pw = getattr(config, f'player_{i}_pw')
@@ -1127,16 +1127,14 @@ def get_pid(target_name):
 def set_company_pw():
     # パスワードを設定する
     global nettool_pw
-    company_pws = [config.player_0_pw, config.player_1_pw, config.player_2_pw, config.player_3_pw, config.player_4_pw, config.player_5_pw, config.player_6_pw, config.player_7_pw, config.player_8_pw, config.player_9_pw, config.player_10_pw, config.player_11_pw, config.player_12_pw, config.player_13_pw, config.player_14_pw]
-    i = 0
-    for company_pw in company_pws:
+    for i in range(63):
         # クラッシュ対策（存在しない会社にパスワードをかけるとクラッシュする）
         company_id = str(i)
+        company_pw = getattr(config, f'player_{i}_pw', '')
         result = subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'info-company', company_id], capture_output=True, text=True, encoding='utf-8')
         # Nothing received.の後は改行が必要
         if result.stdout != 'Nothing received.\n' and company_pw != '':
             subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'lock-company', company_id, company_pw], capture_output=True, text=True)
-        i += 1
     print_gui_log('会社にパスワードを設定しました。')
 
 def app_start():

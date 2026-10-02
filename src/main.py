@@ -119,11 +119,11 @@ class window_main(tk.Frame):
 
         # メンテナンスモードボタン
         self.maintenance_mode_button = ttk.Button(
-            self, text="メンテナンスモード", command=self.maintenance_check_start
+            self, text="サーバーを一時停止", command=self.maintenance_check_start
         )
         self.maintenance_mode_button.grid(row=2, column=1, padx=5, pady=10, sticky="w")
 
-        self.server_stop_button = ttk.Button(self, text="サーバー終了", command=self.server_close_check_start)
+        self.server_stop_button = ttk.Button(self, text="会期終了", command=self.server_close_check_start)
         self.server_stop_button.grid(row=2, column=2, padx=5, pady=10, sticky="w")
 
         self.exit_button = ttk.Button(self, text="らくらくNS+を終了", style='Accent.TButton', command=self.exit_check_start)
@@ -171,11 +171,11 @@ class window_main(tk.Frame):
 
     def update_maintenance_button(self):
             if self.maintenance_mode == 0:
-                text = "メンテナンスモード"
+                text = "サーバーを一時停止"
             elif self.maintenance_mode == 1:
-                text = "メンテナンス終了"
+                text = "サーバーを再開"
             elif self.maintenance_mode == 2:
-                text = "サーバー再開"
+                text = "サーバーを再開"
 
             self.maintenance_mode_button.config(text=text)
             self.maintenance_mode_button.update_idletasks()
@@ -239,10 +239,10 @@ class maintenance_check(tk.Frame):
 
         # 状態ごとにメッセージを変更
         if mode == 0:
-            text = "サーバーを中断しメンテナンスモードに入ります。\nよろしいですか？"
+            text = "サーバーを一時中断します。\nよろしいですか？"
 
         elif mode == 1:
-            text = "メンテナンスモードを終了しサーバーを再開します。\nよろしいですか？"
+            text = "サーバーを再開します。\nよろしいですか？"
 
         elif mode == 2:
             text = "サーバーを再開します。\nよろしいですか？"
@@ -362,7 +362,7 @@ class server_close_check(tk.Frame):
 
     def create_widgets(self):
         # ダイアログのウィジェットを配置
-        self.label = ttk.Label(self.master, text="サーバーを終了し、らくらくNS+を終了します。\nよろしいですか？")
+        self.label = ttk.Label(self.master, text="サーバー会期を終了し、らくらくNS+を終了します。\nよろしいですか？")
         self.label.pack(padx=10, pady=10, fill="both", expand=True)
 
         button_frame = ttk.Frame(self.master)

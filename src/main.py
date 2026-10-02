@@ -74,7 +74,7 @@ except ModuleNotFoundError:
     keywait = input(f'必要なモジュールがインストールされていません。\nコマンド「pip install psutil schedule discord」を実行してからやりなおしてください。\n\nUbuntu環境の場合は、下記コマンドを実行してください。\npip3 install --break-system-packages psutil schedule discord\nsudo apt update\nsudo apt install python3-tk\n\n（らくらくNS+を終了します。Enterキーを押してください。）')
     sys.exit()
 
-from tkinter import ttk
+from tkinter import ttk, filedialog, messagebox
 import array
 import tempfile
 
@@ -91,9 +91,9 @@ class window_main(tk.Frame):
         self.master.title("らくらくNS+")
         self.master.resizable(False, False)
         if os_type == "Linux":
-            self.master.geometry("550x280")
+            self.master.geometry("550x330")
         else:
-            self.master.geometry("550x240")
+            self.master.geometry("550x290")
         self.maintenance_mode = 0  # メンテナンスモードの状態（0:通常, 1:メンテナンス中）
         self.create_widgets()
 
@@ -128,6 +128,19 @@ class window_main(tk.Frame):
 
         self.exit_button = ttk.Button(self, text="らくらくNS+を終了", style='Accent.TButton', command=self.exit_check_start)
         self.exit_button.grid(row=2, column=3, padx=5, pady=10, sticky="w")
+
+        self.update_schedule_button = ttk.Button(
+            self, text="本体・Pakの更新をスケジュール", command=self.update_schedule_start
+        )
+        self.update_schedule_button.grid(row=3, column=0, columnspan=4, padx=5, pady=(0, 10), sticky="ew")
+
+    def update_schedule_start(self):
+        if hasattr(self, "newWindow") and self.newWindow.winfo_exists():
+            self.newWindow.lift()
+            return
+        self.newWindow = tk.Toplevel(self.master)
+        self.newWindow.grab_set()
+        update_schedule_window(self.newWindow)
 
     def server_restart_check_start(self):
         # 確認ダイアログを開く
@@ -213,6 +226,107 @@ class window_main(tk.Frame):
         self.log_text.insert('end', content + '\n')
         self.log_text.configure(state="disabled")
         self.log_text.see("end")
+
+class update_schedule_window(tk.Frame):
+    def __init__(self, master):
+        super().__init__(master)
+        self.master = master
+        self.master.title("本体・Pakの更新をスケジュール")
+        # 下部の通知設定・操作ボタンが画面外へ出ないよう、内容に合わせて高さを確保する
+        self.master.geometry("620x410")
+        self.master.minsize(620, 410)
+        self.master.resizable(False, False)
+        self.master.protocol('WM_DELETE_WINDOW', self.close_window)
+        self.create_widgets()
+
+    def create_widgets(self):
+        self.body_var = tk.IntVar(value=0)
+        self.pak_var = tk.IntVar(value=0)
+        self.backup_var = tk.IntVar(value=1)
+        self.discord_notice_var = tk.IntVar(value=0)
+        self.body_path = tk.StringVar()
+        self.pak_path = tk.StringVar()
+        self.time_var = tk.StringVar(value=datetime.datetime.now().strftime('%Y/%m/%d %H:%M'))
+
+        ttk.Checkbutton(self.master, text="本体を更新する", style='Switch.TCheckbutton', variable=self.body_var).grid(row=0, column=0, padx=10, pady=8, sticky='w')
+        ttk.Entry(self.master, textvariable=self.body_path, width=55).grid(row=1, column=0, padx=10, sticky='w')
+        ttk.Button(self.master, text="本体ファイルを選択", command=self.choose_body).grid(row=1, column=1, padx=5)
+
+        ttk.Checkbutton(self.master, text="Paksetを更新する", style='Switch.TCheckbutton', variable=self.pak_var).grid(row=2, column=0, padx=10, pady=8, sticky='w')
+        ttk.Entry(self.master, textvariable=self.pak_path, width=55).grid(row=3, column=0, padx=10, sticky='w')
+        ttk.Button(self.master, text="Paksetフォルダを選択", command=self.choose_pak).grid(row=3, column=1, padx=5)
+
+        ttk.Label(self.master, text="更新日時（YYYY/MM/DD HH:MM、日付省略時は当日）").grid(row=4, column=0, padx=10, pady=(15, 2), sticky='w')
+        ttk.Entry(self.master, textvariable=self.time_var, width=25).grid(row=5, column=0, padx=10, sticky='w')
+        ttk.Checkbutton(self.master, text="更新直前のセーブデータを長期バックアップする", style='Switch.TCheckbutton', variable=self.backup_var).grid(row=6, column=0, padx=10, pady=12, sticky='w')
+        ttk.Checkbutton(self.master, text="Discordに予告を投稿", style='Switch.TCheckbutton', variable=self.discord_notice_var).grid(row=7, column=0, padx=10, pady=4, sticky='w')
+        button_frame = ttk.Frame(self.master)
+        button_frame.grid(row=8, column=0, columnspan=3, padx=10, pady=5, sticky='w')
+        ttk.Button(button_frame, text="スケジュール登録", style='Accent.TButton', command=self.register).pack(side='left', padx=(0, 5))
+        ttk.Button(button_frame, text="今すぐ更新する", command=self.update_now).pack(side='left', padx=5)
+        ttk.Button(button_frame, text="キャンセル", command=self.close_window).pack(side='left', padx=(185, 5))
+
+    def choose_body(self):
+        path = filedialog.askopenfilename(title="更新する本体ファイルを選択")
+        if path:
+            self.body_path.set(path)
+
+    def choose_pak(self):
+        path = filedialog.askdirectory(title="更新するPaksetフォルダを選択")
+        if path:
+            if not os.path.isfile(os.path.join(path, 'ground.Outside.pak')):
+                messagebox.showerror("Pakset確認", "これはPaksetではありません。ground.Outside.pakがあるかどうか、名前は正しいかどうかをご確認ください。（ファイル名は大文字と小文字を区別します。）", parent=self.master)
+                return
+            self.pak_path.set(path)
+
+    def register(self):
+        update_data = self.validate_update_inputs()
+        if update_data is None:
+            return
+        try:
+            raw = self.time_var.get().strip()
+            if re.fullmatch(r'\d{1,2}:\d{2}', raw):
+                raw = datetime.datetime.now().strftime('%Y/%m/%d ') + raw
+            when = datetime.datetime.strptime(raw, '%Y/%m/%d %H:%M')
+        except ValueError:
+            messagebox.showerror("入力確認", "更新日時は YYYY/MM/DD HH:MM または HH:MM で入力してください。", parent=self.master)
+            return
+        if when <= datetime.datetime.now():
+            messagebox.showerror("入力確認", "未来の日時を指定してください。", parent=self.master)
+            return
+        body, pak = update_data
+        schedule_update(when, body, pak, self.backup_var.get(), self.discord_notice_var.get())
+        messagebox.showinfo("登録完了", when.strftime('%Y/%m/%d %H:%M') + " に更新します。", parent=self.master)
+        self.close_window()
+
+    def validate_update_inputs(self):
+        if not self.body_var.get() and not self.pak_var.get():
+            messagebox.showwarning("入力確認", "本体またはPaksetのどちらかを更新する設定にしてください。", parent=self.master)
+            return None
+        if self.body_var.get() and not os.path.isfile(self.body_path.get()):
+            messagebox.showerror("入力確認", "更新する本体ファイルを選択してください。", parent=self.master)
+            return None
+        if self.pak_var.get() and (not os.path.isdir(self.pak_path.get()) or not os.path.isfile(os.path.join(self.pak_path.get(), 'ground.Outside.pak'))):
+            messagebox.showerror("入力確認", "更新するPaksetフォルダを選択してください。", parent=self.master)
+            return None
+        return (self.body_path.get() if self.body_var.get() else None,
+                self.pak_path.get() if self.pak_var.get() else None)
+
+    def update_now(self):
+        update_data = self.validate_update_inputs()
+        if update_data is None:
+            return
+        if not messagebox.askyesno("確認", "今すぐ本体・Pakの更新を開始しますか？", parent=self.master):
+            return
+        body, pak = update_data
+        threading.Thread(target=execute_scheduled_update, args=({
+            'body': body, 'pak': pak, 'backup': self.backup_var.get()
+        },), daemon=True).start()
+        self.close_window()
+
+    def close_window(self):
+        self.master.destroy()
+
 
 class maintenance_check(tk.Frame):
     # メンテナンスモード確認ダイアログウィンドウ
@@ -574,6 +688,76 @@ def start_threads():
     if config.use_discord_bot in (1, 2):
         threading.Thread(target=run_discord_bot, daemon=True).start()
     threading.Thread(target=auto_long_backup, daemon=True).start()
+    threading.Thread(target=scheduled_update_loop, daemon=True).start()
+
+scheduled_updates = []
+scheduled_updates_lock = threading.Lock()
+
+def schedule_update(when, body_source, pak_source, long_backup_code, discord_notice_code):
+    with scheduled_updates_lock:
+        scheduled_updates.append({
+            'when': when, 'body': body_source, 'pak': pak_source,
+            'backup': long_backup_code, 'discord_notice': discord_notice_code
+        })
+    if discord_notice_code:
+        if body_source and pak_source:
+            update_kind = '本体・Pak更新'
+        elif body_source:
+            update_kind = '本体更新'
+        else:
+            update_kind = 'Pak更新'
+        time_text = when.strftime('%H:%M') if when.date() == datetime.datetime.now().date() else when.strftime('%Y/%m/%d %H:%M')
+        discord_post('メンテナンス開始時刻のお知らせ', f'{update_kind}のため、{time_text}より5分ほどメンテナンスを行います。', 0xffbf00)
+    print_gui_log('本体・Pakの更新をスケジュールしました。')
+
+def scheduled_update_loop():
+    while True:
+        due = []
+        now = datetime.datetime.now()
+        with scheduled_updates_lock:
+            remaining = []
+            for item in scheduled_updates:
+                if item['when'] <= now:
+                    due.append(item)
+                else:
+                    remaining.append(item)
+            scheduled_updates[:] = remaining
+        for item in due:
+            threading.Thread(target=execute_scheduled_update, args=(item,), daemon=True).start()
+        time.sleep(1)
+
+def execute_scheduled_update(item):
+    global start_code
+    try:
+        print_gui_log('スケジュールされた更新を開始します。')
+        # 既存の停止処理で同期・バックアップ・サーバー停止を行う
+        server_stop(3, item['backup'])
+        time.sleep(2)
+        replace_update_files(item['body'], item['pak'])
+        # 監視ループに通常起動を依頼する
+        start_code = 2
+        print_gui_log('更新が完了しました。サーバーを再開します。')
+    except Exception as e:
+        print_gui_log(f'スケジュール更新に失敗しました: {e}')
+        start_code = 2
+
+def replace_update_files(body_source, pak_source):
+    if body_source:
+        shutil.copy2(body_source, server_path)
+        print_gui_log('本体を更新しました。')
+    if pak_source:
+        target = os.path.join(server_folder_path, 'pakset')
+        os.makedirs(target, exist_ok=True)
+        for name in os.listdir(pak_source):
+            src = os.path.join(pak_source, name)
+            dst = os.path.join(target, name)
+            if os.path.isdir(src):
+                if os.path.exists(dst):
+                    shutil.rmtree(dst)
+                shutil.copytree(src, dst)
+            else:
+                shutil.copy2(src, dst)
+        print_gui_log('Paksetを更新しました。')
 
 def resource_path(filename):
     # pyinstaller対策
@@ -1705,3 +1889,4 @@ if __name__ == "__main__":
     root.after(100, start_threads)
 
     root.mainloop()
+    

@@ -1151,7 +1151,11 @@ def app_start():
 def nettool_say(content):
     # contentにはASCII文字以外を入れないこと（文字化け対策）
     global nettool_pw
-    subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'say', content], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    while result == 0:
+        result = subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'say', content], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if result != 0:
+            print_gui_log('メッセージ送信に失敗しました。やり直します。')
+            time.sleep(1)
     return None
 
 def wait_simutrans_responce():
@@ -1168,7 +1172,11 @@ def wait_simutrans_responce():
 def nettool_forcesync():
     # ロード処理
     global nettool_pw
-    subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'force-sync'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    while result == 0:
+        result = subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'force-sync'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if result != 0:
+            print_gui_log('オートセーブに失敗しました。やり直します。')
+            time.sleep(1)
     wait_simutrans_responce()
     save_backup()
 

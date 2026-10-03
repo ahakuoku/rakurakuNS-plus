@@ -195,7 +195,7 @@ class config_window:
         self.add_multiline_tab(notebook, 'BAN IP', 'ban_ips', data.get('network', {}).get('ban_ips', {}))
         button_frame = ttk.Frame(self.window)
         button_frame.pack(fill='x', padx=8, pady=(0, 8))
-        ttk.Button(button_frame, text='config.pyをインポート', command=self.import_legacy_config).pack(side='left')
+        ttk.Button(button_frame, text='らくらくNS+ v0.2.0以前の設定ファイルをインポート', command=self.import_legacy_config).pack(side='left')
         ttk.Button(button_frame, text='らくらくNS（bat版）の設定をインポート', command=self.import_setting_bat).pack(side='left', padx=(8, 0))
         ttk.Button(button_frame, text='保存', style='Accent.TButton', command=self.save).pack(side='right', padx=(8, 0))
         ttk.Button(button_frame, text='キャンセル', command=self.close).pack(side='right')

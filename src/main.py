@@ -204,14 +204,12 @@ def restore_runtime_state():
     if saved:
         try:
             when = datetime.datetime.fromisoformat(str(saved['when']))
-            if when > datetime.datetime.now():
-                scheduled_updates = {
-                    'when': when, 'body': saved.get('body'), 'pak': saved.get('pak'),
-                    'backup': saved.get('backup', 0),
-                    'discord_notice': saved.get('discord_notice', 0),
-                }
-            else:
-                scheduled_updates = None
+            # 予定時刻を過ぎていても予約を復元し、更新ループで直ちに実行する。
+            scheduled_updates = {
+                'when': when, 'body': saved.get('body'), 'pak': saved.get('pak'),
+                'backup': saved.get('backup', 0),
+                'discord_notice': saved.get('discord_notice', 0),
+            }
         except (KeyError, TypeError, ValueError):
             scheduled_updates = None
 

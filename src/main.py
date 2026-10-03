@@ -733,7 +733,8 @@ class update_schedule_window(tk.Frame):
         button_frame.grid(row=11, column=0, columnspan=3, padx=10, pady=5, sticky='w')
         ttk.Button(button_frame, text="スケジュール登録", style='Accent.TButton', command=self.register).pack(side='left', padx=(0, 5))
         ttk.Button(button_frame, text="今すぐ更新する", command=self.update_now).pack(side='left', padx=5)
-        ttk.Button(button_frame, text="キャンセル", command=self.close_window).pack(side='left', padx=(185, 5))
+        ttk.Button(button_frame, text="スケジュールをキャンセル", command=self.cancel_schedule).pack(side='left', padx=5)
+        ttk.Button(button_frame, text="キャンセル", command=self.close_window).pack(side='left', padx=(20, 5))
 
     def choose_body(self):
         path = filedialog.askopenfilename(title="更新する本体ファイルを選択")
@@ -792,6 +793,13 @@ class update_schedule_window(tk.Frame):
             'body': body, 'pak': pak, 'backup': self.backup_var.get(),
             'restart_server': self.restart_server_var.get()
         },), daemon=True).start()
+        self.close_window()
+
+    def cancel_schedule(self):
+        if not cancel_scheduled_update():
+            messagebox.showinfo("確認", "キャンセルする更新スケジュールはありません。", parent=self.master)
+            return
+        messagebox.showinfo("キャンセル完了", "更新スケジュールをキャンセルしました。", parent=self.master)
         self.close_window()
 
     def close_window(self):
@@ -1185,6 +1193,17 @@ def schedule_update(when, body_source, pak_source, long_backup_code, discord_not
         time_text = when.strftime('%H:%M') if when.date() == datetime.datetime.now().date() else when.strftime('%Y/%m/%d %H:%M')
         discord_post('メンテナンス開始時刻のお知らせ', f'{update_kind}のため、{time_text}より5分ほどメンテナンスを行います。', 0xffbf00)
     print_gui_log('本体・Pakの更新をスケジュールしました。')
+
+def cancel_scheduled_update():
+    """登録済みの更新スケジュールを取り消す。取り消せた場合はTrueを返す。"""
+    global scheduled_updates
+    with scheduled_updates_lock:
+        if scheduled_updates is None:
+            return False
+        scheduled_updates = None
+    persist_runtime_state()
+    print_gui_log('本体・Pakの更新スケジュールをキャンセルしました。')
+    return True
 
 def scheduled_update_loop():
     while True:

@@ -1103,15 +1103,18 @@ def start_threads():
     threading.Thread(target=auto_long_backup, daemon=True).start()
     threading.Thread(target=scheduled_update_loop, daemon=True).start()
 
-scheduled_updates = []
+# 更新スケジュールは常に1件だけ保持する。新しい登録で既存の予約を置き換える。
+scheduled_updates = None
 scheduled_updates_lock = threading.Lock()
 
 def schedule_update(when, body_source, pak_source, long_backup_code, discord_notice_code):
+    global scheduled_updates
+    update_item = {
+        'when': when, 'body': body_source, 'pak': pak_source,
+        'backup': long_backup_code, 'discord_notice': discord_notice_code
+    }
     with scheduled_updates_lock:
-        scheduled_updates.append({
-            'when': when, 'body': body_source, 'pak': pak_source,
-            'backup': long_backup_code, 'discord_notice': discord_notice_code
-        })
+        scheduled_updates = update_item
     if discord_notice_code:
         if body_source and pak_source:
             update_kind = '本体・Pak更新'
@@ -1127,14 +1130,11 @@ def scheduled_update_loop():
     while True:
         due = []
         now = datetime.datetime.now()
+        global scheduled_updates
         with scheduled_updates_lock:
-            remaining = []
-            for item in scheduled_updates:
-                if item['when'] <= now:
-                    due.append(item)
-                else:
-                    remaining.append(item)
-            scheduled_updates[:] = remaining
+            if scheduled_updates is not None and scheduled_updates['when'] <= now:
+                due.append(scheduled_updates)
+                scheduled_updates = None
         for item in due:
             threading.Thread(target=execute_scheduled_update, args=(item,), daemon=True).start()
         time.sleep(1)

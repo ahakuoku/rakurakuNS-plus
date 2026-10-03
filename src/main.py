@@ -172,6 +172,8 @@ class config_window:
         self.window.geometry('980x620')
         self.window.protocol('WM_DELETE_WINDOW', self.close)
         self.fields = {}
+        self.secret_entries = {'token': [], 'passwords': []}
+        self.secret_visibility = {'token': tk.IntVar(value=0), 'passwords': tk.IntVar(value=0)}
         data = config_data if config_data else default_config_data()
         notebook = ttk.Notebook(self.window)
         notebook.pack(fill='both', expand=True, padx=8, pady=8)
@@ -211,6 +213,13 @@ class config_window:
                 entry.insert(0, str(values.get(key, '')))
                 entry.grid(row=row, column=1, sticky='ew', padx=10, pady=8)
                 self.fields[key] = entry
+                if key == 'token':
+                    self.secret_entries['token'].append(entry)
+                    ttk.Checkbutton(
+                        frame, text='表示', variable=self.secret_visibility['token'],
+                        style='Switch.TCheckbutton',
+                        command=lambda: self.toggle_secret('token')
+                    ).grid(row=row, column=3, padx=5, pady=8)
             ttk.Button(frame, text='説明', command=lambda k=key: self.show_help(k)).grid(row=row, column=2, padx=5, pady=8)
 
     def add_multiline_tab(self, notebook, title, key, values):
@@ -232,6 +241,11 @@ class config_window:
         frame.grid_rowconfigure(1, weight=1)
         frame.grid_columnconfigure(0, weight=1)
         ttk.Label(frame, text='会社ごとのパスワード').grid(row=0, column=0, sticky='w', padx=10, pady=8)
+        ttk.Checkbutton(
+            frame, text='パスワードを表示', variable=self.secret_visibility['passwords'],
+            style='Switch.TCheckbutton',
+            command=lambda: self.toggle_secret('passwords')
+        ).grid(row=0, column=1, sticky='w', padx=10, pady=8)
         canvas_frame = ttk.Frame(frame)
         canvas_frame.grid(row=1, column=0, sticky='nsew', padx=5)
         canvas_frame.grid_rowconfigure(0, weight=1)
@@ -264,8 +278,14 @@ class config_window:
             entry.bind('<Button-4>', lambda event: canvas.yview_scroll(-1, 'units'))
             entry.bind('<Button-5>', lambda event: canvas.yview_scroll(1, 'units'))
             password_fields[i] = entry
+            self.secret_entries['passwords'].append(entry)
         ttk.Button(frame, text='説明', command=lambda: self.show_help('passwords')).grid(row=2, column=0, padx=10, pady=8, sticky='w')
         self.fields['passwords'] = password_fields
+
+    def toggle_secret(self, key):
+        show = '' if self.secret_visibility[key].get() else '*'
+        for entry in self.secret_entries[key]:
+            entry.configure(show=show)
 
     def show_help(self, key):
         descriptions = {

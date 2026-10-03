@@ -1,6 +1,7 @@
 
 /src/__pycache__
 src/config.py
+src/config.yaml
 /distribution
 /src/command_file
 /src/build

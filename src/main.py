@@ -244,7 +244,10 @@ class config_window:
         notebook.add(frame, text='プレイヤー')
         frame.grid_rowconfigure(1, weight=1)
         frame.grid_columnconfigure(0, weight=1)
-        ttk.Label(frame, text='会社ごとのパスワード').grid(row=0, column=0, sticky='w', padx=10, pady=8)
+        ttk.Label(
+            frame,
+            text='会社ごとのパスワード（15番以降はOTRP v59_0_2以降専用）'
+        ).grid(row=0, column=0, sticky='w', padx=10, pady=8)
         ttk.Checkbutton(
             frame, text='パスワードを表示', variable=self.secret_visibility['passwords'],
             style='Switch.TCheckbutton',

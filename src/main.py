@@ -81,6 +81,7 @@ import shutil
 import threading
 import sched
 import asyncio
+import ctypes
 
 try:
     import tkinter as tk
@@ -104,6 +105,7 @@ CONFIG_DISPLAY_NAMES = {
     'path': 'サーバー実行ファイル',
     'port': 'ポート',
     'restart_time': '自動再起動時刻',
+    'press_space_after_start': '起動30秒後にスペースキーを押す',
     'mode': 'オートセーブモード',
     'backup_count': 'バックアップ数',
     'interval': 'オートセーブ間隔',
@@ -136,6 +138,7 @@ def load_config():
     config.server_name = server_path[separator_position + 1:] if separator_position >= 0 else server_path
     config.port_number = server.get('port')
     config.restart_time = server.get('restart_time')
+    config.press_space_after_start = server.get('press_space_after_start', 0)
     autosave = config_data.get('autosave', {})
     config.autosave_mode = autosave.get('mode')
     config.autosave_backup = autosave.get('backup_count')
@@ -155,7 +158,7 @@ def load_config():
 
 def default_config_data():
     return {
-        'server': {'path': '', 'port': '13353', 'restart_time': -1},
+        'server': {'path': '', 'port': '13353', 'restart_time': -1, 'press_space_after_start': 0},
         'autosave': {'mode': 0, 'backup_count': 80, 'interval': 1200},
         'backup': {'long_term_keep_days': 0, 'long_term_time': 5},
         'players': {'passwords': {i: '' for i in range(63)}},
@@ -184,7 +187,7 @@ class config_window:
             separator = '\\' if '\\' in str(folder) and '/' not in str(folder) else '/'
             server_values = dict(server_values)
             server_values['path'] = f'{folder}{separator}{name}' if folder or name else ''
-        self.add_tab(notebook, 'サーバー', ['path', 'port', 'restart_time'], server_values)
+        self.add_tab(notebook, 'サーバー', ['path', 'port', 'restart_time', 'press_space_after_start'], server_values)
         self.add_tab(notebook, 'オートセーブ', ['mode', 'backup_count', 'interval'], data.get('autosave', {}))
         self.add_tab(notebook, 'バックアップ', ['long_term_keep_days', 'long_term_time'], data.get('backup', {}))
         self.add_tab(notebook, 'Discord', ['enabled', 'token', 'channel'], data.get('discord', {}))
@@ -203,9 +206,10 @@ class config_window:
         notebook.add(frame, text=title)
         for row, key in enumerate(fields):
             ttk.Label(frame, text=CONFIG_DISPLAY_NAMES[key]).grid(row=row, column=0, sticky='w', padx=10, pady=8)
-            if key == 'enabled':
+            if key in ('enabled', 'press_space_after_start'):
                 variable = tk.IntVar(value=1 if int(values.get(key, 0) or 0) in (1, 2) else 0)
-                entry = ttk.Checkbutton(frame, text='使用する', style='Switch.TCheckbutton', variable=variable)
+                text = '使用する' if key == 'enabled' else '有効にする'
+                entry = ttk.Checkbutton(frame, text=text, style='Switch.TCheckbutton', variable=variable)
                 entry.grid(row=row, column=1, sticky='w', padx=10, pady=8)
                 self.fields[key] = variable
             else:
@@ -292,6 +296,7 @@ class config_window:
             'path': '起動するSimutransサーバーの実行ファイルを、フォルダを含むフルパスで指定します。',
             'port': 'サーバーが使用するポート番号を指定します。',
             'restart_time': '毎日自動再起動する時刻を0～24で指定します。-1で無効です。',
+            'press_space_after_start': '有効にすると、Simutransの起動開始から30秒後にスペースキーを1回送信します。Standard以外の本体では通常必要ありません。',
             'mode': 'オートセーブのモードです。0は一定間隔、1は最後のロードからの経過時間です。',
             'backup_count': 'オートセーブのバックアップ保存数を指定します。',
             'interval': 'オートセーブの間隔を秒で指定します。60以上を指定してください。',
@@ -331,6 +336,7 @@ class config_window:
                 'path': f'{legacy_folder_path.rstrip(chr(92) + "/")}{legacy_separator}{legacy_server_name}',
                 'port': getattr(legacy, 'port_number', '13353'),
                 'restart_time': getattr(legacy, 'restart_time', -1),
+                'press_space_after_start': getattr(legacy, 'press_space_after_start', 0),
                 'mode': getattr(legacy, 'autosave_mode', 0),
                 'backup_count': getattr(legacy, 'autosave_backup', 80),
                 'interval': getattr(legacy, 'autosave_interval', 1200),
@@ -341,7 +347,7 @@ class config_window:
                 'channel': getattr(legacy, 'discord_channel', ''),
             }
             for key, value in values.items():
-                if key == 'enabled':
+                if key in ('enabled', 'press_space_after_start'):
                     self.fields[key].set(1 if int(value or 0) in (1, 2) else 0)
                 else:
                     self.fields[key].delete(0, 'end')
@@ -395,6 +401,7 @@ class config_window:
         integer_rules = (
             ('server.port', data['server']['port'], 0, 65535),
             ('server.restart_time', data['server']['restart_time'], -1, 24),
+            ('server.press_space_after_start', data['server']['press_space_after_start'], 0, 1),
             ('autosave.mode', data['autosave']['mode'], 0, 1),
             ('autosave.backup_count', data['autosave']['backup_count'], 1, None),
             ('autosave.interval', data['autosave']['interval'], 60, None),
@@ -1235,6 +1242,12 @@ def check_config():
             '設定「restart_time」が定義されていません。'
             '自動再起動は行いません。'
         ),
+
+        'press_space_after_start': (
+            0,
+            '設定「press_space_after_start」が定義されていません。'
+            '起動30秒後のスペースキー送信は行いません。'
+        ),
     }
 
     for setting, (default_value, message) in default_settings.items():
@@ -1370,6 +1383,25 @@ def check_config():
         )
         sys.exit()
     config.restart_time = restart_time
+
+    # ====================================================
+    # press_space_after_start
+    # ====================================================
+
+    try:
+        press_space_after_start = int(config.press_space_after_start)
+
+        if press_space_after_start not in (0, 1):
+            raise ValueError
+
+    except (NameError, ValueError, TypeError):
+        input(
+            '設定「press_space_after_start」に不正な値が設定されています。'
+            '0か1いずれかの値を入力してください。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
+        sys.exit()
+    config.press_space_after_start = press_space_after_start
 
     # ====================================================
     # long_backup_keep
@@ -1713,9 +1745,33 @@ def app_start():
     os_system = platform.system()
     # WindowsとUNIX系OSでコマンドが違うのでその対策
     if os_system == 'Windows':
-        return subprocess.Popen(['start', server_path, '-server', config.port_number, '-fps', '30', '-nomidi', '-nosound', '-load', launch_save], shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        process = subprocess.Popen(['start', server_path, '-server', config.port_number, '-fps', '30', '-nomidi', '-nosound', '-load', launch_save], shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     elif os_system == 'Linux' or os_system == 'Darwin':
-        return subprocess.Popen([server_path, '-server', config.port_number, '-fps', '30', '-nomidi', '-nosound', '-load', launch_save], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        process = subprocess.Popen([server_path, '-server', config.port_number, '-fps', '30', '-nomidi', '-nosound', '-load', launch_save], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    else:
+        return None
+
+    if int(getattr(config, 'press_space_after_start', 0)) == 1:
+        space_timer = threading.Timer(30, press_space_key)
+        space_timer.daemon = True
+        space_timer.start()
+    return process
+
+def press_space_key():
+    """Simutrans起動から30秒後に、現在アクティブなウィンドウへスペースキーを送る。"""
+    try:
+        os_system = platform.system()
+        if os_system == 'Windows':
+            user32 = ctypes.windll.user32
+            user32.keybd_event(0x20, 0, 0, 0)
+            user32.keybd_event(0x20, 0, 2, 0)
+        elif os_system == 'Linux':
+            subprocess.run(['xdotool', 'key', 'space'], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elif os_system == 'Darwin':
+            subprocess.run(['osascript', '-e', 'tell application "System Events" to key code 49'], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        print_gui_log('Simutrans起動から30秒後にスペースキーを送信しました。')
+    except Exception as error:
+        print_gui_log(f'スペースキーの送信に失敗しました: {error}')
 
 def nettool_say(content):
     # contentにはASCII文字以外を入れないこと（文字化け対策）

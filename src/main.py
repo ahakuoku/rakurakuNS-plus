@@ -187,6 +187,7 @@ def persist_runtime_state():
             'pak': item.get('pak'),
             'backup': item.get('backup', 0),
             'discord_notice': item.get('discord_notice', 0),
+            'restart_server': item.get('restart_server', 1),
         }
     data = dict(config_data)
     data['runtime'] = runtime
@@ -209,6 +210,7 @@ def restore_runtime_state():
                 'when': when, 'body': saved.get('body'), 'pak': saved.get('pak'),
                 'backup': saved.get('backup', 0),
                 'discord_notice': saved.get('discord_notice', 0),
+                'restart_server': saved.get('restart_server', 1),
             }
         except (KeyError, TypeError, ValueError):
             scheduled_updates = None
@@ -696,8 +698,8 @@ class update_schedule_window(tk.Frame):
         self.master = master
         self.master.title("本体・Pakの更新をスケジュール")
         # 下部の通知設定・操作ボタンが画面外へ出ないよう、内容に合わせて高さを確保する
-        self.master.geometry("620x410")
-        self.master.minsize(620, 410)
+        self.master.geometry("620x500")
+        self.master.minsize(620, 500)
         self.master.resizable(False, False)
         self.master.protocol('WM_DELETE_WINDOW', self.close_window)
         self.create_widgets()
@@ -707,6 +709,7 @@ class update_schedule_window(tk.Frame):
         self.pak_var = tk.IntVar(value=0)
         self.backup_var = tk.IntVar(value=1)
         self.discord_notice_var = tk.IntVar(value=0)
+        self.restart_server_var = tk.IntVar(value=1)
         self.body_path = tk.StringVar()
         self.pak_path = tk.StringVar()
         self.time_var = tk.StringVar(value=datetime.datetime.now().strftime('%Y/%m/%d %H:%M'))
@@ -723,8 +726,11 @@ class update_schedule_window(tk.Frame):
         ttk.Entry(self.master, textvariable=self.time_var, width=25).grid(row=5, column=0, padx=10, sticky='w')
         ttk.Checkbutton(self.master, text="更新直前のセーブデータを長期バックアップする", style='Switch.TCheckbutton', variable=self.backup_var).grid(row=6, column=0, padx=10, pady=12, sticky='w')
         ttk.Checkbutton(self.master, text="Discordに予告を投稿", style='Switch.TCheckbutton', variable=self.discord_notice_var).grid(row=7, column=0, padx=10, pady=4, sticky='w')
+        ttk.Label(self.master, text="更新後の動作").grid(row=8, column=0, padx=10, pady=(8, 2), sticky='w')
+        ttk.Radiobutton(self.master, text="更新完了後、サーバーを再起動する", variable=self.restart_server_var, value=1).grid(row=9, column=0, padx=25, sticky='w')
+        ttk.Radiobutton(self.master, text="更新完了後、サーバーの再起動をせずにらくらくNS+を終了する", variable=self.restart_server_var, value=0).grid(row=10, column=0, padx=25, sticky='w')
         button_frame = ttk.Frame(self.master)
-        button_frame.grid(row=8, column=0, columnspan=3, padx=10, pady=5, sticky='w')
+        button_frame.grid(row=11, column=0, columnspan=3, padx=10, pady=5, sticky='w')
         ttk.Button(button_frame, text="スケジュール登録", style='Accent.TButton', command=self.register).pack(side='left', padx=(0, 5))
         ttk.Button(button_frame, text="今すぐ更新する", command=self.update_now).pack(side='left', padx=5)
         ttk.Button(button_frame, text="キャンセル", command=self.close_window).pack(side='left', padx=(185, 5))
@@ -758,7 +764,7 @@ class update_schedule_window(tk.Frame):
             messagebox.showerror("入力確認", "未来の日時を指定してください。", parent=self.master)
             return
         body, pak = update_data
-        schedule_update(when, body, pak, self.backup_var.get(), self.discord_notice_var.get())
+        schedule_update(when, body, pak, self.backup_var.get(), self.discord_notice_var.get(), self.restart_server_var.get())
         messagebox.showinfo("登録完了", when.strftime('%Y/%m/%d %H:%M') + " に更新します。", parent=self.master)
         self.close_window()
 
@@ -783,7 +789,8 @@ class update_schedule_window(tk.Frame):
             return
         body, pak = update_data
         threading.Thread(target=execute_scheduled_update, args=({
-            'body': body, 'pak': pak, 'backup': self.backup_var.get()
+            'body': body, 'pak': pak, 'backup': self.backup_var.get(),
+            'restart_server': self.restart_server_var.get()
         },), daemon=True).start()
         self.close_window()
 
@@ -1158,11 +1165,12 @@ def start_threads():
 scheduled_updates = None
 scheduled_updates_lock = threading.Lock()
 
-def schedule_update(when, body_source, pak_source, long_backup_code, discord_notice_code):
+def schedule_update(when, body_source, pak_source, long_backup_code, discord_notice_code, restart_server_code=1):
     global scheduled_updates
     update_item = {
         'when': when, 'body': body_source, 'pak': pak_source,
-        'backup': long_backup_code, 'discord_notice': discord_notice_code
+        'backup': long_backup_code, 'discord_notice': discord_notice_code,
+        'restart_server': restart_server_code
     }
     with scheduled_updates_lock:
         scheduled_updates = update_item
@@ -1200,9 +1208,15 @@ def execute_scheduled_update(item):
         server_stop(3, item['backup'])
         time.sleep(2)
         replace_update_files(item['body'], item['pak'])
-        # 監視ループに通常起動を依頼する
-        start_code = 2
-        print_gui_log('更新が完了しました。サーバーを再開します。')
+        if item.get('restart_server', 1):
+            # 監視ループに通常起動を依頼する
+            start_code = 2
+            print_gui_log('更新が完了しました。サーバーを再開します。')
+        else:
+            # 監視ループがサーバーを起動しないようにしてからGUIを終了する。
+            start_code = 8
+            print_gui_log('更新が完了しました。サーバーを再起動せず、らくらくNS+を終了します。')
+            app.master.after(0, app.master.destroy)
     except Exception as e:
         print_gui_log(f'スケジュール更新に失敗しました: {e}')
         start_code = 2
@@ -2107,7 +2121,7 @@ def monitoring():
         start_code = 1
     while True:
         # start_codeが3（メンテナンス中）または6（復旧待ち）であれば処理を行わない
-        if start_code not in (3, 6):
+        if start_code not in (3, 6, 8):
             # PIDを取得し、Noneなら起動する
             server_pid = get_pid(config.server_name)
             if server_pid is None:

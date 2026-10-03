@@ -201,11 +201,17 @@ class config_window:
         notebook.add(frame, text=title)
         for row, key in enumerate(fields):
             ttk.Label(frame, text=CONFIG_DISPLAY_NAMES[key]).grid(row=row, column=0, sticky='w', padx=10, pady=8)
-            entry = ttk.Entry(frame, width=48, show='*' if key == 'token' else '')
-            entry.insert(0, str(values.get(key, '')))
-            entry.grid(row=row, column=1, sticky='ew', padx=10, pady=8)
+            if key == 'enabled':
+                variable = tk.IntVar(value=1 if int(values.get(key, 0) or 0) in (1, 2) else 0)
+                entry = ttk.Checkbutton(frame, text='使用する', variable=variable)
+                entry.grid(row=row, column=1, sticky='w', padx=10, pady=8)
+                self.fields[key] = variable
+            else:
+                entry = ttk.Entry(frame, width=48, show='*' if key == 'token' else '')
+                entry.insert(0, str(values.get(key, '')))
+                entry.grid(row=row, column=1, sticky='ew', padx=10, pady=8)
+                self.fields[key] = entry
             ttk.Button(frame, text='説明', command=lambda k=key: self.show_help(k)).grid(row=row, column=2, padx=5, pady=8)
-            self.fields[key] = entry
 
     def add_multiline_tab(self, notebook, title, key, values):
         frame = ttk.Frame(notebook)
@@ -271,7 +277,7 @@ class config_window:
             'interval': 'オートセーブの間隔を秒で指定します。60以上を指定してください。',
             'long_term_keep_days': '長期バックアップの保存日数です。0で無効、-1で無期限です。',
             'long_term_time': '長期バックアップを実行する時刻を0～24で指定します。',
-            'enabled': 'Discord botを使用するか指定します。0は無効、1または2は有効です。',
+            'enabled': 'Discord botを使用するか切り替えます。オンにすると有効です。',
             'token': 'Discord botのトークンを指定します。',
             'channel': 'Discord botが書き込むチャンネルIDを指定します。',
             'passwords': '会社番号ごとのパスワードを入力します。空欄の会社にはパスワードを設定しません。',
@@ -315,8 +321,11 @@ class config_window:
                 'channel': getattr(legacy, 'discord_channel', ''),
             }
             for key, value in values.items():
-                self.fields[key].delete(0, 'end')
-                self.fields[key].insert(0, str(value))
+                if key == 'enabled':
+                    self.fields[key].set(1 if int(value or 0) in (1, 2) else 0)
+                else:
+                    self.fields[key].delete(0, 'end')
+                    self.fields[key].insert(0, str(value))
             for i in range(63):
                 value = getattr(legacy, f'player_{i}_pw', '')
                 self.fields['passwords'][i].delete(0, 'end')

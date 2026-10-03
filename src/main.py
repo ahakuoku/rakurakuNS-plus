@@ -106,8 +106,18 @@ def load_config():
         config_data = yaml.safe_load(config_file) or {}
     config = type('Config', (), {})()
     server = config_data.get('server', {})
-    config.server_folder_path = server.get('folder_path')
-    config.server_name = server.get('name')
+    server_path = server.get('path')
+    if server_path is None:
+        # 旧形式のYAMLも読み込めるようにする。
+        folder_path = server.get('folder_path', '')
+        server_name = server.get('name', '')
+        separator = '\\' if '\\' in str(folder_path) and '/' not in str(folder_path) else '/'
+        server_path = f'{folder_path}{separator}{server_name}'
+    server_path = str(server_path)
+    separator_positions = [position for position in (server_path.rfind('/'), server_path.rfind('\\')) if position >= 0]
+    separator_position = max(separator_positions, default=-1)
+    config.server_folder_path = server_path[:separator_position] if separator_position >= 0 else ''
+    config.server_name = server_path[separator_position + 1:] if separator_position >= 0 else server_path
     config.port_number = server.get('port')
     config.restart_time = server.get('restart_time')
     autosave = config_data.get('autosave', {})
@@ -129,7 +139,7 @@ def load_config():
 
 def default_config_data():
     return {
-        'server': {'folder_path': '', 'name': '', 'port': '13353', 'restart_time': -1},
+        'server': {'path': '', 'port': '13353', 'restart_time': -1},
         'autosave': {'mode': 0, 'backup_count': 80, 'interval': 1200},
         'backup': {'long_term_keep_days': 0, 'long_term_time': 5},
         'players': {'passwords': {i: '' for i in range(63)}},
@@ -149,7 +159,14 @@ class config_window:
         data = config_data if config_data else default_config_data()
         notebook = ttk.Notebook(self.window)
         notebook.pack(fill='both', expand=True, padx=8, pady=8)
-        self.add_tab(notebook, 'サーバー', [('folder_path', 'サーバーフォルダ'), ('name', 'サーバー名'), ('port', 'ポート'), ('restart_time', '自動再起動時刻')], data.get('server', {}))
+        server_values = data.get('server', {})
+        if 'path' not in server_values:
+            folder = server_values.get('folder_path', '')
+            name = server_values.get('name', '')
+            separator = '\\' if '\\' in str(folder) and '/' not in str(folder) else '/'
+            server_values = dict(server_values)
+            server_values['path'] = f'{folder}{separator}{name}' if folder or name else ''
+        self.add_tab(notebook, 'サーバー', [('path', 'サーバー実行ファイル'), ('port', 'ポート'), ('restart_time', '自動再起動時刻')], server_values)
         self.add_tab(notebook, 'オートセーブ', [('mode', 'モード'), ('backup_count', 'バックアップ数'), ('interval', '間隔（秒）')], data.get('autosave', {}))
         self.add_tab(notebook, 'バックアップ', [('long_term_keep_days', '長期保存日数'), ('long_term_time', '実行時刻')], data.get('backup', {}))
         self.add_tab(notebook, 'Discord', [('enabled', '使用（0/1/2）'), ('token', 'トークン'), ('channel', 'チャンネル')], data.get('discord', {}))
@@ -221,8 +238,7 @@ class config_window:
 
     def show_help(self, key):
         descriptions = {
-            'folder_path': 'Simutransのサーバーフォルダを指定します。',
-            'name': '起動するSimutransサーバーの実行ファイル名を指定します。',
+            'path': '起動するSimutransサーバーの実行ファイルを、フォルダを含むフルパスで指定します。',
             'port': 'サーバーが使用するポート番号を指定します。',
             'restart_time': '毎日自動再起動する時刻を0～24で指定します。-1で無効です。',
             'mode': 'オートセーブのモードです。0は一定間隔、1は最後のロードからの経過時間です。',
@@ -250,9 +266,18 @@ class config_window:
             spec = importlib.util.spec_from_file_location('legacy_config', path)
             legacy = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(legacy)
+            legacy_folder_path = str(getattr(legacy, 'server_folder_path', ''))
+            legacy_server_name = str(getattr(legacy, 'server_name', ''))
+            if '\\' in legacy_folder_path and '/' in legacy_folder_path:
+                # 区切り文字が混在している場合は、スラッシュへ統一する。
+                legacy_folder_path = legacy_folder_path.replace('\\', '/')
+                legacy_separator = '/'
+            elif '\\' in legacy_folder_path:
+                legacy_separator = '\\'
+            else:
+                legacy_separator = '/'
             values = {
-                'folder_path': getattr(legacy, 'server_folder_path', ''),
-                'name': getattr(legacy, 'server_name', ''),
+                'path': f'{legacy_folder_path.rstrip(chr(92) + "/")}{legacy_separator}{legacy_server_name}',
                 'port': getattr(legacy, 'port_number', '13353'),
                 'restart_time': getattr(legacy, 'restart_time', -1),
                 'mode': getattr(legacy, 'autosave_mode', 0),
@@ -295,11 +320,12 @@ class config_window:
                     data['network']['ban_ips'][int(index)] = value
         with open(config_path, 'w', encoding='utf-8') as config_file:
             yaml.safe_dump(data, config_file, allow_unicode=True, sort_keys=False)
-        self.close()
+        # 保存直後にYAMLを読み込み直し、アプリ内の設定も更新する。
         load_config()
         if not self.first_run:
             check_config()
             app.server_name_label.config(text='管理対象のサーバー：' + config.server_name)
+        self.close()
 
     def close(self):
         self.window.grab_release()

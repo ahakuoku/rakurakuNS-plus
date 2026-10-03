@@ -318,6 +318,10 @@ class config_window:
                 index, value = line.split('=', 1)
                 if index.strip().isdigit() and 0 <= int(index) < 63:
                     data['network']['ban_ips'][int(index)] = value
+        error = self.validate_config_data(data)
+        if error:
+            messagebox.showerror('入力エラー', error, parent=self.window)
+            return
         with open(config_path, 'w', encoding='utf-8') as config_file:
             yaml.safe_dump(data, config_file, allow_unicode=True, sort_keys=False)
         # 保存直後にYAMLを読み込み直し、アプリ内の設定も更新する。
@@ -326,6 +330,50 @@ class config_window:
             check_config()
             app.server_name_label.config(text='管理対象のサーバー：' + config.server_name)
         self.close()
+
+    def validate_config_data(self, data):
+        server_path = str(data['server']['path']).strip()
+        if not server_path:
+            return 'サーバー実行ファイルのパスを入力してください。'
+        if not os.path.isfile(server_path):
+            return '指定されたサーバー実行ファイルが存在しません。'
+
+        integer_rules = (
+            ('server.port', data['server']['port'], 0, 65535),
+            ('server.restart_time', data['server']['restart_time'], -1, 24),
+            ('autosave.mode', data['autosave']['mode'], 0, 1),
+            ('autosave.backup_count', data['autosave']['backup_count'], 1, None),
+            ('autosave.interval', data['autosave']['interval'], 60, None),
+            ('backup.long_term_keep_days', data['backup']['long_term_keep_days'], -1, None),
+            ('backup.long_term_time', data['backup']['long_term_time'], 0, 24),
+            ('discord.enabled', data['discord']['enabled'], 0, 2),
+        )
+        display_names = {
+            'server.port': 'ポート',
+            'server.restart_time': '自動再起動時刻',
+            'autosave.mode': 'オートセーブモード',
+            'autosave.backup_count': 'バックアップ数',
+            'autosave.interval': 'オートセーブ間隔',
+            'backup.long_term_keep_days': '長期バックアップ保存日数',
+            'backup.long_term_time': '長期バックアップ実行時刻',
+            'discord.enabled': 'Discord botの使用設定',
+            'discord.channel': 'DiscordチャンネルID',
+        }
+        for name, value, minimum, maximum in integer_rules:
+            try:
+                number = int(value)
+            except (TypeError, ValueError):
+                return f'設定「{display_names[name]}」には整数を入力してください。'
+            if number < minimum or (maximum is not None and number > maximum):
+                return f'設定「{display_names[name]}」の値が範囲外です。'
+        if int(data['discord']['enabled']) in (1, 2):
+            if not str(data['discord']['token']).strip():
+                return 'Discordを使用する場合はトークンを入力してください。'
+            try:
+                int(data['discord']['channel'])
+            except (TypeError, ValueError):
+                return f'設定「{display_names["discord.channel"]}」には整数を入力してください。'
+        return None
 
     def close(self):
         self.window.grab_release()

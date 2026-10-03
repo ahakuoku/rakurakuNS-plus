@@ -203,7 +203,7 @@ class config_window:
             ttk.Label(frame, text=CONFIG_DISPLAY_NAMES[key]).grid(row=row, column=0, sticky='w', padx=10, pady=8)
             if key == 'enabled':
                 variable = tk.IntVar(value=1 if int(values.get(key, 0) or 0) in (1, 2) else 0)
-                entry = ttk.Checkbutton(frame, text='使用する', variable=variable)
+                entry = ttk.Checkbutton(frame, text='使用する', style='Switch.TCheckbutton', variable=variable)
                 entry.grid(row=row, column=1, sticky='w', padx=10, pady=8)
                 self.fields[key] = variable
             else:

@@ -112,6 +112,7 @@ CONFIG_DISPLAY_NAMES = {
     'long_term_keep_days': '長期バックアップ保存日数',
     'long_term_time': '長期バックアップ実行時刻',
     'enabled': 'Discord botの使用設定',
+    'autosave_notice': 'Discordでオートセーブを告知する',
     'token': 'Discord botトークン',
     'channel': 'DiscordチャンネルID',
     'passwords': 'プレイヤーパスワード',
@@ -155,6 +156,7 @@ def load_config():
     config.use_discord_bot = discord_settings.get('enabled', 0)
     config.discord_token = discord_settings.get('token', '')
     config.discord_channel = discord_settings.get('channel', '')
+    config.discord_autosave_notice = discord_settings.get('autosave_notice', 0)
 
 def default_config_data():
     return {
@@ -163,7 +165,7 @@ def default_config_data():
         'backup': {'long_term_keep_days': 0, 'long_term_time': 5},
         'players': {'passwords': {i: '' for i in range(63)}},
         'network': {'ban_ips': {i: '' for i in range(63)}},
-        'discord': {'enabled': 0, 'token': '', 'channel': ''},
+        'discord': {'enabled': 0, 'token': '', 'channel': '', 'autosave_notice': 0},
         # アプリケーション内部状態。設定画面には表示しない。
         'runtime': {
             'maintenance_mode': 0,
@@ -239,7 +241,7 @@ class config_window:
         self.add_tab(notebook, 'サーバー', ['path', 'port', 'restart_time', 'press_space_after_start'], server_values)
         self.add_tab(notebook, 'オートセーブ', ['mode', 'backup_count', 'interval'], data.get('autosave', {}))
         self.add_tab(notebook, 'バックアップ', ['long_term_keep_days', 'long_term_time'], data.get('backup', {}))
-        self.add_tab(notebook, 'Discord', ['enabled', 'token', 'channel'], data.get('discord', {}))
+        self.add_tab(notebook, 'Discord', ['enabled', 'autosave_notice', 'token', 'channel'], data.get('discord', {}))
         self.add_password_tab(notebook, data.get('players', {}).get('passwords', {}))
         self.add_multiline_tab(notebook, 'BAN IP', 'ban_ips', data.get('network', {}).get('ban_ips', {}))
         button_frame = ttk.Frame(self.window)
@@ -256,7 +258,7 @@ class config_window:
         notebook.add(frame, text=title)
         for row, key in enumerate(fields):
             ttk.Label(frame, text=CONFIG_DISPLAY_NAMES[key]).grid(row=row, column=0, sticky='w', padx=10, pady=8)
-            if key in ('enabled', 'press_space_after_start'):
+            if key in ('enabled', 'autosave_notice', 'press_space_after_start'):
                 variable = tk.IntVar(value=1 if int(values.get(key, 0) or 0) in (1, 2) else 0)
                 text = '使用する' if key == 'enabled' else '有効にする'
                 entry = ttk.Checkbutton(frame, text=text, style='Switch.TCheckbutton', variable=variable)
@@ -356,6 +358,7 @@ class config_window:
             'long_term_keep_days': '長期バックアップの保存日数です。0で無効、-1で無期限です。',
             'long_term_time': '長期バックアップを実行する時刻を0～24で指定します。',
             'enabled': 'Discord botを使用するか切り替えます。オンにすると有効です。',
+            'autosave_notice': '有効にすると、オートセーブ開始30秒前の予告をDiscordに投稿します。Discord botの使用設定が有効な場合に利用できます。なお、Discordの通知が非常に多くなるため利用は推奨しません。',
             'token': 'Discord botのトークンを指定します。',
             'channel': 'Discord botが書き込むチャンネルIDを指定します。',
             'passwords': '会社番号ごとのパスワードを入力します。空欄の会社にはパスワードを設定しません。',
@@ -396,11 +399,12 @@ class config_window:
                 'long_term_keep_days': getattr(legacy, 'long_backup_keep', 0),
                 'long_term_time': getattr(legacy, 'long_backup_time', 5),
                 'enabled': getattr(legacy, 'use_discord_bot', 0),
+                'autosave_notice': getattr(legacy, 'discord_autosave_notice', 0),
                 'token': getattr(legacy, 'discord_token', ''),
                 'channel': getattr(legacy, 'discord_channel', ''),
             }
             for key, value in values.items():
-                if key in ('enabled', 'press_space_after_start'):
+                if key in ('enabled', 'autosave_notice', 'press_space_after_start'):
                     self.fields[key].set(1 if int(value or 0) in (1, 2) else 0)
                 else:
                     self.fields[key].delete(0, 'end')
@@ -451,6 +455,19 @@ class config_window:
             if settings.get('autosave_interval') is not None:
                 self.fields['interval'].delete(0, 'end')
                 self.fields['interval'].insert(0, settings['autosave_interval'])
+
+            # bat版の変数名はバージョン差があるため、既知の表記を順に受け付ける。
+            autosave_notice = next(
+                (settings[key] for key in (
+                    'discord_autosave_notice', 'discord_autosave',
+                    'autosave_discord_notice', 'discord_save_notice'
+                ) if key in settings),
+                None,
+            )
+            if autosave_notice is not None:
+                self.fields['autosave_notice'].set(
+                    1 if str(autosave_notice).strip().lower() in ('1', '2', 'true', 'on', 'yes') else 0
+                )
 
             for i in range(63):
                 self.fields['passwords'][i].delete(0, 'end')
@@ -514,6 +531,7 @@ class config_window:
             ('backup.long_term_keep_days', data['backup']['long_term_keep_days'], -1, None),
             ('backup.long_term_time', data['backup']['long_term_time'], 0, 24),
             ('discord.enabled', data['discord']['enabled'], 0, 2),
+            ('discord.autosave_notice', data['discord']['autosave_notice'], 0, 1),
         )
         for name, value, minimum, maximum in integer_rules:
             display_name = CONFIG_DISPLAY_NAMES[name.split('.')[-1]]
@@ -1123,6 +1141,24 @@ def discord_post(title, description, color=0x00ff00):
             future.result(timeout=10)
         except Exception as e:
             print_with_date(f"通知送信エラー: {e}")
+
+def post_autosave_notice():
+    """設定が有効な場合だけ、オートセーブ予告をDiscordへ送信する。"""
+    if getattr(config, 'discord_autosave_notice', 0) in (1, 2):
+        discord_post(
+            'まもなくオートセーブです。',
+            'オートセーブ完了まで、サーバーに入らないでください。',
+            0xffbf00,
+        )
+
+def post_autosave_completed():
+    """設定が有効な場合だけ、オートセーブ完了をDiscordへ送信する。"""
+    if getattr(config, 'discord_autosave_notice', 0) in (1, 2):
+        discord_post(
+            'オートセーブが完了しました。',
+            'サーバーに入る際は、過度なログインラッシュのないようにお願いします。',
+            0x00ff00,
+        )
 
 # Bot用のスレッドターゲット
 def run_discord_bot():
@@ -2244,6 +2280,7 @@ def autosave():
             # ----------------------------------------
             # autosave予告
             # ----------------------------------------
+            post_autosave_notice()
             nettool_say('Autosave soon.')
             print_gui_log('オートセーブ予告メッセージを送信しました。')
 
@@ -2262,6 +2299,7 @@ def autosave():
             end_time = time.time()
 
             print_gui_log('オートセーブ処理が完了しました。')
+            post_autosave_completed()
 
             last_backup_time = time.time()
 
@@ -2364,6 +2402,7 @@ def autosave():
             and now_time >= autosave_warn_time
         ):
 
+            post_autosave_notice()
             nettool_say('Autosave soon.')
             print_gui_log('オートセーブ予告メッセージを送信しました。')
 
@@ -2402,6 +2441,7 @@ def autosave():
             set_company_pw()
 
             print_gui_log('オートセーブ処理が完了しました。')
+            post_autosave_completed()
 
             # autosave後のsave時刻取得
             if os.path.isfile(pt):

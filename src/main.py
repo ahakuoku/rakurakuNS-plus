@@ -164,7 +164,56 @@ def default_config_data():
         'players': {'passwords': {i: '' for i in range(63)}},
         'network': {'ban_ips': {i: '' for i in range(63)}},
         'discord': {'enabled': 0, 'token': '', 'channel': ''},
+        # アプリケーション内部状態。設定画面には表示しない。
+        'runtime': {
+            'maintenance_mode': 0,
+            'update_schedule': None,
+            'next_autosave_at': None,
+        },
     }
+
+def persist_runtime_state():
+    """設定画面では編集できない、再起動後も必要な内部状態を保存する。"""
+    runtime = {
+        'maintenance_mode': int(getattr(app, 'maintenance_mode', 0)) if 'app' in globals() else 0,
+        'update_schedule': None,
+        'next_autosave_at': globals().get('next_autosave_at'),
+    }
+    item = globals().get('scheduled_updates')
+    if item is not None:
+        runtime['update_schedule'] = {
+            'when': item['when'].isoformat(),
+            'body': item.get('body'),
+            'pak': item.get('pak'),
+            'backup': item.get('backup', 0),
+            'discord_notice': item.get('discord_notice', 0),
+        }
+    data = dict(config_data)
+    data['runtime'] = runtime
+    config_data['runtime'] = runtime
+    with open(config_path, 'w', encoding='utf-8') as config_file:
+        yaml.safe_dump(data, config_file, allow_unicode=True, sort_keys=False)
+
+def restore_runtime_state():
+    global scheduled_updates, next_autosave_at
+    runtime = config_data.get('runtime', {})
+    app.maintenance_mode = int(runtime.get('maintenance_mode', 0) or 0)
+    app.update_maintenance_button()
+    next_autosave_at = runtime.get('next_autosave_at')
+    saved = runtime.get('update_schedule')
+    if saved:
+        try:
+            when = datetime.datetime.fromisoformat(str(saved['when']))
+            if when > datetime.datetime.now():
+                scheduled_updates = {
+                    'when': when, 'body': saved.get('body'), 'pak': saved.get('pak'),
+                    'backup': saved.get('backup', 0),
+                    'discord_notice': saved.get('discord_notice', 0),
+                }
+            else:
+                scheduled_updates = None
+        except (KeyError, TypeError, ValueError):
+            scheduled_updates = None
 
 class config_window:
     def __init__(self, master, first_run=False):
@@ -423,6 +472,8 @@ class config_window:
 
     def save(self):
         data = default_config_data()
+        # 設定画面にない内部状態を保持する。
+        data['runtime'] = config_data.get('runtime', data['runtime'])
         for key in ('server', 'autosave', 'backup', 'discord'):
             for name in data[key]:
                 data[key][name] = self.fields[name].get()
@@ -623,10 +674,12 @@ class window_main(tk.Frame):
             self.maintenance_mode = 0
         
         self.update_maintenance_button()
+        persist_runtime_state()
 
     def set_manual_restart_mode(self):
         self.maintenance_mode = 2
         self.update_maintenance_button()
+        persist_runtime_state()
 
     def log_text_insert(self, content):
         # 他スレッドからも呼び出せる安全な方法
@@ -1115,6 +1168,7 @@ def schedule_update(when, body_source, pak_source, long_backup_code, discord_not
     }
     with scheduled_updates_lock:
         scheduled_updates = update_item
+    persist_runtime_state()
     if discord_notice_code:
         if body_source and pak_source:
             update_kind = '本体・Pak更新'
@@ -1135,6 +1189,7 @@ def scheduled_update_loop():
             if scheduled_updates is not None and scheduled_updates['when'] <= now:
                 due.append(scheduled_updates)
                 scheduled_updates = None
+                persist_runtime_state()
         for item in due:
             threading.Thread(target=execute_scheduled_update, args=(item,), daemon=True).start()
         time.sleep(1)
@@ -2132,6 +2187,8 @@ def monitoring():
 
 def autosave():
 
+    global next_autosave_at
+
     pt = server_folder_path + '/' + server_save
 
     # ====================================================
@@ -2140,12 +2197,16 @@ def autosave():
     if autosave_mode == 0:
 
         autosave_interval = config.autosave_interval - 30
+        saved_next = float(next_autosave_at) if next_autosave_at else 0
+        initial_wait = max(0, saved_next - time.time()) if saved_next > time.time() else max(0, autosave_interval)
+        next_autosave_at = time.time() + initial_wait
+        persist_runtime_state()
 
         # backup用タイマー
         last_backup_time = time.time()
 
-        if autosave_interval > 0:
-            time.sleep(autosave_interval)
+        if initial_wait > 0:
+            time.sleep(initial_wait)
 
         while True:
 
@@ -2183,6 +2244,8 @@ def autosave():
                 - 30
                 - process_time
             )
+            next_autosave_at = time.time() + max(0, next_autosave)
+            persist_runtime_state()
 
             # autosave待機中に
             # backupだけ実行する可能性あり
@@ -2210,12 +2273,18 @@ def autosave():
 
                 next_autosave -= sleep_time
 
+            next_autosave_at = time.time()
+            persist_runtime_state()
+
         return None
 
     # ====================================================
     # savefile timestamp方式
     # ====================================================
     now_time = time.time()
+
+    if next_autosave_at:
+        now_time = max(now_time, float(next_autosave_at))
 
     # 最後のsave activity時刻
     last_save_activity_time = now_time
@@ -2276,6 +2345,7 @@ def autosave():
             last_save_activity_time
             + config.autosave_interval
         )
+        next_autosave_at = autosave_execute_time
 
         if now_time >= autosave_execute_time:
 
@@ -2308,8 +2378,10 @@ def autosave():
                 last_save_activity_time = os.path.getctime(pt)
 
             else:
-
                 last_save_activity_time = time.time()
+
+            next_autosave_at = last_save_activity_time + config.autosave_interval
+            persist_runtime_state()
 
             # backupタイマー更新
             last_backup_time = time.time()
@@ -2361,6 +2433,7 @@ if __name__ == "__main__":
     check_nettool()
     nettool_pw = get_nettool_pw(0)
     app = window_main(master=root)
+    restore_runtime_state()
 
     root.after(100, start_threads)
 

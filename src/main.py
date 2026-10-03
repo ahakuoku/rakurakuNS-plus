@@ -100,6 +100,22 @@ import tempfile
 intents = discord.Intents.default()
 bot = discord.Client(intents=intents)
 
+CONFIG_DISPLAY_NAMES = {
+    'path': 'サーバー実行ファイル',
+    'port': 'ポート',
+    'restart_time': '自動再起動時刻',
+    'mode': 'オートセーブモード',
+    'backup_count': 'バックアップ数',
+    'interval': 'オートセーブ間隔',
+    'long_term_keep_days': '長期バックアップ保存日数',
+    'long_term_time': '長期バックアップ実行時刻',
+    'enabled': 'Discord botの使用設定',
+    'token': 'Discord botトークン',
+    'channel': 'DiscordチャンネルID',
+    'passwords': 'プレイヤーパスワード',
+    'ban_ips': 'BAN IP',
+}
+
 def load_config():
     global config, config_data
     with open(config_path, 'r', encoding='utf-8') as config_file:
@@ -166,10 +182,10 @@ class config_window:
             separator = '\\' if '\\' in str(folder) and '/' not in str(folder) else '/'
             server_values = dict(server_values)
             server_values['path'] = f'{folder}{separator}{name}' if folder or name else ''
-        self.add_tab(notebook, 'サーバー', [('path', 'サーバー実行ファイル'), ('port', 'ポート'), ('restart_time', '自動再起動時刻')], server_values)
-        self.add_tab(notebook, 'オートセーブ', [('mode', 'モード'), ('backup_count', 'バックアップ数'), ('interval', '間隔（秒）')], data.get('autosave', {}))
-        self.add_tab(notebook, 'バックアップ', [('long_term_keep_days', '長期保存日数'), ('long_term_time', '実行時刻')], data.get('backup', {}))
-        self.add_tab(notebook, 'Discord', [('enabled', '使用（0/1/2）'), ('token', 'トークン'), ('channel', 'チャンネル')], data.get('discord', {}))
+        self.add_tab(notebook, 'サーバー', ['path', 'port', 'restart_time'], server_values)
+        self.add_tab(notebook, 'オートセーブ', ['mode', 'backup_count', 'interval'], data.get('autosave', {}))
+        self.add_tab(notebook, 'バックアップ', ['long_term_keep_days', 'long_term_time'], data.get('backup', {}))
+        self.add_tab(notebook, 'Discord', ['enabled', 'token', 'channel'], data.get('discord', {}))
         self.add_password_tab(notebook, data.get('players', {}).get('passwords', {}))
         self.add_multiline_tab(notebook, 'BAN IP', 'ban_ips', data.get('network', {}).get('ban_ips', {}))
         button_frame = ttk.Frame(self.window)
@@ -183,8 +199,8 @@ class config_window:
     def add_tab(self, notebook, title, fields, values):
         frame = ttk.Frame(notebook)
         notebook.add(frame, text=title)
-        for row, (key, label) in enumerate(fields):
-            ttk.Label(frame, text=label).grid(row=row, column=0, sticky='w', padx=10, pady=8)
+        for row, key in enumerate(fields):
+            ttk.Label(frame, text=CONFIG_DISPLAY_NAMES[key]).grid(row=row, column=0, sticky='w', padx=10, pady=8)
             entry = ttk.Entry(frame, width=48, show='*' if key == 'token' else '')
             entry.insert(0, str(values.get(key, '')))
             entry.grid(row=row, column=1, sticky='ew', padx=10, pady=8)
@@ -334,9 +350,9 @@ class config_window:
     def validate_config_data(self, data):
         server_path = str(data['server']['path']).strip()
         if not server_path:
-            return 'サーバー実行ファイルのパスを入力してください。'
+            return f'「{CONFIG_DISPLAY_NAMES["path"]}」のパスを入力してください。'
         if not os.path.isfile(server_path):
-            return '指定されたサーバー実行ファイルが存在しません。'
+            return f'指定された「{CONFIG_DISPLAY_NAMES["path"]}」が存在しません。'
 
         integer_rules = (
             ('server.port', data['server']['port'], 0, 65535),
@@ -348,31 +364,21 @@ class config_window:
             ('backup.long_term_time', data['backup']['long_term_time'], 0, 24),
             ('discord.enabled', data['discord']['enabled'], 0, 2),
         )
-        display_names = {
-            'server.port': 'ポート',
-            'server.restart_time': '自動再起動時刻',
-            'autosave.mode': 'オートセーブモード',
-            'autosave.backup_count': 'バックアップ数',
-            'autosave.interval': 'オートセーブ間隔',
-            'backup.long_term_keep_days': '長期バックアップ保存日数',
-            'backup.long_term_time': '長期バックアップ実行時刻',
-            'discord.enabled': 'Discord botの使用設定',
-            'discord.channel': 'DiscordチャンネルID',
-        }
         for name, value, minimum, maximum in integer_rules:
+            display_name = CONFIG_DISPLAY_NAMES[name.split('.')[-1]]
             try:
                 number = int(value)
             except (TypeError, ValueError):
-                return f'設定「{display_names[name]}」には整数を入力してください。'
+                return f'設定「{display_name}」には整数を入力してください。'
             if number < minimum or (maximum is not None and number > maximum):
-                return f'設定「{display_names[name]}」の値が範囲外です。'
+                return f'設定「{display_name}」の値が範囲外です。'
         if int(data['discord']['enabled']) in (1, 2):
             if not str(data['discord']['token']).strip():
-                return 'Discordを使用する場合はトークンを入力してください。'
+                return f'{CONFIG_DISPLAY_NAMES["enabled"]}を有効にする場合は、{CONFIG_DISPLAY_NAMES["token"]}を入力してください。'
             try:
                 int(data['discord']['channel'])
             except (TypeError, ValueError):
-                return f'設定「{display_names["discord.channel"]}」には整数を入力してください。'
+                return f'設定「{CONFIG_DISPLAY_NAMES["channel"]}」には整数を入力してください。'
         return None
 
     def close(self):

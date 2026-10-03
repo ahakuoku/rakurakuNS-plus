@@ -239,6 +239,12 @@ class config_window:
         canvas_window = canvas.create_window((0, 0), window=contents, anchor='nw')
         contents.bind('<Configure>', lambda event: canvas.configure(scrollregion=canvas.bbox('all')))
         canvas.bind('<Configure>', lambda event: canvas.itemconfigure(canvas_window, width=event.width))
+        canvas.bind('<MouseWheel>', lambda event: canvas.yview_scroll(-int(event.delta / 120), 'units'))
+        contents.bind('<MouseWheel>', lambda event: canvas.yview_scroll(-int(event.delta / 120), 'units'))
+        canvas.bind('<Button-4>', lambda event: canvas.yview_scroll(-1, 'units'))
+        canvas.bind('<Button-5>', lambda event: canvas.yview_scroll(1, 'units'))
+        contents.bind('<Button-4>', lambda event: canvas.yview_scroll(-1, 'units'))
+        contents.bind('<Button-5>', lambda event: canvas.yview_scroll(1, 'units'))
         password_fields = {}
         for i in range(63):
             column = (i // 21) * 2
@@ -248,6 +254,9 @@ class config_window:
             value = values.get(i, values.get(str(i), ''))
             entry.insert(0, str(value or ''))
             entry.grid(row=row, column=column + 1, sticky='w', padx=(0, 18), pady=3)
+            entry.bind('<MouseWheel>', lambda event: canvas.yview_scroll(-int(event.delta / 120), 'units'))
+            entry.bind('<Button-4>', lambda event: canvas.yview_scroll(-1, 'units'))
+            entry.bind('<Button-5>', lambda event: canvas.yview_scroll(1, 'units'))
             password_fields[i] = entry
         ttk.Button(frame, text='説明', command=lambda: self.show_help('passwords')).grid(row=2, column=0, padx=10, pady=8, sticky='w')
         self.fields['passwords'] = password_fields

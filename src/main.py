@@ -196,6 +196,7 @@ class config_window:
         button_frame = ttk.Frame(self.window)
         button_frame.pack(fill='x', padx=8, pady=(0, 8))
         ttk.Button(button_frame, text='config.pyをインポート', command=self.import_legacy_config).pack(side='left')
+        ttk.Button(button_frame, text='らくらくNS（bat版）の設定をインポート', command=self.import_setting_bat).pack(side='left', padx=(8, 0))
         ttk.Button(button_frame, text='保存', style='Accent.TButton', command=self.save).pack(side='right', padx=(8, 0))
         ttk.Button(button_frame, text='キャンセル', command=self.close).pack(side='right')
         self.window.transient(master)
@@ -368,6 +369,57 @@ class config_window:
             messagebox.showinfo('インポート完了', 'config.pyの設定を画面に反映しました。保存するとconfig.yamlが作成されます。', parent=self.window)
         except Exception as error:
             messagebox.showerror('インポート失敗', f'config.pyを読み込めませんでした。\n{error}', parent=self.window)
+
+    def import_setting_bat(self):
+        path = filedialog.askopenfilename(
+            title='インポートするsetting.batを選択',
+            filetypes=[('設定ファイル', 'setting.bat'), ('バッチファイル', '*.bat')],
+            parent=self.window,
+        )
+        if not path:
+            return
+        try:
+            settings = {}
+            with open(path, 'r', encoding='cp932', errors='replace') as setting_file:
+                for line in setting_file:
+                    line = line.strip()
+                    if not line.lower().startswith('set ') or '=' not in line:
+                        continue
+                    key, value = line[4:].split('=', 1)
+                    settings[key.strip()] = value.strip().strip('"')
+
+            launch_file = settings.get('launch_file') or settings.get('check_exe', '')
+            setting_directory = os.path.dirname(os.path.abspath(path))
+            server_path = os.path.join(setting_directory, launch_file) if launch_file else ''
+            self.fields['path'].delete(0, 'end')
+            self.fields['path'].insert(0, server_path)
+
+            server_address = settings.get('server_address', '')
+            if ':' in server_address:
+                self.fields['port'].delete(0, 'end')
+                self.fields['port'].insert(0, server_address.rsplit(':', 1)[1])
+
+            if settings.get('autosave_interval') is not None:
+                self.fields['interval'].delete(0, 'end')
+                self.fields['interval'].insert(0, settings['autosave_interval'])
+
+            for i in range(63):
+                self.fields['passwords'][i].delete(0, 'end')
+            for i in range(1, 4):
+                number = settings.get(f'company_password_{i}_number', '-1')
+                password = settings.get(f'company_password_{i}', '')
+                if number.lstrip('-').isdigit() and 0 <= int(number) < 63:
+                    self.fields['passwords'][int(number)].insert(0, password)
+
+            ban_text = self.fields['ban_ips']
+            ban_text.delete('1.0', 'end')
+            for i in range(1, 64):
+                address = settings.get(f'ban_address_{i}', '')
+                if address:
+                    ban_text.insert('end', f'{i - 1}={address}\n')
+            messagebox.showinfo('インポート完了', 'setting.batの設定を画面に反映しました。保存するとconfig.yamlが作成されます。', parent=self.window)
+        except Exception as error:
+            messagebox.showerror('インポート失敗', f'setting.batを読み込めませんでした。\n{error}', parent=self.window)
 
     def save(self):
         data = default_config_data()

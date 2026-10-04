@@ -1226,12 +1226,11 @@ def manual_save():
     print_gui_log('手動セーブ予告メッセージを送信しました。')
     time.sleep(30)
 
-    print_gui_log('オートセーブ中です。')
+    print_gui_log('セーブ中です。')
     nettool_forcesync()
     set_company_pw()
-    print_gui_log('オートセーブ処理が完了しました。')
     post_autosave_completed()
-    print_gui_log('手動セーブが完了しました。')
+    print_gui_log('セーブが完了しました。')
 
 # 関数定義（Discord関連）
 async def send_notification(

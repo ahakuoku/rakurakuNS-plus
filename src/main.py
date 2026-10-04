@@ -647,7 +647,7 @@ class window_main(tk.Frame):
         self.maintenance_mode_button = ttk.Button(
             self, text="サーバーを一時停止", command=self.maintenance_check_start
         )
-        self.maintenance_mode_button.grid(row=2, column=1, padx=5, pady=10, sticky="w")
+        self.maintenance_mode_button.grid(row=2, column=2, padx=5, pady=10, sticky="w")
 
         self.server_stop_button = ttk.Button(self, text="会期終了", command=self.server_close_check_start)
         self.server_stop_button.grid(row=3, column=3, padx=5, pady=(0, 10), sticky="ew")

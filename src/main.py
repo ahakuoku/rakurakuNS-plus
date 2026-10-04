@@ -617,9 +617,9 @@ class window_main(tk.Frame):
         self.master.title("らくらくNS+")
         self.master.resizable(False, False)
         if os_type == "Linux":
-            self.master.geometry("550x370")
+            self.master.geometry("680x370")
         else:
-            self.master.geometry("550x330")
+            self.master.geometry("680x330")
         self.maintenance_mode = 0  # メンテナンスモードの状態（0:通常, 1:メンテナンス中）
         self.create_widgets()
 
@@ -627,30 +627,39 @@ class window_main(tk.Frame):
         # Gridの設定
         self.master.grid_rowconfigure(0, weight=1)
         self.master.grid_columnconfigure(0, weight=1)
+        for column in range(4):
+            self.grid_columnconfigure(column, weight=1, uniform="main_buttons")
+        self.grid_rowconfigure(1, weight=1)
 
         # GUIの配置
         self.server_name_label = ttk.Label(self, text="管理対象のサーバー：" + config.server_name, anchor="w")
         self.server_name_label.grid(row=0, column=0, columnspan=4, sticky="w")
 
-        self.log_text = tk.Text(self, width=40, height=10, wrap="word")
+        # ログ欄とスクロールバーを専用フレームに収め、5列目にはみ出さないようにする。
+        self.log_frame = ttk.Frame(self)
+        self.log_frame.grid(row=1, column=0, columnspan=4, sticky="nsew")
+        self.log_frame.grid_columnconfigure(0, weight=1)
+        self.log_frame.grid_rowconfigure(0, weight=1)
+
+        self.log_text = tk.Text(self.log_frame, width=40, height=10, wrap="word")
         self.log_text.configure(state="disabled")
-        self.log_text.grid(row=1, column=0, columnspan=4, sticky="nsew")
+        self.log_text.grid(row=0, column=0, sticky="nsew")
         
-        self.scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.log_text.yview)
-        self.scrollbar.grid(row=1, column=4, sticky="ns")
+        self.scrollbar = ttk.Scrollbar(self.log_frame, orient="vertical", command=self.log_text.yview)
+        self.scrollbar.grid(row=0, column=1, sticky="ns")
         self.log_text.config(yscrollcommand=self.scrollbar.set)
 
         self.restart_button = ttk.Button(self, text="サーバー再起動", command=self.server_restart_check_start)
-        self.restart_button.grid(row=2, column=0, padx=5, pady=10, sticky="w")
+        self.restart_button.grid(row=2, column=0, padx=5, pady=10, sticky="ew")
 
         self.manual_save_button = ttk.Button(self, text="手動セーブ", command=self.manual_save_start)
-        self.manual_save_button.grid(row=2, column=1, padx=5, pady=10, sticky="w")
+        self.manual_save_button.grid(row=2, column=1, padx=5, pady=10, sticky="ew")
 
         # メンテナンスモードボタン
         self.maintenance_mode_button = ttk.Button(
             self, text="サーバーを一時停止", command=self.maintenance_check_start
         )
-        self.maintenance_mode_button.grid(row=2, column=2, padx=5, pady=10, sticky="w")
+        self.maintenance_mode_button.grid(row=2, column=2, padx=5, pady=10, sticky="ew")
 
         self.server_force_stop_button = ttk.Button(
             self,
@@ -658,10 +667,15 @@ class window_main(tk.Frame):
             style="Danger.TButton",
             command=self.server_force_stop_check_start,
         )
-        self.server_force_stop_button.grid(row=2, column=3, padx=5, pady=10, sticky="w")
+        self.server_force_stop_button.grid(row=2, column=3, padx=5, pady=10, sticky="ew")
 
         self.server_stop_button = ttk.Button(self, text="会期終了", command=self.server_close_check_start)
         self.server_stop_button.grid(row=3, column=3, padx=5, pady=(0, 10), sticky="ew")
+
+        self.rollback_button = ttk.Button(
+            self, text="データをロールバック", command=self.rollback_start
+        )
+        self.rollback_button.grid(row=3, column=2, padx=5, pady=(0, 10), sticky="ew")
 
         self.update_schedule_button = ttk.Button(
             self, text="本体・Pakの更新をスケジュール", command=self.update_schedule_start
@@ -687,6 +701,22 @@ class window_main(tk.Frame):
         self.newWindow = tk.Toplevel(self.master)
         self.newWindow.grab_set()
         update_schedule_window(self.newWindow)
+
+    def rollback_start(self):
+        if hasattr(self, "newWindow") and self.newWindow.winfo_exists():
+            self.newWindow.lift()
+            return
+        self.newWindow = tk.Toplevel(self.master)
+        self.newWindow.grab_set()
+        rollback_window(self.newWindow, self)
+
+    def rollback_execute(self, save_path, timestamp):
+        self.rollback_button.config(state="disabled")
+        threading.Thread(
+            target=rollback_server,
+            args=(save_path, timestamp),
+            daemon=True,
+        ).start()
 
     def server_restart_check_start(self):
         # 確認ダイアログを開く
@@ -1197,6 +1227,98 @@ class manual_save_check(tk.Frame):
     def start_save(self):
         self.app.manual_save_execute()
         self.close_window()
+
+class rollback_window(tk.Frame):
+    """ロールバック対象のセーブデータを選択する画面。"""
+    def __init__(self, master, app):
+        super().__init__(master)
+        self.master = master
+        self.app = app
+        self.master.title("セーブデータをロールバック")
+        self.master.resizable(False, False)
+        self.master.geometry("610x150")
+        self.master.protocol('WM_DELETE_WINDOW', self.close_window)
+        self.path_var = tk.StringVar()
+
+        ttk.Label(self.master, text="ロールバック先のセーブデータ（.sve）").pack(
+            padx=10, pady=(10, 4), anchor="w"
+        )
+        path_frame = ttk.Frame(self.master)
+        path_frame.pack(fill="x", padx=10)
+        ttk.Entry(path_frame, textvariable=self.path_var, width=60).pack(
+            side="left", fill="x", expand=True
+        )
+        ttk.Button(path_frame, text="参照", command=self.choose_file).pack(
+            side="right", padx=(5, 0)
+        )
+        button_frame = ttk.Frame(self.master)
+        button_frame.pack(fill="x", padx=10, pady=12)
+        ttk.Button(
+            button_frame, text="ロールバックする", style="Danger.TButton",
+            command=self.confirm
+        ).pack(side="left", expand=True, padx=5)
+        ttk.Button(button_frame, text="キャンセル", command=self.close_window).pack(
+            side="right", expand=True, padx=5
+        )
+
+    def choose_file(self):
+        path = filedialog.askopenfilename(
+            title="ロールバック先のセーブデータを選択",
+            filetypes=[("Simutrans save data", "*.sve"), ("すべてのファイル", "*.*")],
+            initialdir=server_folder_path,
+            parent=self.master,
+        )
+        if path:
+            self.path_var.set(path)
+
+    def confirm(self):
+        path = self.path_var.get().strip()
+        if not path or not os.path.isfile(path) or not path.lower().endswith('.sve'):
+            messagebox.showerror("入力確認", ".sveファイルを指定してください。", parent=self.master)
+            return
+        timestamp = datetime.datetime.fromtimestamp(os.path.getctime(path)).strftime('%Y/%m/%d %H:%M:%S')
+        message = (
+            "セーブデータのロールバックを行います。\n"
+            f"{timestamp}以降の作業はすべて失われます。\n"
+            "よろしいですか？"
+        )
+        if messagebox.askyesno("確認", message, parent=self.master):
+            self.app.rollback_execute(path, timestamp)
+            self.close_window()
+
+    def close_window(self):
+        self.master.destroy()
+
+def rollback_server(save_path, timestamp):
+    """通知、停止、現行データのバックアップ、置換、再起動を行う。"""
+    global start_code
+    try:
+        nettool_say('Maintenance soon.')
+        discord_post(
+            'ロールバックに伴うメンテナンスのお知らせ',
+            f'{timestamp.rsplit(" ", 1)[-1]}時点へのセーブデータのロールバックを行うため、ただいまよりメンテナンスを行います。\n'
+            'ご迷惑をおかけし申し訳ございませんが、何卒ご理解のほどよろしくお願いいたします。',
+            0xff0000,
+        )
+        time.sleep(30)
+        nettool_forcesync()
+        subprocess.run(
+            [run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'shutdown'],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        deadline = time.time() + 60
+        while get_pid(config.server_name) is not None and time.time() < deadline:
+            time.sleep(1)
+        if get_pid(config.server_name) is not None:
+            raise RuntimeError('Simutransの終了を確認できませんでした。')
+
+        long_backup(1)
+        shutil.copy2(save_path, os.path.join(server_folder_path, server_save))
+        print_gui_log('セーブデータをロールバックしました。サーバーを再開します。')
+        start_code = 7
+    except Exception as error:
+        print_gui_log(f'セーブデータのロールバックに失敗しました: {error}')
+        start_code = 6
 
 class server_restart_check(tk.Frame):
     # 確認ダイアログウィンドウ

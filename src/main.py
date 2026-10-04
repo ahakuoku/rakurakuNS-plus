@@ -652,16 +652,16 @@ class window_main(tk.Frame):
         self.server_stop_button = ttk.Button(self, text="会期終了", command=self.server_close_check_start)
         self.server_stop_button.grid(row=2, column=2, padx=5, pady=10, sticky="w")
 
-        self.exit_button = ttk.Button(self, text="らくらくNS+を終了", style='Accent.TButton', command=self.exit_check_start)
-        self.exit_button.grid(row=2, column=3, padx=5, pady=10, sticky="w")
-
         self.update_schedule_button = ttk.Button(
             self, text="本体・Pakの更新をスケジュール", command=self.update_schedule_start
         )
         self.update_schedule_button.grid(row=3, column=0, columnspan=3, padx=5, pady=(0, 10), sticky="ew")
 
         self.settings_button = ttk.Button(self, text="設定", command=self.open_settings)
-        self.settings_button.grid(row=3, column=3, padx=5, pady=(0, 10), sticky="ew")
+        self.settings_button.grid(row=4, column=2, padx=5, pady=(0, 10), sticky="ew")
+
+        self.exit_button = ttk.Button(self, text="らくらくNS+を終了", style='Accent.TButton', command=self.exit_check_start)
+        self.exit_button.grid(row=4, column=3, padx=5, pady=(0, 10), sticky="ew")
 
     def open_settings(self):
         if hasattr(self, "newWindow") and self.newWindow.winfo_exists():

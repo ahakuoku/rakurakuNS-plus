@@ -258,7 +258,22 @@ class config_window:
         notebook.add(frame, text=title)
         for row, key in enumerate(fields):
             ttk.Label(frame, text=CONFIG_DISPLAY_NAMES[key]).grid(row=row, column=0, sticky='w', padx=10, pady=8)
-            if key in ('enabled', 'autosave_notice', 'press_space_after_start'):
+            if key == 'mode':
+                try:
+                    mode = int(values.get(key, 0) or 0)
+                except (TypeError, ValueError):
+                    mode = 0
+                variable = tk.IntVar(value=mode if mode in (0, 1) else 0)
+                mode_frame = ttk.Frame(frame)
+                mode_frame.grid(row=row, column=1, sticky='w', padx=10, pady=8)
+                ttk.Radiobutton(
+                    mode_frame, text='一定間隔', variable=variable, value=0
+                ).pack(side='left', padx=(0, 16))
+                ttk.Radiobutton(
+                    mode_frame, text='最後のロードからの経過時間', variable=variable, value=1
+                ).pack(side='left')
+                self.fields[key] = variable
+            elif key in ('enabled', 'autosave_notice', 'press_space_after_start'):
                 variable = tk.IntVar(value=1 if int(values.get(key, 0) or 0) in (1, 2) else 0)
                 text = '使用する' if key == 'enabled' else '有効にする'
                 entry = ttk.Checkbutton(frame, text=text, style='Switch.TCheckbutton', variable=variable)
@@ -352,7 +367,7 @@ class config_window:
             'port': 'サーバーが使用するポート番号を指定します。',
             'restart_time': '毎日自動再起動する時刻を0～24で指定します。-1で無効です。',
             'press_space_after_start': '有効にすると、Simutransの起動開始から30秒後にスペースキーを1回送信します。Standard以外の本体では通常必要ありません。',
-            'mode': 'オートセーブのモードです。0は一定間隔、1は最後のロードからの経過時間です。',
+            'mode': 'オートセーブのモードを選択します。「一定間隔」は指定した間隔ごとに、「最後のロードからの経過時間」は最後にロードしてから指定した時間が経過した時点でオートセーブします。',
             'backup_count': 'オートセーブのバックアップ保存数を指定します。',
             'interval': 'オートセーブの間隔を秒で指定します。60以上を指定してください。',
             'long_term_keep_days': '長期バックアップの保存日数です。0で無効、-1で無期限です。',

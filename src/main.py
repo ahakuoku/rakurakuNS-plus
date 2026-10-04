@@ -652,6 +652,14 @@ class window_main(tk.Frame):
         )
         self.maintenance_mode_button.grid(row=2, column=2, padx=5, pady=10, sticky="w")
 
+        self.server_force_stop_button = ttk.Button(
+            self,
+            text="サーバーを強制終了",
+            style="Danger.TButton",
+            command=self.server_force_stop_check_start,
+        )
+        self.server_force_stop_button.grid(row=2, column=3, padx=5, pady=10, sticky="w")
+
         self.server_stop_button = ttk.Button(self, text="会期終了", command=self.server_close_check_start)
         self.server_stop_button.grid(row=3, column=3, padx=5, pady=(0, 10), sticky="ew")
 
@@ -747,6 +755,16 @@ class window_main(tk.Frame):
         self.newWindow = tk.Toplevel(self.master)
         self.newWindow.grab_set()
         maintenance_check(self.newWindow, self)  # 自分自身を渡す
+
+    def server_force_stop_check_start(self):
+        # サーバー強制終了の確認ダイアログを開く
+        if hasattr(self, "newWindow") and self.newWindow.winfo_exists():
+            self.newWindow.lift()
+            return
+
+        self.newWindow = tk.Toplevel(self.master)
+        self.newWindow.grab_set()
+        server_force_stop_check(self.newWindow)
 
     def update_maintenance_button(self):
             if self.maintenance_mode == 0:
@@ -1089,6 +1107,52 @@ class server_close_check(tk.Frame):
         self.master.master.quit()
         self.master.master.destroy()
 
+class server_force_stop_check(tk.Frame):
+    # サーバー強制終了確認ダイアログウィンドウ
+    def __init__(self, master):
+        super().__init__(master)
+        self.master = master
+        self.master.title("らくらくNS+")
+        self.master.resizable(False, False)
+        self.master.geometry("430x140")
+        self.master.protocol('WM_DELETE_WINDOW', self.close_window)
+
+        self.create_widgets()
+
+    def create_widgets(self):
+        self.label = ttk.Label(
+            self.master,
+            text="サーバーを強制終了します。\n強制終了すると、前回のロード以降のデータは失われます。\nよろしいですか？",
+        )
+        self.label.pack(padx=10, pady=10, fill="both", expand=True)
+
+        button_frame = ttk.Frame(self.master)
+        button_frame.pack(pady=10, fill="x")
+
+        self.force_stop_button = ttk.Button(
+            button_frame,
+            text="はい",
+            style='Accent.TButton',
+            command=self.force_stop_server,
+        )
+        self.force_stop_button.pack(side="left", padx=5, expand=True)
+
+        self.cancel_button = ttk.Button(
+            button_frame, text="いいえ", command=self.close_window
+        )
+        self.cancel_button.pack(side="right", padx=5, expand=True)
+
+    def close_window(self):
+        self.master.destroy()
+
+    def force_stop_server(self):
+        force_stop_thread = threading.Thread(
+            target=force_stop_server,
+            daemon=True,
+        )
+        force_stop_thread.start()
+        self.master.destroy()
+
 class manual_save_check(tk.Frame):
     # 手動セーブ確認ダイアログウィンドウ
     def __init__(self, master, app):
@@ -1199,6 +1263,8 @@ def gui_main(create_app=True):
     # テーマ読み込み
     root.tk.call("source", resource_path("azure.tcl"))
     root.tk.call("set_theme", "light")
+
+    ttk.Style(root).configure("Danger.TButton", foreground="#d13438")
 
     root.grid_rowconfigure(0, weight=1)
     root.grid_columnconfigure(0, weight=1)
@@ -2050,6 +2116,32 @@ def get_pid(target_name):
             continue
 
     return target_pid
+
+def force_stop_server():
+    """サーバーのPIDを指定して強制終了する。"""
+    server_pid = get_pid(config.server_name)
+    if server_pid is None:
+        print_gui_log('強制終了するサーバーが見つかりません。')
+        return None
+
+    if platform.system() == 'Windows':
+        command = ['taskkill', '/PID', str(server_pid), '/F']
+    elif platform.system() in ('Linux', 'Darwin'):
+        command = ['kill', '-KILL', str(server_pid)]
+    else:
+        print_gui_log('このOSではサーバーを強制終了できません。')
+        return None
+
+    result = subprocess.run(
+        command,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    if result.returncode == 0:
+        print_gui_log('サーバーを強制終了しました。')
+    else:
+        print_gui_log('サーバーの強制終了に失敗しました。')
+    return None
 
 def set_company_pw():
     # パスワードを設定する

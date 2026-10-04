@@ -643,6 +643,9 @@ class window_main(tk.Frame):
         self.restart_button = ttk.Button(self, text="サーバー再起動", command=self.server_restart_check_start)
         self.restart_button.grid(row=2, column=0, padx=5, pady=10, sticky="w")
 
+        self.manual_save_button = ttk.Button(self, text="手動セーブ", command=self.manual_save_start)
+        self.manual_save_button.grid(row=2, column=1, padx=5, pady=10, sticky="w")
+
         # メンテナンスモードボタン
         self.maintenance_mode_button = ttk.Button(
             self, text="サーバーを一時停止", command=self.maintenance_check_start
@@ -686,6 +689,34 @@ class window_main(tk.Frame):
         self.newWindow = tk.Toplevel(self.master)
         self.newWindow.grab_set()
         server_restart_check(self.newWindow)
+
+    def manual_save_start(self):
+        # 手動セーブの確認ダイアログを開く
+        if hasattr(self, "newWindow") and self.newWindow.winfo_exists():
+            self.newWindow.lift()
+            return
+
+        self.newWindow = tk.Toplevel(self.master)
+        self.newWindow.grab_set()
+        manual_save_check(self.newWindow, self)
+
+    def manual_save_execute(self):
+        """確認後、告知して30秒待機した手動セーブを実行する。"""
+        if hasattr(self, "manual_save_thread") and self.manual_save_thread.is_alive():
+            return
+
+        self.manual_save_button.config(state="disabled")
+        self.manual_save_thread = threading.Thread(
+            target=self.manual_save_threaded,
+            daemon=True,
+        )
+        self.manual_save_thread.start()
+
+    def manual_save_threaded(self):
+        try:
+            manual_save()
+        finally:
+            self.after(0, lambda: self.manual_save_button.config(state="normal"))
 
     def exit_check_start(self):
         # 確認ダイアログを開く
@@ -1058,6 +1089,51 @@ class server_close_check(tk.Frame):
         self.master.master.quit()
         self.master.master.destroy()
 
+class manual_save_check(tk.Frame):
+    # 手動セーブ確認ダイアログウィンドウ
+    def __init__(self, master, app):
+        super().__init__(master)
+        self.master = master
+        self.app = app
+        self.master.title("らくらくNS+")
+        self.master.resizable(False, False)
+        self.master.geometry("320x160")
+        self.master.protocol('WM_DELETE_WINDOW', self.close_window)
+
+        self.create_widgets()
+
+    def create_widgets(self):
+        self.label = ttk.Label(
+            self.master,
+            text="手動セーブを実行します。\n告知後30秒待ってセーブします。\nよろしいですか？",
+        )
+        self.label.pack(padx=10, pady=10, fill="both", expand=True)
+
+        button_frame = ttk.Frame(self.master)
+        button_frame.pack(pady=10, fill="x")
+
+        self.save_button = ttk.Button(
+            button_frame,
+            text="はい",
+            style='Accent.TButton',
+            command=self.start_save,
+        )
+        self.save_button.pack(side="left", padx=5, expand=True)
+
+        self.cancel_button = ttk.Button(
+            button_frame,
+            text="いいえ",
+            command=self.close_window,
+        )
+        self.cancel_button.pack(side="right", padx=5, expand=True)
+
+    def close_window(self):
+        self.master.destroy()
+
+    def start_save(self):
+        self.app.manual_save_execute()
+        self.close_window()
+
 class server_restart_check(tk.Frame):
     # 確認ダイアログウィンドウ
     def __init__(self, master):
@@ -1142,6 +1218,17 @@ def print_gui_log(content):
 def restart_server_threaded(set_code):
     thread = threading.Thread(target=server_stop, args=(set_code, 0))
     thread.start()
+
+def manual_save():
+    """告知して30秒待機した後、サーバーを停止せずにセーブする。"""
+    post_autosave_notice()
+    nettool_say('Autosave soon.')
+    print_gui_log('手動セーブ予告メッセージを送信しました。')
+    time.sleep(30)
+    nettool_forcesync()
+    save_backup()
+    print_gui_log('手動セーブが完了しました。')
+    post_autosave_completed()
 
 # 関数定義（Discord関連）
 async def send_notification(

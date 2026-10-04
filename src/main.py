@@ -107,8 +107,8 @@ CONFIG_DISPLAY_NAMES = {
     'restart_time': '自動再起動時刻',
     'press_space_after_start': '起動30秒後にスペースキーを押す',
     'mode': 'オートセーブモード',
-    'backup_count': 'バックアップ数',
-    'interval': 'オートセーブ間隔',
+    'backup_count': 'セーブデータバックアップ数',
+    'interval': 'オートセーブ間隔（秒）',
     'long_term_keep_days': '長期バックアップ保存日数',
     'long_term_time': '長期バックアップ実行時刻',
     'enabled': 'Discord botの使用設定',
@@ -239,8 +239,15 @@ class config_window:
             server_values = dict(server_values)
             server_values['path'] = f'{folder}{separator}{name}' if folder or name else ''
         self.add_tab(notebook, 'サーバー', ['path', 'port', 'restart_time', 'press_space_after_start'], server_values)
-        self.add_tab(notebook, 'オートセーブ', ['mode', 'backup_count', 'interval'], data.get('autosave', {}))
-        self.add_tab(notebook, 'バックアップ', ['long_term_keep_days', 'long_term_time'], data.get('backup', {}))
+        save_data_values = {}
+        save_data_values.update(data.get('autosave', {}))
+        save_data_values.update(data.get('backup', {}))
+        self.add_tab(
+            notebook,
+            'セーブデータ',
+            ['mode', 'backup_count', 'interval', 'long_term_keep_days', 'long_term_time'],
+            save_data_values,
+        )
         self.add_tab(notebook, 'Discord', ['enabled', 'autosave_notice', 'token', 'channel'], data.get('discord', {}))
         self.add_password_tab(notebook, data.get('players', {}).get('passwords', {}))
         self.add_multiline_tab(notebook, 'BAN IP', 'ban_ips', data.get('network', {}).get('ban_ips', {}))

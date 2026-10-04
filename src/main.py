@@ -284,6 +284,10 @@ class config_window:
                 entry.insert(0, str(values.get(key, '')))
                 entry.grid(row=row, column=1, sticky='ew', padx=10, pady=8)
                 self.fields[key] = entry
+                if key == 'path':
+                    ttk.Button(
+                        frame, text='参照…', command=self.select_server_executable
+                    ).grid(row=row, column=2, padx=5, pady=8)
                 if key == 'token':
                     self.secret_entries['token'].append(entry)
                     ttk.Checkbutton(
@@ -291,7 +295,31 @@ class config_window:
                         style='Switch.TCheckbutton',
                         command=lambda: self.toggle_secret('token')
                     ).grid(row=row, column=3, padx=5, pady=8)
-            ttk.Button(frame, text='説明', command=lambda k=key: self.show_help(k)).grid(row=row, column=2, padx=5, pady=8)
+            help_column = 3 if key == 'path' else 2
+            ttk.Button(frame, text='説明', command=lambda k=key: self.show_help(k)).grid(row=row, column=help_column, padx=5, pady=8)
+
+    def select_server_executable(self):
+        """ファイル選択ダイアログでサーバー実行ファイルを指定する。"""
+        current_path = self.fields['path'].get().strip()
+        initial_dir = os.path.dirname(current_path) if current_path else ''
+        if platform.system() == 'Windows':
+            filetypes = [
+                ('実行ファイル', '*.exe'),
+                ('すべてのファイル', '*.*'),
+            ]
+        else:
+            # Linux/macOSの実行ファイルは拡張子を持たないことが多いため、
+            # 拡張子では絞り込まず、すべてのファイルを選択対象にする。
+            filetypes = [('実行ファイル', '*')]
+        path = filedialog.askopenfilename(
+            title='サーバー実行ファイルを選択',
+            initialdir=initial_dir if os.path.isdir(initial_dir) else None,
+            filetypes=filetypes,
+            parent=self.window,
+        )
+        if path:
+            self.fields['path'].delete(0, 'end')
+            self.fields['path'].insert(0, path)
 
     def add_multiline_tab(self, notebook, title, key, values):
         frame = ttk.Frame(notebook)

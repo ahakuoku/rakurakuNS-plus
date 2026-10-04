@@ -256,6 +256,10 @@ class config_window:
     def add_tab(self, notebook, title, fields, values):
         frame = ttk.Frame(notebook)
         notebook.add(frame, text=title)
+        is_server_tab = title == 'サーバー'
+        is_discord_tab = title == 'Discord'
+        if is_server_tab or is_discord_tab:
+            frame.grid_columnconfigure(1, weight=1)
         for row, key in enumerate(fields):
             ttk.Label(frame, text=CONFIG_DISPLAY_NAMES[key]).grid(row=row, column=0, sticky='w', padx=10, pady=8)
             if key == 'mode':
@@ -282,7 +286,11 @@ class config_window:
             else:
                 entry = ttk.Entry(frame, width=48, show='*' if key == 'token' else '')
                 entry.insert(0, str(values.get(key, '')))
-                entry.grid(row=row, column=1, sticky='ew', padx=10, pady=8)
+                entry.grid(
+                    row=row, column=1,
+                    columnspan=2 if (is_server_tab and key != 'path') or (is_discord_tab and key != 'token') else 1,
+                    sticky='ew', padx=10, pady=8
+                )
                 self.fields[key] = entry
                 if key == 'path':
                     ttk.Button(
@@ -294,8 +302,8 @@ class config_window:
                         frame, text='表示', variable=self.secret_visibility['token'],
                         style='Switch.TCheckbutton',
                         command=lambda: self.toggle_secret('token')
-                    ).grid(row=row, column=3, padx=5, pady=8)
-            help_column = 3 if key == 'path' else 2
+                    ).grid(row=row, column=2 if is_discord_tab else 3, padx=5, pady=8)
+            help_column = 3 if is_server_tab or is_discord_tab else 2
             ttk.Button(frame, text='説明', command=lambda k=key: self.show_help(k)).grid(row=row, column=help_column, padx=5, pady=8)
 
     def select_server_executable(self):

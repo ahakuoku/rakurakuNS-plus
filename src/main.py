@@ -226,6 +226,8 @@ class config_window:
         self.window.geometry('980x620')
         self.window.protocol('WM_DELETE_WINDOW', self.close)
         self.fields = {}
+        self.long_term_keep_mode = None
+        self.long_term_keep_days_entry = None
         self.secret_entries = {'token': [], 'passwords': []}
         self.secret_visibility = {'token': tk.IntVar(value=0), 'passwords': tk.IntVar(value=0)}
         data = config_data if config_data else default_config_data()
@@ -284,6 +286,34 @@ class config_window:
                     mode_frame, text='最後のロードからの経過時間', variable=variable, value=1
                 ).pack(side='left')
                 self.fields[key] = variable
+            elif key == 'long_term_keep_days':
+                try:
+                    keep_days = int(values.get(key, 0) or 0)
+                except (TypeError, ValueError):
+                    keep_days = 0
+                mode = tk.StringVar(
+                    value='disabled' if keep_days == 0 else
+                    'unlimited' if keep_days == -1 else 'days'
+                )
+                mode_frame = ttk.Frame(frame)
+                mode_frame.grid(row=row, column=1, sticky='w', padx=10, pady=8)
+                ttk.Radiobutton(
+                    mode_frame, text='無効', variable=mode, value='disabled'
+                ).pack(side='left', padx=(0, 12))
+                ttk.Radiobutton(
+                    mode_frame, text='無期限', variable=mode, value='unlimited'
+                ).pack(side='left', padx=(0, 12))
+                ttk.Radiobutton(
+                    mode_frame, text='日数指定', variable=mode, value='days'
+                ).pack(side='left', padx=(0, 6))
+                days_entry = ttk.Entry(mode_frame, width=10)
+                if keep_days > 0:
+                    days_entry.insert(0, str(keep_days))
+                days_entry.pack(side='left')
+                ttk.Label(mode_frame, text='日').pack(side='left', padx=(4, 0))
+                self.long_term_keep_mode = mode
+                self.long_term_keep_days_entry = days_entry
+                self.fields[key] = mode
             elif key in ('enabled', 'autosave_notice', 'press_space_after_start'):
                 variable = tk.IntVar(value=1 if int(values.get(key, 0) or 0) in (1, 2) else 0)
                 text = '使用する' if key == 'enabled' else '有効にする'
@@ -413,7 +443,7 @@ class config_window:
             'mode': 'オートセーブのモードを選択します。「一定間隔」は指定した間隔ごとに、「最後のロードからの経過時間」は最後にロードしてから指定した時間が経過した時点でオートセーブします。',
             'backup_count': 'オートセーブのバックアップ保存数を指定します。',
             'interval': 'オートセーブの間隔を秒で指定します。60以上を指定してください。',
-            'long_term_keep_days': '長期バックアップの保存日数です。0で無効、-1で無期限です。',
+            'long_term_keep_days': '長期バックアップの保存有無と、保存日数です。',
             'long_term_time': '長期バックアップを実行する時刻を0～24で指定します。',
             'enabled': 'Discord botを使用するか切り替えます。オンにすると有効です。',
             'autosave_notice': '有効にすると、オートセーブ開始30秒前の予告をDiscordに投稿します。Discord botの使用設定が有効な場合に利用できます。なお、Discordの通知が非常に多くなるため利用は推奨しません。',
@@ -465,6 +495,18 @@ class config_window:
                 if key == 'mode':
                     # mode is represented by radio buttons backed by IntVar.
                     self.fields[key].set(1 if int(value or 0) == 1 else 0)
+                elif key == 'long_term_keep_days':
+                    try:
+                        keep_days = int(value or 0)
+                    except (TypeError, ValueError):
+                        keep_days = 0
+                    self.long_term_keep_mode.set(
+                        'disabled' if keep_days == 0 else
+                        'unlimited' if keep_days == -1 else 'days'
+                    )
+                    self.long_term_keep_days_entry.delete(0, 'end')
+                    if keep_days > 0:
+                        self.long_term_keep_days_entry.insert(0, str(keep_days))
                 elif key in ('enabled', 'autosave_notice', 'press_space_after_start'):
                     self.fields[key].set(1 if int(value or 0) in (1, 2) else 0)
                 else:
@@ -554,7 +596,16 @@ class config_window:
         data['runtime'] = config_data.get('runtime', data['runtime'])
         for key in ('server', 'autosave', 'backup', 'discord'):
             for name in data[key]:
-                data[key][name] = self.fields[name].get()
+                if name == 'long_term_keep_days':
+                    mode = self.long_term_keep_mode.get()
+                    if mode == 'disabled':
+                        data[key][name] = 0
+                    elif mode == 'unlimited':
+                        data[key][name] = -1
+                    else:
+                        data[key][name] = self.long_term_keep_days_entry.get()
+                else:
+                    data[key][name] = self.fields[name].get()
         for i, entry in self.fields['passwords'].items():
             data['players']['passwords'][i] = entry.get()
         for line in self.fields['ban_ips'].get('1.0', 'end').splitlines():

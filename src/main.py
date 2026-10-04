@@ -1226,6 +1226,7 @@ def manual_save():
     print_gui_log('手動セーブ予告メッセージを送信しました。')
     time.sleep(30)
     nettool_forcesync()
+    wait_simutrans_responce()
     save_backup()
     print_gui_log('手動セーブが完了しました。')
     post_autosave_completed()

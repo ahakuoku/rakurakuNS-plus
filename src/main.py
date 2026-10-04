@@ -650,12 +650,12 @@ class window_main(tk.Frame):
         self.maintenance_mode_button.grid(row=2, column=1, padx=5, pady=10, sticky="w")
 
         self.server_stop_button = ttk.Button(self, text="会期終了", command=self.server_close_check_start)
-        self.server_stop_button.grid(row=2, column=2, padx=5, pady=10, sticky="w")
+        self.server_stop_button.grid(row=3, column=3, padx=5, pady=(0, 10), sticky="ew")
 
         self.update_schedule_button = ttk.Button(
             self, text="本体・Pakの更新をスケジュール", command=self.update_schedule_start
         )
-        self.update_schedule_button.grid(row=3, column=0, columnspan=3, padx=5, pady=(0, 10), sticky="ew")
+        self.update_schedule_button.grid(row=3, column=0, columnspan=2, padx=5, pady=(0, 10), sticky="ew")
 
         self.settings_button = ttk.Button(self, text="設定", command=self.open_settings)
         self.settings_button.grid(row=4, column=2, padx=5, pady=(0, 10), sticky="ew")

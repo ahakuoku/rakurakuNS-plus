@@ -104,6 +104,8 @@ bot = discord.Client(intents=intents)
 CONFIG_DISPLAY_NAMES = {
     'path': 'サーバー実行ファイル',
     'port': 'ポート',
+    'response_monitor_enabled': 'サーバー応答監視',
+    'response_timeout': 'サーバー応答待機時間（分）',
     'restart_time': '自動再起動時刻',
     'press_space_after_start': '起動30秒後にスペースキーを押す',
     'mode': 'オートセーブモード',
@@ -138,6 +140,8 @@ def load_config():
     config.server_folder_path = server_path[:separator_position] if separator_position >= 0 else ''
     config.server_name = server_path[separator_position + 1:] if separator_position >= 0 else server_path
     config.port_number = server.get('port')
+    config.response_monitor_enabled = server.get('response_monitor_enabled', 0)
+    config.response_timeout = server.get('response_timeout', 0)
     config.restart_time = server.get('restart_time')
     config.press_space_after_start = server.get('press_space_after_start', 0)
     autosave = config_data.get('autosave', {})
@@ -160,7 +164,11 @@ def load_config():
 
 def default_config_data():
     return {
-        'server': {'path': '', 'port': '13353', 'restart_time': -1, 'press_space_after_start': 0},
+        'server': {
+            'path': '', 'port': '13353', 'restart_time': -1,
+            'response_monitor_enabled': 0, 'response_timeout': 0,
+            'press_space_after_start': 0,
+        },
         'autosave': {'mode': 0, 'backup_count': 80, 'interval': 1200},
         'backup': {'long_term_keep_days': 0, 'long_term_time': 5},
         'players': {'passwords': {i: '' for i in range(63)}},
@@ -240,7 +248,17 @@ class config_window:
             separator = '\\' if '\\' in str(folder) and '/' not in str(folder) else '/'
             server_values = dict(server_values)
             server_values['path'] = f'{folder}{separator}{name}' if folder or name else ''
-        self.add_tab(notebook, 'サーバー', ['path', 'port', 'restart_time', 'press_space_after_start'], server_values)
+        server_values.setdefault('response_timeout', 0)
+        server_values.setdefault('response_monitor_enabled', 0)
+        self.add_tab(
+            notebook,
+            'サーバー',
+            [
+                'path', 'port', 'restart_time', 'response_monitor_enabled',
+                'response_timeout', 'press_space_after_start',
+            ],
+            server_values,
+        )
         save_data_values = {}
         save_data_values.update(data.get('autosave', {}))
         save_data_values.update(data.get('backup', {}))
@@ -314,9 +332,9 @@ class config_window:
                 self.long_term_keep_mode = mode
                 self.long_term_keep_days_entry = days_entry
                 self.fields[key] = mode
-            elif key in ('enabled', 'autosave_notice', 'press_space_after_start'):
+            elif key in ('enabled', 'autosave_notice', 'press_space_after_start', 'response_monitor_enabled'):
                 variable = tk.IntVar(value=1 if int(values.get(key, 0) or 0) in (1, 2) else 0)
-                text = '使用する' if key == 'enabled' else '有効にする'
+                text = '使用する' if key in ('enabled', 'response_monitor_enabled') else '有効にする'
                 entry = ttk.Checkbutton(frame, text=text, style='Switch.TCheckbutton', variable=variable)
                 entry.grid(row=row, column=1, sticky='w', padx=10, pady=8)
                 self.fields[key] = variable
@@ -439,6 +457,8 @@ class config_window:
             'path': '起動するSimutransサーバーの実行ファイルを、フォルダを含むフルパスで指定します。',
             'port': 'サーバーが使用するポート番号を指定します。',
             'restart_time': '毎日自動再起動する時刻を0～24で指定します。-1で無効です。',
+            'response_monitor_enabled': '有効にすると、サーバーのclients応答を常時監視します。応答失敗が指定時間続くとサーバーを強制終了します。',
+            'response_timeout': 'サーバー起動後、clientsコマンドが正常終了するまで待機する最大時間を分で指定します。0で無効です。超過するとサーバーを強制終了します。',
             'press_space_after_start': '有効にすると、Simutransの起動開始から30秒後にスペースキーを1回送信します。Standard以外の本体では通常必要ありません。',
             'mode': 'オートセーブのモードを選択します。「一定間隔」は指定した間隔ごとに、「最後のロードからの経過時間」は最後にロードしてから指定した時間が経過した時点でオートセーブします。',
             'backup_count': 'オートセーブのバックアップ保存数を指定します。',
@@ -636,6 +656,8 @@ class config_window:
         integer_rules = (
             ('server.port', data['server']['port'], 0, 65535),
             ('server.restart_time', data['server']['restart_time'], -1, 24),
+            ('server.response_monitor_enabled', data['server']['response_monitor_enabled'], 0, 1),
+            ('server.response_timeout', data['server']['response_timeout'], 0, None),
             ('server.press_space_after_start', data['server']['press_space_after_start'], 0, 1),
             ('autosave.mode', data['autosave']['mode'], 0, 1),
             ('autosave.backup_count', data['autosave']['backup_count'], 1, None),
@@ -1587,6 +1609,7 @@ async def on_ready():
 
 def start_threads():
     threading.Thread(target=monitoring, daemon=True).start()
+    threading.Thread(target=monitor_server_response, daemon=True).start()
     threading.Thread(target=autosave, daemon=True).start()
     threading.Thread(target=auto_restart, daemon=True).start()
     if config.use_discord_bot in (1, 2):
@@ -2029,6 +2052,44 @@ def check_config():
         sys.exit()
 
     # ====================================================
+    # response_monitor_enabled
+    # ====================================================
+
+    try:
+        response_monitor_enabled = int(getattr(config, 'response_monitor_enabled', 0))
+
+        if response_monitor_enabled not in (0, 1):
+            raise ValueError
+
+    except (NameError, ValueError, TypeError):
+        input(
+            '設定「response_monitor_enabled」に不正な値が設定されています。'
+            '0または1を入力してください。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
+        sys.exit()
+    config.response_monitor_enabled = response_monitor_enabled
+
+    # ====================================================
+    # response_timeout
+    # ====================================================
+
+    try:
+        response_timeout = int(getattr(config, 'response_timeout', 0))
+
+        if response_timeout < 0:
+            raise ValueError
+
+    except (NameError, ValueError, TypeError):
+        input(
+            '設定「response_timeout」に不正な値が設定されています。'
+            '0以上の整数（分）を入力してください。0で無効です。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
+        sys.exit()
+    config.response_timeout = response_timeout
+
+    # ====================================================
     # autosave_backup
     # ====================================================
 
@@ -2380,6 +2441,40 @@ def wait_simutrans_responce():
         if result.returncode == 0:
             print_gui_log('Simutransが応答しました。処理を再開します。')
             break
+        time.sleep(1)
+
+def monitor_server_response():
+    """有効時、サーバーの応答を常時監視し、無応答が続けば強制終了する。"""
+    global nettool_pw
+    unresponsive_since = None
+    while True:
+        try:
+            response_timeout = int(config.response_timeout)
+        except (AttributeError, TypeError, ValueError):
+            response_timeout = 0
+        response_monitor_enabled = int(getattr(config, 'response_monitor_enabled', 0))
+
+        server_pid = get_pid(config.server_name)
+        if response_monitor_enabled == 0 or response_timeout <= 0 or server_pid is None or start_code in (3, 6, 8):
+            unresponsive_since = None
+            time.sleep(1)
+            continue
+
+        result = subprocess.run(
+            [run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'clients'],
+            encoding='utf-8', stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
+        )
+        if result.returncode == 0:
+            unresponsive_since = None
+        else:
+            if unresponsive_since is None:
+                unresponsive_since = time.monotonic()
+            elif time.monotonic() - unresponsive_since >= response_timeout * 60:
+                print_gui_log(
+                    f'Simutransが{response_timeout}分間応答しなかったため、サーバーを強制終了します。'
+                )
+                force_stop_server()
+                unresponsive_since = None
         time.sleep(1)
 
 def nettool_lockcompany(company_id, company_pw):

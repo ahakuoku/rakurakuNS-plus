@@ -455,7 +455,10 @@ class config_window:
                 'channel': getattr(legacy, 'discord_channel', ''),
             }
             for key, value in values.items():
-                if key in ('enabled', 'autosave_notice', 'press_space_after_start'):
+                if key == 'mode':
+                    # mode is represented by radio buttons backed by IntVar.
+                    self.fields[key].set(1 if int(value or 0) == 1 else 0)
+                elif key in ('enabled', 'autosave_notice', 'press_space_after_start'):
                     self.fields[key].set(1 if int(value or 0) in (1, 2) else 0)
                 else:
                     self.fields[key].delete(0, 'end')

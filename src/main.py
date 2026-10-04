@@ -2000,7 +2000,7 @@ def press_space_key():
             subprocess.run(['xdotool', 'key', 'space'], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         elif os_system == 'Darwin':
             subprocess.run(['osascript', '-e', 'tell application "System Events" to key code 49'], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        print_gui_log('Simutrans起動から30秒後にスペースキーを送信しました。')
+        print_gui_log('スペースキーを送信しました。')
     except Exception as error:
         print_gui_log(f'スペースキーの送信に失敗しました: {error}')
 

@@ -238,4 +238,4 @@ strings:
   help_discord_token: Discord botのトークンを指定します。
   help_discord_channel: Discord botが書き込むチャンネルIDを指定します。
   help_player_passwords: 会社番号ごとのパスワードを入力します。空欄の会社にはパスワードを設定しません。
-  help_ban_ips: 番号=IPアドレスの形式で入力します。1行に1件、番号は0～62です。
+  help_ban_ips: 1行につき、1つのIPアドレスの形式で入力します。最大63件です。

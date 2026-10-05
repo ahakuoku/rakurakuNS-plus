@@ -238,4 +238,4 @@ strings:
   help_discord_token: Specify the Discord bot token.
   help_discord_channel: Specify the channel ID where the Discord bot posts.
   help_player_passwords: Enter a password for each company; blank companies have no password.
-  help_ban_ips: Enter one number=IP address entry per line; numbers range from 0 to 62.
+  help_ban_ips: Enter one IP address per line. You can enter up to 63 addresses.

@@ -65,6 +65,26 @@ def t(key, **values):
     value = translations.get(translation_aliases.get(key, key), key)
     return value.format(**values) if values else value
 
+def available_languages():
+    """Return language choices discovered from language/*.yaml."""
+    choices = []
+    try:
+        filenames = sorted(name for name in os.listdir(language_dir) if name.endswith('.yaml'))
+    except OSError:
+        filenames = []
+    for filename in filenames:
+        path = os.path.join(language_dir, filename)
+        try:
+            with open(path, 'r', encoding='utf-8') as language_file:
+                document = yaml.safe_load(language_file) or {}
+            locale = str(document.get('locale') or os.path.splitext(filename)[0])
+            language_name = document.get('language_name')
+            if language_name:
+                choices.append((locale, str(language_name)))
+        except (OSError, yaml.YAMLError):
+            continue
+    return choices
+
 load_language(config_data.get('language', 'en-US'))
 
 try:
@@ -297,18 +317,15 @@ class config_window:
         language_frame = ttk.Frame(notebook)
         notebook.add(language_frame, text=t('language_tab'))
         ttk.Label(language_frame, text=t('language_tab')).grid(row=0, column=0, sticky='w', padx=10, pady=12)
-        # 言語名は選択中の言語で翻訳せず、各言語の固定表記を使う。
-        available_languages = [
-            ('ja-JP', '日本語'),
-            ('en-US', 'English'),
-        ]
+        # 言語名は選択中の言語で翻訳せず、各YAMLの固定表記を使う。
+        languages = available_languages()
         self.language_var = tk.StringVar(value=config_data.get('language', 'en-US'))
         language_box = ttk.Combobox(
             language_frame, textvariable=self.language_var,
-            values=[f'{code} - {name}' for code, name in available_languages],
+            values=[f'{code} - {name}' for code, name in languages],
             state='readonly', width=28,
         )
-        language_box.set(next((f'{code} - {name}' for code, name in available_languages if code == self.language_var.get()), 'en-US - English'))
+        language_box.set(next((f'{code} - {name}' for code, name in languages if code == self.language_var.get()), ''))
         language_box.grid(row=0, column=1, sticky='w', padx=10, pady=12)
         language_box.bind('<<ComboboxSelected>>', self.apply_language)
         ttk.Label(language_frame, text=t('translation_accuracy_notice')).grid(row=1, column=0, columnspan=2, sticky='w', padx=10, pady=8)

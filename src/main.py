@@ -219,7 +219,10 @@ def load_config():
     autosave = config_data.get('autosave', {})
     config.autosave_mode = autosave.get('mode')
     config.autosave_backup = autosave.get('backup_count')
-    config.autosave_interval = autosave.get('interval')
+    try:
+        config.autosave_interval = int(autosave.get('interval', 1200))
+    except (TypeError, ValueError):
+        config.autosave_interval = 1200
     backup = config_data.get('backup', {})
     config.long_backup_keep = backup.get('long_term_keep_days')
     config.long_backup_time = backup.get('long_term_time')
@@ -374,6 +377,8 @@ class config_window:
         config_data['language'] = selected
         with open(config_path, 'w', encoding='utf-8') as config_file:
             yaml.safe_dump(config_data, config_file, allow_unicode=True, sort_keys=False)
+        # 言語以外の設定を実行中のConfigオブジェクトにも再同期する。
+        load_config()
         load_language(selected)
         if 'app' in globals() and app is not None:
             app.apply_language()

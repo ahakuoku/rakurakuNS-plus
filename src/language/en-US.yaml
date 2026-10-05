@@ -65,8 +65,8 @@ strings:
   update_now: Update now
   cancel_schedule: Cancel schedule
   confirm: Confirm
-  "yes": Yes
-  "no": No
+  "yes": "Yes"
+  "no": "No"
   input_confirmation: Input confirmation
   registration_complete: Registration complete
   cancellation_complete: Cancellation complete

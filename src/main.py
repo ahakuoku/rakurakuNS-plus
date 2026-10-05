@@ -124,6 +124,7 @@ import datetime
 import platform
 import shutil
 import threading
+import queue
 import sched
 import asyncio
 import ctypes
@@ -177,6 +178,9 @@ for _filedialog_name in ('askopenfilename', 'askdirectory', 'asksaveasfilename')
 # 変数定義
 intents = discord.Intents.default()
 bot = discord.Client(intents=intents)
+pending_discord_notifications = []
+pending_discord_notifications_lock = threading.Lock()
+gui_log_queue = queue.Queue()
 
 CONFIG_DISPLAY_NAMES = {
     'path': 'config_server_executable', 'port': 'config_port',
@@ -232,10 +236,16 @@ def load_config():
         setattr(config, f'player_{i}_pw', players.get(i, players.get(str(i), '')))
         setattr(config, f'banip_{i}', ban_ips.get(i, ban_ips.get(str(i), '')))
     discord_settings = config_data.get('discord', {})
-    config.use_discord_bot = discord_settings.get('enabled', 0)
+    try:
+        config.use_discord_bot = int(discord_settings.get('enabled', 0) or 0)
+    except (TypeError, ValueError):
+        config.use_discord_bot = 0
     config.discord_token = discord_settings.get('token', '')
     config.discord_channel = discord_settings.get('channel', '')
-    config.discord_autosave_notice = discord_settings.get('autosave_notice', 0)
+    try:
+        config.discord_autosave_notice = int(discord_settings.get('autosave_notice', 0) or 0)
+    except (TypeError, ValueError):
+        config.discord_autosave_notice = 0
 
 def default_config_data():
     return {
@@ -377,8 +387,6 @@ class config_window:
         config_data['language'] = selected
         with open(config_path, 'w', encoding='utf-8') as config_file:
             yaml.safe_dump(config_data, config_file, allow_unicode=True, sort_keys=False)
-        # 言語以外の設定を実行中のConfigオブジェクトにも再同期する。
-        load_config()
         load_language(selected)
         if 'app' in globals() and app is not None:
             app.apply_language()
@@ -741,7 +749,7 @@ class config_window:
         # 保存直後にYAMLを読み込み直し、アプリ内の設定も更新する。
         load_config()
         if not self.first_run:
-            check_config()
+            check_config(initialize_runtime=False)
             app.server_name_label.config(text=t('managed_server') + config.server_name)
         self.close()
 
@@ -801,6 +809,16 @@ class window_main(tk.Frame):
             self.master.geometry("680x330")
         self.maintenance_mode = 0  # メンテナンスモードの状態（0:通常, 1:メンテナンス中）
         self.create_widgets()
+        self.after(100, self.flush_gui_log_queue)
+
+    def flush_gui_log_queue(self):
+        """Move worker-thread log messages into Tk from the main thread."""
+        try:
+            while True:
+                self.log_text_insert(gui_log_queue.get_nowait())
+        except queue.Empty:
+            pass
+        self.after(100, self.flush_gui_log_queue)
 
     def create_widgets(self):
         # Gridの設定
@@ -1588,12 +1606,22 @@ def print_gui_log(content):
     # GUIのログに追記
     date_time = datetime.datetime.now()
     content = date_time.strftime('[%Y/%m/%d %H:%M:%S] ' + content)
-    app.log_text_insert(content)
+    if threading.current_thread() is threading.main_thread():
+        app.log_text_insert(content)
+    else:
+        gui_log_queue.put(content)
     return None
 
 def restart_server_threaded(set_code):
     thread = threading.Thread(target=server_stop, args=(set_code, 0))
     thread.start()
+
+def discord_is_enabled():
+    """Treat YAML values such as 1 and \"1\" as enabled."""
+    try:
+        return int(getattr(config, 'use_discord_bot', 0) or 0) in (1, 2)
+    except (TypeError, ValueError):
+        return False
 
 def manual_save():
     """告知して30秒待機した後、サーバーを停止せずにセーブする。"""
@@ -1615,7 +1643,7 @@ async def send_notification(
     color=0x00ff00
 ):
 
-    if config.use_discord_bot not in (1, 2):
+    if not discord_is_enabled():
         return
 
     try:
@@ -1628,11 +1656,7 @@ async def send_notification(
 
         # チャンネル取得失敗
         if channel is None:
-
-            print_gui_log(
-                t('log_discord_channel_not_found')
-            )
-
+            print_with_date(t('log_discord_channel_not_found'))
             return
 
         embed = discord.Embed(
@@ -1644,26 +1668,40 @@ async def send_notification(
         await channel.send(embed=embed)
 
     except ValueError:
-        print_gui_log(t('log_discord_channel_integer_required'))
+        print_with_date(t('log_discord_channel_integer_required'))
 
     except discord.errors.Forbidden:
-        print_gui_log(t('log_discord_channel_permission_denied'))
+        print_with_date(t('log_discord_channel_permission_denied'))
 
     except Exception as e:
-        print_gui_log(t('log_discord_post_failed', error=e))
+        print_with_date(t('log_discord_post_failed', error=e))
 
 def discord_post(title, description, color=0x00ff00):
-    if config.use_discord_bot in (1, 2):
-        coro = send_notification(title, description, color)
-        future = asyncio.run_coroutine_threadsafe(coro, bot.loop)
+    if not discord_is_enabled():
+        return
+    if not bot.is_ready():
+        with pending_discord_notifications_lock:
+            pending_discord_notifications.append((title, description, color))
+        return
+    try:
+        future = asyncio.run_coroutine_threadsafe(
+            send_notification(title, description, color), bot.loop
+        )
+    except RuntimeError as error:
+        print_with_date(t('log_notification_send_error', error=error))
+        return
+
+    def report_failure(completed_future):
         try:
-            future.result(timeout=10)
-        except Exception as e:
-            print_with_date(t('log_notification_send_error', error=e))
+            completed_future.result()
+        except Exception as error:
+            print_with_date(t('log_notification_send_error', error=error))
+
+    future.add_done_callback(report_failure)
 
 def post_autosave_notice():
     """設定が有効な場合だけ、オートセーブ予告をDiscordへ送信する。"""
-    if getattr(config, 'discord_autosave_notice', 0) in (1, 2):
+    if str(getattr(config, 'discord_autosave_notice', 0)).strip() in ('1', '2'):
         discord_post(
             t('discord_autosave_soon_title'), t('discord_autosave_soon_description'),
             0xffbf00,
@@ -1671,7 +1709,7 @@ def post_autosave_notice():
 
 def post_autosave_completed():
     """設定が有効な場合だけ、オートセーブ完了をDiscordへ送信する。"""
-    if getattr(config, 'discord_autosave_notice', 0) in (1, 2):
+    if str(getattr(config, 'discord_autosave_notice', 0)).strip() in ('1', '2'):
         discord_post(
             t('discord_autosave_completed_title'), t('discord_autosave_completed_description'),
             0x00ff00,
@@ -1680,7 +1718,7 @@ def post_autosave_completed():
 # Bot用のスレッドターゲット
 def run_discord_bot():
 
-    if config.use_discord_bot not in (1, 2):
+    if not discord_is_enabled():
         return
 
     try:
@@ -1700,15 +1738,21 @@ def run_discord_bot():
 
 @bot.event
 async def on_ready():
-    if config.use_discord_bot in (1, 2):
-            print_gui_log(t('log_discord_bot_started', user=bot.user))
+    if discord_is_enabled():
+            print_with_date(t('log_discord_bot_started', user=bot.user))
 
             channel = bot.get_channel(
                 int(config.discord_channel)
             )
 
             if channel is None:
-                print_gui_log(t('log_discord_channel_not_found'))
+                print_with_date(t('log_discord_channel_not_found'))
+
+            with pending_discord_notifications_lock:
+                pending = list(pending_discord_notifications)
+                pending_discord_notifications.clear()
+            for title, description, color in pending:
+                await send_notification(title, description, color)
 
 # 関数定義（一般）
 
@@ -1717,7 +1761,7 @@ def start_threads():
     threading.Thread(target=monitor_server_response, daemon=True).start()
     threading.Thread(target=autosave, daemon=True).start()
     threading.Thread(target=auto_restart, daemon=True).start()
-    if config.use_discord_bot in (1, 2):
+    if discord_is_enabled():
         threading.Thread(target=run_discord_bot, daemon=True).start()
     threading.Thread(target=auto_long_backup, daemon=True).start()
     threading.Thread(target=scheduled_update_loop, daemon=True).start()
@@ -1855,7 +1899,7 @@ def check_os():
     return os_system
 
 # 初期化・設定チェック
-def check_config():
+def check_config(initialize_runtime=True):
     global server_folder_path
     global server_path
     global server_save
@@ -2324,17 +2368,18 @@ def check_config():
     long_backup_folder_path = long_backup_folder_path.replace('\\', '/')
 
     # ====================================================
-    # 初期変数
+    # 初期変数（起動時のみ。設定保存時は監視状態を維持する）
     # ====================================================
 
-    start_code = 0
-    exit_code = 0
-    nettool_pw = 0
+    if initialize_runtime:
+        start_code = 0
+        exit_code = 0
+        nettool_pw = 0
 
-    scheduler = sched.scheduler(time.time, time.sleep)
-    scheduler_running = False
+        scheduler = sched.scheduler(time.time, time.sleep)
+        scheduler_running = False
 
-    server_ip = '127.0.0.1:'
+        server_ip = '127.0.0.1:'
 
     print_with_date(t('log_configuration_validated'))
 

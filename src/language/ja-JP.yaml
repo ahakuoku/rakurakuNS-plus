@@ -3,7 +3,7 @@ locale: ja-JP
 language_name: 日本語
 strings:
   language_tab: Language
-  language_restart_notice: 言語を変更した場合は保存後に反映されます。
+  language_restart_notice: 翻訳は間違っている場合があります。
   settings: 設定
   server: サーバー
   save_data: セーブデータ

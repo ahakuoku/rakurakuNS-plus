@@ -3,7 +3,7 @@ locale: en-US
 language_name: English (US)
 strings:
   language_tab: Language
-  language_restart_notice: The language change will take effect after saving.
+  language_restart_notice: The translation may be incorrect.
   settings: Settings
   server: Server
   save_data: Save Data

@@ -43,11 +43,11 @@ except Exception:
 
     sys.exit()
 
-language_code = 'ja-JP'
+language_code = 'en-US'
 translations = {}
 translation_aliases = {}
 
-def load_language(code='ja-JP'):
+def load_language(code='en-US'):
     global language_code, translations, translation_aliases
     requested = str(code or 'ja-JP')
     path = os.path.join(language_dir, f'{requested}.yaml')
@@ -59,13 +59,13 @@ def load_language(code='ja-JP'):
         translations = document.get('strings', {})
         translation_aliases = document.get('aliases', {})
     except (OSError, yaml.YAMLError):
-        language_code, translations, translation_aliases = 'ja-JP', {}, {}
+        language_code, translations, translation_aliases = 'en-US', {}, {}
 
 def t(key, **values):
     value = translations.get(translation_aliases.get(key, key), key)
     return value.format(**values) if values else value
 
-load_language(config_data.get('language', 'ja-JP'))
+load_language(config_data.get('language', 'en-US'))
 
 try:
     import psutil
@@ -216,7 +216,7 @@ def load_config():
 
 def default_config_data():
     return {
-        'language': 'ja-JP',
+        'language': 'en-US',
         'server': {
             'path': '', 'port': '13353', 'restart_time': -1,
             'response_monitor_enabled': 0, 'response_timeout': 0,
@@ -302,14 +302,15 @@ class config_window:
             ('ja-JP', '日本語'),
             ('en-US', 'English'),
         ]
-        self.language_var = tk.StringVar(value=config_data.get('language', 'ja-JP'))
+        self.language_var = tk.StringVar(value=config_data.get('language', 'en-US'))
         language_box = ttk.Combobox(
             language_frame, textvariable=self.language_var,
             values=[f'{code} - {name}' for code, name in available_languages],
             state='readonly', width=28,
         )
-        language_box.set(next((f'{code} - {name}' for code, name in available_languages if code == self.language_var.get()), 'ja-JP - 日本語'))
+        language_box.set(next((f'{code} - {name}' for code, name in available_languages if code == self.language_var.get()), 'en-US - English'))
         language_box.grid(row=0, column=1, sticky='w', padx=10, pady=12)
+        language_box.bind('<<ComboboxSelected>>', self.apply_language)
         ttk.Label(language_frame, text=t('language_restart_notice')).grid(row=1, column=0, columnspan=2, sticky='w', padx=10, pady=8)
         server_values = data.get('server', {})
         if 'path' not in server_values:
@@ -349,6 +350,19 @@ class config_window:
         ttk.Button(button_frame, text=t('cancel'), command=self.close).pack(side='right')
         self.window.transient(master)
         self.window.grab_set()
+
+    def apply_language(self, event=None):
+        """Apply a language selection immediately by rebuilding the settings UI."""
+        selected = self.language_var.get().split(' - ', 1)[0]
+        config_data['language'] = selected
+        with open(config_path, 'w', encoding='utf-8') as config_file:
+            yaml.safe_dump(config_data, config_file, allow_unicode=True, sort_keys=False)
+        load_language(selected)
+        if 'app' in globals() and app is not None:
+            app.apply_language()
+        self.window.grab_release()
+        self.window.destroy()
+        config_window(self.master, first_run=self.first_run)
 
     def add_tab(self, notebook, title, fields, values):
         frame = ttk.Frame(notebook)
@@ -836,6 +850,20 @@ class window_main(tk.Frame):
             self.newWindow.lift()
             return
         self.newWindow = config_window(self.master).window
+
+    def apply_language(self):
+        """Refresh the already-open main window after a language change."""
+        self.master.title(t('app_name'))
+        self.server_name_label.config(text=t('managed_server') + config.server_name)
+        self.restart_button.config(text=t('restart_server'))
+        self.manual_save_button.config(text=t('manual_save'))
+        self.server_force_stop_button.config(text=t('force_stop_server'))
+        self.server_stop_button.config(text=t('close_session'))
+        self.rollback_button.config(text=t('rollback_data'))
+        self.update_schedule_button.config(text=t('schedule_update'))
+        self.settings_button.config(text=t('settings'))
+        self.exit_button.config(text=t('exit_app'))
+        self.update_maintenance_button()
 
     def update_schedule_start(self):
         if hasattr(self, "newWindow") and self.newWindow.winfo_exists():

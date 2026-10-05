@@ -311,7 +311,7 @@ class config_window:
         language_box.set(next((f'{code} - {name}' for code, name in available_languages if code == self.language_var.get()), 'en-US - English'))
         language_box.grid(row=0, column=1, sticky='w', padx=10, pady=12)
         language_box.bind('<<ComboboxSelected>>', self.apply_language)
-        ttk.Label(language_frame, text=t('language_restart_notice')).grid(row=1, column=0, columnspan=2, sticky='w', padx=10, pady=8)
+        ttk.Label(language_frame, text=t('translation_accuracy_notice')).grid(row=1, column=0, columnspan=2, sticky='w', padx=10, pady=8)
         server_values = data.get('server', {})
         if 'path' not in server_values:
             folder = server_values.get('folder_path', '')

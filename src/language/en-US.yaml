@@ -49,10 +49,10 @@ strings:
   force_stop_server: Force stop server
   close_session: Close session
   rollback_data: Roll back data
-  schedule_update: Schedule body/Pak update
+  schedule_update: Schedule Simutrans application/Pak update
   exit_app: Exit Rakuraku NS+
-  update_body: Update the body
-  select_body: Select the body file
+  update_application: Update the Simutrans application
+  select_application: Select the Simutrans application
   update_pakset: Update the Pakset
   select_pakset: Select the Pakset folder
   update_datetime: Update time (YYYY/MM/DD HH:MM; omit the date for today)
@@ -87,22 +87,22 @@ strings:
   config_discord_token: Discord bot token
   config_discord_channel: Discord channel ID
   config_player_passwords: Player passwords
-  select_update_body: Select the body file to update
+  select_update_application: Select the Simutrans application to update
   select_update_pakset: Select the Pakset folder to update
   select_rollback_save_file: Select the save data for rollback
   simutrans_save_data: Simutrans save data
-  update_kind_body_and_pak: body and Pak
-  update_kind_body: body
+  update_kind_application_and_pak: Simutrans application and Pak
+  update_kind_application: Simutrans application
   update_kind_pak: Pak
   pakset_validation_title: Pakset validation
   pakset_validation_message: This is not a Pakset. Check whether ground.Outside.pak exists and is correctly named. File names are case-sensitive.
   invalid_update_datetime: Enter the update time as YYYY/MM/DD HH:MM or HH:MM.
   future_datetime_required: Specify a future date and time.
   update_registered: Update scheduled for {when}.
-  update_target_required: Select either the body or Pakset to update.
-  update_body_required: Select the body file to update.
+  update_target_required: Select either the Simutrans application or Pakset to update.
+  update_application_required: Select the Simutrans application to update.
   update_pakset_required: Select the Pakset folder to update.
-  confirm_update_now: Start the body/Pak update now?
+  confirm_update_now: Start the Simutrans application/Pak update now?
   no_update_schedule: There is no update schedule to cancel.
   update_schedule_cancelled: The update schedule was cancelled.
   confirm_pause_server: "Pause the server.\nAre you sure?"
@@ -133,12 +133,12 @@ strings:
   log_save_completed: Save completed.
   log_discord_channel_integer_required: The Discord channel setting must be an integer.
   log_discord_channel_permission_denied: No permission to send to the specified Discord channel.
-  log_update_scheduled: Body/Pak update scheduled.
-  log_update_schedule_cancelled: Body/Pak update schedule cancelled.
+  log_update_scheduled: Simutrans application/Pak update scheduled.
+  log_update_schedule_cancelled: Simutrans application/Pak update schedule cancelled.
   log_scheduled_update_started: Scheduled update started.
   log_update_completed_resume_server: Update completed. Resuming the server.
   log_update_completed_exit_app: Update completed. Exiting without restarting the server.
-  log_body_updated: Body updated.
+  log_application_updated: Simutrans application updated.
   log_pakset_updated: Pakset updated.
   log_nettool_detected: nettool detected successfully.
   log_supported_os_confirmed: A supported operating system was confirmed.

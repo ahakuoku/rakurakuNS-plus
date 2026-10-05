@@ -51,8 +51,8 @@ strings:
   rollback_data: データをロールバック
   schedule_update: 本体・Pakの更新をスケジュール
   exit_app: らくらくNS+を終了
-  update_body: 本体を更新する
-  select_body: 本体ファイルを選択
+  update_application: Simutransアプリケーションを更新する
+  select_application: Simutransアプリケーションを選択
   update_pakset: Paksetを更新する
   select_pakset: Paksetフォルダを選択
   update_datetime: 更新日時（YYYY/MM/DD HH:MM、日付省略時は当日）
@@ -87,17 +87,17 @@ strings:
   config_discord_token: Discord botトークン
   config_discord_channel: DiscordチャンネルID
   config_player_passwords: プレイヤーパスワード
-  select_update_body: 更新する本体ファイルを選択
+  select_update_application: 更新するSimutransアプリケーションを選択
   select_update_pakset: 更新するPaksetフォルダを選択
   pakset_validation_title: Pakset確認
   pakset_validation_message: これはPaksetではありません。ground.Outside.pakがあるかどうか、名前は正しいかどうかをご確認ください。（ファイル名は大文字と小文字を区別します。）
   invalid_update_datetime: 更新日時は YYYY/MM/DD HH:MM または HH:MM で入力してください。
   future_datetime_required: 未来の日時を指定してください。
   update_registered: '{when} に更新します。'
-  update_target_required: 本体またはPaksetのどちらかを更新する設定にしてください。
-  update_body_required: 更新する本体ファイルを選択してください。
+  update_target_required: SimutransアプリケーションまたはPaksetのどちらかを更新する設定にしてください。
+  update_application_required: 更新するSimutransアプリケーションを選択してください。
   update_pakset_required: 更新するPaksetフォルダを選択してください。
-  confirm_update_now: 今すぐ本体・Pakの更新を開始しますか？
+  confirm_update_now: 今すぐSimutransアプリケーション・Pakの更新を開始しますか？
   no_update_schedule: キャンセルする更新スケジュールはありません。
   update_schedule_cancelled: 更新スケジュールをキャンセルしました。
   confirm_pause_server: "サーバーを一時中断します。\nよろしいですか？"
@@ -130,12 +130,12 @@ strings:
   log_save_completed: セーブが完了しました。
   log_discord_channel_integer_required: 設定「discord_channel」には整数を入力してください。
   log_discord_channel_permission_denied: 指定されたDiscordのチャンネルへの送信権限がありません。
-  log_update_scheduled: 本体・Pakの更新をスケジュールしました。
-  log_update_schedule_cancelled: 本体・Pakの更新スケジュールをキャンセルしました。
+  log_update_scheduled: Simutransアプリケーション・Pakの更新をスケジュールしました。
+  log_update_schedule_cancelled: Simutransアプリケーション・Pakの更新スケジュールをキャンセルしました。
   log_scheduled_update_started: スケジュールされた更新を開始します。
   log_update_completed_resume_server: 更新が完了しました。サーバーを再開します。
   log_update_completed_exit_app: 更新が完了しました。サーバーを再起動せず、らくらくNS+を終了します。
-  log_body_updated: 本体を更新しました。
+  log_application_updated: Simutransアプリケーションを更新しました。
   log_pakset_updated: Paksetを更新しました。
   log_nettool_detected: nettoolの認識に成功しました。
   log_supported_os_confirmed: 動作可能OSであることを確認しました。
@@ -219,15 +219,15 @@ strings:
   discord_thanks_description: 皆様のご協力ありがとうございました。
   discord_server_resumed_title: サーバーを再開しました。
   discord_server_resumed_description: 大変お待たせしました。
-  update_kind_body_and_pak: 本体・Pak更新
-  update_kind_body: 本体更新
+  update_kind_application_and_pak: 本体・Pak更新
+  update_kind_application: 本体更新
   update_kind_pak: Pak更新
   help_server_executable: 起動するSimutransサーバーの実行ファイルを、フォルダを含むフルパスで指定します。
   help_port: サーバーが使用するポート番号を指定します。
   help_restart_time: 毎日自動再起動する時刻を0～24で指定します。-1で無効です。
   help_response_monitor: 有効にすると、サーバーのclients応答を常時監視します。応答失敗が指定時間続くとサーバーを強制終了します。
   help_response_timeout: サーバー起動後、clientsコマンドが正常終了するまで待機する最大時間を分で指定します。0で無効です。超過するとサーバーを強制終了します。
-  help_press_space: 有効にすると、Simutransの起動開始から30秒後にスペースキーを1回送信します。Standard以外の本体では通常必要ありません。
+  help_press_space: 有効にすると、Simutransの起動開始から30秒後にスペースキーを1回送信します。Standard以外のSimutransアプリケーションでは通常必要ありません。
   help_autosave_mode: オートセーブのモードを選択します。「一定間隔」は指定した間隔ごとに、「最後のロードからの経過時間」は最後にロードしてから指定した時間が経過した時点でオートセーブします。
   help_backup_count: オートセーブのバックアップ保存数を指定します。
   help_autosave_interval: オートセーブの間隔を秒で指定します。60以上を指定してください。

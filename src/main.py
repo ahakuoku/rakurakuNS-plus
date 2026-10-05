@@ -1036,9 +1036,9 @@ class update_schedule_window(tk.Frame):
         self.pak_path = tk.StringVar()
         self.time_var = tk.StringVar(value=datetime.datetime.now().strftime('%Y/%m/%d %H:%M'))
 
-        ttk.Checkbutton(self.master, text=t('update_body'), style='Switch.TCheckbutton', variable=self.body_var).grid(row=0, column=0, padx=10, pady=8, sticky='w')
+        ttk.Checkbutton(self.master, text=t('update_application'), style='Switch.TCheckbutton', variable=self.body_var).grid(row=0, column=0, padx=10, pady=8, sticky='w')
         ttk.Entry(self.master, textvariable=self.body_path, width=55).grid(row=1, column=0, padx=10, sticky='w')
-        ttk.Button(self.master, text=t('select_body'), command=self.choose_body).grid(row=1, column=1, padx=5)
+        ttk.Button(self.master, text=t('select_application'), command=self.choose_body).grid(row=1, column=1, padx=5)
 
         ttk.Checkbutton(self.master, text=t('update_pakset'), style='Switch.TCheckbutton', variable=self.pak_var).grid(row=2, column=0, padx=10, pady=8, sticky='w')
         ttk.Entry(self.master, textvariable=self.pak_path, width=55).grid(row=3, column=0, padx=10, sticky='w')
@@ -1059,7 +1059,7 @@ class update_schedule_window(tk.Frame):
         ttk.Button(button_frame, text=t('cancel'), command=self.close_window).pack(side='left', padx=(20, 5))
 
     def choose_body(self):
-        path = filedialog.askopenfilename(title=t('select_update_body'))
+        path = filedialog.askopenfilename(title=t('select_update_application'))
         if path:
             self.body_path.set(path)
 
@@ -1096,7 +1096,7 @@ class update_schedule_window(tk.Frame):
             messagebox.showwarning(t('input_confirmation'), t('update_target_required'), parent=self.master)
             return None
         if self.body_var.get() and not os.path.isfile(self.body_path.get()):
-            messagebox.showerror(t('input_confirmation'), t('update_body_required'), parent=self.master)
+            messagebox.showerror(t('input_confirmation'), t('update_application_required'), parent=self.master)
             return None
         if self.pak_var.get() and (not os.path.isdir(self.pak_path.get()) or not os.path.isfile(os.path.join(self.pak_path.get(), 'ground.Outside.pak'))):
             messagebox.showerror(t('input_confirmation'), t('update_pakset_required'), parent=self.master)
@@ -1716,9 +1716,9 @@ def schedule_update(when, body_source, pak_source, long_backup_code, discord_not
     persist_runtime_state()
     if discord_notice_code:
         if body_source and pak_source:
-            update_kind = t('update_kind_body_and_pak')
+            update_kind = t('update_kind_application_and_pak')
         elif body_source:
-            update_kind = t('update_kind_body')
+            update_kind = t('update_kind_application')
         else:
             update_kind = t('update_kind_pak')
         time_text = when.strftime('%H:%M') if when.date() == datetime.datetime.now().date() else when.strftime('%Y/%m/%d %H:%M')
@@ -1774,7 +1774,7 @@ def execute_scheduled_update(item):
 def replace_update_files(body_source, pak_source):
     if body_source:
         shutil.copy2(body_source, server_path)
-        print_gui_log(t('log_body_updated'))
+        print_gui_log(t('log_application_updated'))
     if pak_source:
         target = os.path.join(server_folder_path, 'pakset')
         os.makedirs(target, exist_ok=True)

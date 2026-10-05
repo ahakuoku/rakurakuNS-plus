@@ -66,8 +66,8 @@ strings:
   update_now: 今すぐ更新する
   cancel_schedule: スケジュールをキャンセル
   confirm: 確認
-  yes: はい
-  no: いいえ
+  "yes": はい
+  "no": いいえ
   input_confirmation: 入力確認
   registration_complete: 登録完了
   cancellation_complete: キャンセル完了

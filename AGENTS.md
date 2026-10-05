@@ -11,5 +11,5 @@
 # GUI上に表示されるテキストについて
 
 GUI上に表示されるテキストを追加する場合は、pythonファイルにハードコーディングするのではなく、下記のようにしてください。
-  - 日本語をsrc/language/ja-JP.yamlに記載する
-  - 英語訳をsrc/language/en-US.yamlに記載する
+  - 日本語の表示テキストをsrc/language/ja-JP.yamlに記載する
+  - 英語の表示テキストをsrc/language/en-US.yamlに記載する

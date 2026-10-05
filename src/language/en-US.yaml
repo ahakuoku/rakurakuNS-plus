@@ -42,7 +42,7 @@ strings:
   import_failed: Import failed
   input_error: Input error
   app_name: Rakuraku NS+
-  managed_server: Managed server: 
+  managed_server: "Managed server: "
   restart_server: Restart server
   manual_save: Manual save
   pause_server: Pause server

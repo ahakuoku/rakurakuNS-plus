@@ -101,23 +101,23 @@ strings:
   confirm_update_now: 今すぐ本体・Pakの更新を開始しますか？
   no_update_schedule: キャンセルする更新スケジュールはありません。
   update_schedule_cancelled: 更新スケジュールをキャンセルしました。
-  confirm_pause_server: 'サーバーを一時中断します。\nよろしいですか？'
-  confirm_resume_server: 'サーバーを再開します。\nよろしいですか？'
-  backup_at_maintenance_start: 'メンテナンス開始時点のデータを\n長期バックアップする'
-  confirm_exit_app: 'らくらくNS+を終了します。\nよろしいですか？'
-  confirm_close_session: 'サーバー会期を終了し、らくらくNS+を終了します。\nよろしいですか？'
-  confirm_force_stop_server: 'サーバーを強制終了します。\n強制終了すると、前回のロード以降のデータは失われます。\nよろしいですか？'
-  confirm_manual_save: '手動セーブを実行します。\n告知後30秒待ってセーブします。\nよろしいですか？'
+  confirm_pause_server: "サーバーを一時中断します。\nよろしいですか？"
+  confirm_resume_server: "サーバーを再開します。\nよろしいですか？"
+  backup_at_maintenance_start: "メンテナンス開始時点のデータを\n長期バックアップする"
+  confirm_exit_app: "らくらくNS+を終了します。\nよろしいですか？"
+  confirm_close_session: "サーバー会期を終了し、らくらくNS+を終了します。\nよろしいですか？"
+  confirm_force_stop_server: "サーバーを強制終了します。\n強制終了すると、前回のロード以降のデータは失われます。\nよろしいですか？"
+  confirm_manual_save: "手動セーブを実行します。\n告知後30秒待ってセーブします。\nよろしいですか？"
   rollback_save_file: ロールバック先のセーブデータ（.sve）
   perform_rollback: ロールバックする
   sve_file_required: .sveファイルを指定してください。
-  confirm_restart_server: 'サーバーを再起動します。\nよろしいですか？'
+  confirm_restart_server: "サーバーを再起動します。\nよろしいですか？"
   select_legacy_config: インポートするconfig.pyを選択
   legacy_import_complete: config.pyの設定を画面に反映しました。保存するとconfig.yamlが作成されます。
-  legacy_import_failed: 'config.pyを読み込めませんでした。\n{error}'
+  legacy_import_failed: "config.pyを読み込めませんでした。\n{error}"
   select_bat_settings: インポートするsetting.batを選択
   bat_import_complete: setting.batの設定を画面に反映しました。保存するとconfig.yamlが作成されます。
-  bat_import_failed: 'setting.batを読み込めませんでした。\n{error}'
+  bat_import_failed: "setting.batを読み込めませんでした。\n{error}"
   select_rollback_save_file: ロールバック先のセーブデータを選択
   simutrans_save_data: Simutrans save data
   server_path_required: '「{field}」のパスを入力してください。'
@@ -125,7 +125,7 @@ strings:
   integer_required: '設定「{field}」には整数を入力してください。'
   value_out_of_range: '設定「{field}」の値が範囲外です。'
   discord_token_required: '{enabled}を有効にする場合は、{token}を入力してください。'
-  confirm_rollback: 'セーブデータのロールバックを行います。\n{timestamp}以降の作業はすべて失われます。\nよろしいですか？'
+  confirm_rollback: "セーブデータのロールバックを行います。\n{timestamp}以降の作業はすべて失われます。\nよろしいですか？"
   log_manual_save_notice_sent: 手動セーブ予告メッセージを送信しました。
   log_saving: セーブ中です。
   log_save_completed: セーブが完了しました。
@@ -162,7 +162,7 @@ strings:
   log_long_term_backup_created: 長期バックアップを作成しました。
   log_backup_file_missing: バックアップファイルが存在しません。
   discord_rollback_title: ロールバックに伴うメンテナンスのお知らせ
-  discord_rollback_description: '{timestamp}時点へのセーブデータのロールバックを行うため、ただいまよりメンテナンスを行います。\nご迷惑をおかけし申し訳ございませんが、何卒ご理解のほどよろしくお願いいたします。'
+  discord_rollback_description: "{timestamp}時点へのセーブデータのロールバックを行うため、ただいまよりメンテナンスを行います。\nご迷惑をおかけし申し訳ございませんが、何卒ご理解のほどよろしくお願いいたします。"
   log_rollback_completed: セーブデータをロールバックしました。サーバーを再開します。
   log_rollback_failed: 'セーブデータのロールバックに失敗しました: {error}'
   log_discord_channel_not_found: 指定されたDiscordのチャンネルはありません。
@@ -211,8 +211,8 @@ strings:
   discord_server_closed_title: サーバーは終了しました。
   discord_server_closed_description: 皆様のご参加ありがとうございました。
   discord_server_down_title: サーバーがダウンしました。
-  discord_server_down_manual_recovery: '復旧用のデータがないため、今回は自動復旧できません。\nご迷惑をおかけしますが、復旧までしばらくお待ちください。'
-  discord_server_down_auto_recovery: '自動で復帰します。しばらくお待ちください。\nこれに伴い、{timestamp}までデータが巻き戻ります。'
+  discord_server_down_manual_recovery: "復旧用のデータがないため、今回は自動復旧できません。\nご迷惑をおかけしますが、復旧までしばらくお待ちください。"
+  discord_server_down_auto_recovery: "自動で復帰します。しばらくお待ちください。\nこれに伴い、{timestamp}までデータが巻き戻ります。"
   discord_server_recovered_title: サーバーが復旧しました。
   discord_server_restarted_title: サーバーを再起動しました。
   discord_orderly_login_description: サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。

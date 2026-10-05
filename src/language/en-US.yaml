@@ -1,9 +1,8 @@
 # Rakuraku NS+ English UI language pack
 locale: en-US
-language_name: English
+language_name: English (US)
 strings:
   language_tab: Language
-  japanese: Japanese
   language_restart_notice: The language change will take effect after saving.
   settings: Settings
   server: Server

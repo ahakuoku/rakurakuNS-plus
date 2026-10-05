@@ -297,8 +297,9 @@ class config_window:
         language_frame = ttk.Frame(notebook)
         notebook.add(language_frame, text=t('language_tab'))
         ttk.Label(language_frame, text=t('language_tab')).grid(row=0, column=0, sticky='w', padx=10, pady=12)
+        # 言語名は選択中の言語で翻訳せず、各言語の固定表記を使う。
         available_languages = [
-            ('ja-JP', t('japanese')),
+            ('ja-JP', '日本語'),
             ('en-US', 'English'),
         ]
         self.language_var = tk.StringVar(value=config_data.get('language', 'ja-JP'))
@@ -307,7 +308,7 @@ class config_window:
             values=[f'{code} - {name}' for code, name in available_languages],
             state='readonly', width=28,
         )
-        language_box.set(next((f'{code} - {name}' for code, name in available_languages if code == self.language_var.get()), f'ja-JP - {t("japanese")}'))
+        language_box.set(next((f'{code} - {name}' for code, name in available_languages if code == self.language_var.get()), 'ja-JP - 日本語'))
         language_box.grid(row=0, column=1, sticky='w', padx=10, pady=12)
         ttk.Label(language_frame, text=t('language_restart_notice')).grid(row=1, column=0, columnspan=2, sticky='w', padx=10, pady=8)
         server_values = data.get('server', {})

@@ -2429,11 +2429,12 @@ def press_space_key():
 def nettool_say(content):
     # contentにはASCII文字以外を入れないこと（文字化け対策）
     global nettool_pw
-    while result == 0:
+    while True:
         result = subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'say', content], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        if result != 0:
-            print_gui_log('メッセージ送信に失敗しました。やり直します。コード: ' + result)
-            time.sleep(1)
+        if result.returncode == 0:
+            break
+        print_gui_log(f'メッセージ送信に失敗しました。やり直します。コード: {result.returncode}')
+        time.sleep(1)
     return None
 
 def wait_simutrans_responce():
@@ -2491,11 +2492,12 @@ def nettool_lockcompany(company_id, company_pw):
 def nettool_forcesync():
     # ロード処理
     global nettool_pw
-    while result == 0:
+    while True:
         result = subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'force-sync'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        if result != 0:
-            print_gui_log('オートセーブに失敗しました。やり直します。コード: ' + result)
-            time.sleep(1)
+        if result.returncode == 0:
+            break
+        print_gui_log(f'オートセーブに失敗しました。やり直します。コード: {result.returncode}')
+        time.sleep(1)
     wait_simutrans_responce()
     save_backup()
 

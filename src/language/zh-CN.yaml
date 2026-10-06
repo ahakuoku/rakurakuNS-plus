@@ -50,6 +50,45 @@ strings:
   close_session: 结束会议
   rollback_data: 回滚数据
   schedule_update: 安排 Simutrans 应用程序/Pak 更新
+  nettool_commands: nettool 命令
+  send: 发送
+  nettool_apply_ban_setting: 应用到 BAN IP 设置并重新加载
+  nettool_announce_warning: 将公开地图缩略图和连接信息。确定发送吗？
+  nettool_argument_required: 请输入参数。
+  nettool_company_missing: 指定的公司不存在。
+  nettool_sent: 已发送 {command}。
+  nettool_failed: '发送失败：{error}'
+  nettool_description: 发送用于管理服务器的 nettool 命令。结果显示在下方。
+  nettool_group_information: 信息与公开
+  nettool_group_company: 公司管理
+  nettool_group_connection: 客户端与 BAN 管理
+  nettool_group_server: 服务器操作
+  nettool_result: 执行结果
+  nettool_no_argument: 无参数
+  nettool_company_number: 公司编号
+  nettool_client_number: 客户端编号
+  nettool_ip_address: IP 地址
+  nettool_message: 消息
+  nettool_new_password: 新密码
+  nettool_close: 关闭
+  nettool_no_output: 没有输出。
+  nettool_command_failed: '{command} 发送失败（退出代码：{code}）。{output}'
+  nettool_shutdown_warning: 将关闭服务器。确定发送吗？
+  nettool_help_announce: 公开服务器信息。
+  nettool_help_clients: 显示已连接的客户端。
+  nettool_help_companies: 显示公司。
+  nettool_help_info-company: 显示公司的详细信息。
+  nettool_help_blacklist: 显示 BAN 列表。
+  nettool_help_lock-company: 使用密码锁定公司。
+  nettool_help_unlock-company: 解锁公司。
+  nettool_help_remove-company: 删除公司。
+  nettool_help_ban-ip: BAN 指定 IP 地址。
+  nettool_help_unban-ip: 解除 IP BAN。
+  nettool_help_say: 发送服务器消息。在 Windows 上不建议使用双字节字符，因为可能会乱码。
+  nettool_help_kick-client: 断开指定客户端。可用 clients 查询编号。
+  nettool_help_ban-client: BAN 指定客户端。可用 clients 查询编号。
+  nettool_help_force-sync: 请求同步，以便服务器保存并重新加载游戏。
+  nettool_help_shutdown: 关闭服务器。
   exit_app: 退出乐乐 NS+
   update_application: 更新 Simutrans 应用程序
   select_application: 选择 Simutrans 应用程序

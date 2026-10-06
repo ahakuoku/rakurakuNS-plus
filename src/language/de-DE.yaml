@@ -50,6 +50,45 @@ strings:
   close_session: Sitzung schließen
   rollback_data: Daten zurücksetzen
   schedule_update: Planen Sie ein Simutrans-Anwendungs-/Pak-Update
+  nettool_commands: nettool-Befehle
+  send: Senden
+  nettool_apply_ban_setting: Auf BAN-IP-Einstellungen anwenden und neu laden
+  nettool_announce_warning: Dies veröffentlicht Kartenminiatur und Verbindungsinformationen. Befehl senden?
+  nettool_argument_required: Argument eingeben.
+  nettool_company_missing: Das Unternehmen existiert nicht.
+  nettool_sent: '{command} gesendet.'
+  nettool_failed: 'Senden fehlgeschlagen: {error}'
+  nettool_description: Nettool-Befehle zur Serververwaltung senden. Ergebnisse erscheinen unten.
+  nettool_group_information: Information und Veröffentlichung
+  nettool_group_company: Unternehmensverwaltung
+  nettool_group_connection: Clients und Sperren
+  nettool_group_server: Serveraktionen
+  nettool_result: Ergebnis
+  nettool_no_argument: Kein Argument
+  nettool_company_number: Unternehmensnummer
+  nettool_client_number: Clientnummer
+  nettool_ip_address: IP-Adresse
+  nettool_message: Nachricht
+  nettool_new_password: Neues Passwort
+  nettool_close: Schließen
+  nettool_no_output: Keine Ausgabe.
+  nettool_command_failed: '{command} fehlgeschlagen (Exit-Code: {code}). {output}'
+  nettool_shutdown_warning: Der Server wird beendet. Befehl senden?
+  nettool_help_announce: Veröffentlicht Serverinformationen.
+  nettool_help_clients: Zeigt verbundene Clients an.
+  nettool_help_companies: Zeigt Unternehmen an.
+  nettool_help_info-company: Zeigt Informationen zu einem Unternehmen an.
+  nettool_help_blacklist: Zeigt die Sperrliste an.
+  nettool_help_lock-company: Sperrt ein Unternehmen mit einem Passwort.
+  nettool_help_unlock-company: Entsperrt ein Unternehmen.
+  nettool_help_remove-company: Entfernt ein Unternehmen.
+  nettool_help_ban-ip: Sperrt eine IP-Adresse.
+  nettool_help_unban-ip: Hebt die IP-Sperre auf.
+  nettool_help_say: Sendet eine Servernachricht. Zwei-Byte-Zeichen werden unter Windows nicht empfohlen.
+  nettool_help_kick-client: Trennt einen Client. Die Clientnummer finden Sie mit clients.
+  nettool_help_ban-client: Sperrt einen Client. Die Clientnummer finden Sie mit clients.
+  nettool_help_force-sync: Fordert eine Synchronisierung zum Speichern und Neuladen an.
+  nettool_help_shutdown: Beendet den Server.
   exit_app: Verlassen Sie Rakuraku NS+
   update_application: Aktualisieren Sie die Simutrans-Anwendung
   select_application: Wählen Sie die Simutrans-Anwendung aus

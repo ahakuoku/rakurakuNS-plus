@@ -50,6 +50,45 @@ strings:
   close_session: 会期終了
   rollback_data: データをロールバック
   schedule_update: 本体・Pakの更新をスケジュール
+  nettool_commands: nettoolコマンド
+  send: 送信
+  nettool_apply_ban_setting: BAN IP設定に反映して再読み込み
+  nettool_announce_warning: "このコマンドを送信すると、マップのサムネイルや接続先情報などが公開されます。本当に送信しますか？"
+  nettool_argument_required: 引数を入力してください。
+  nettool_company_missing: 指定された会社は存在しません。
+  nettool_sent: '{command} を送信しました。'
+  nettool_failed: '送信に失敗しました: {error}'
+  nettool_help_announce: サーバー情報を公開します。
+  nettool_help_clients: 接続中のクライアント一覧を表示します。
+  nettool_help_companies: 会社一覧を表示します。
+  nettool_help_info-company: 指定した会社の情報を表示します。
+  nettool_help_blacklist: ブラックリストを表示します。
+  nettool_help_lock-company: 指定した会社をパスワードでロックします。
+  nettool_help_unlock-company: 指定した会社のロックを解除します。
+  nettool_help_remove-company: 指定した会社を削除します。
+  nettool_help_ban-ip: 指定したIPアドレスをBANします。
+  nettool_help_unban-ip: 指定したIPアドレスのBANを解除します。
+  nettool_help_say: サーバー内にメッセージを表示します。Windowsでは2バイト文字は文字化けする可能性があるため非推奨です。
+  nettool_description: サーバー管理用のnettoolコマンドを送信します。実行結果は画面下部に表示されます。
+  nettool_group_information: 情報・公開
+  nettool_group_company: 会社管理
+  nettool_group_connection: 接続者・BAN管理
+  nettool_group_server: サーバー操作
+  nettool_result: 実行結果
+  nettool_no_argument: 引数なし
+  nettool_company_number: 会社番号
+  nettool_client_number: クライアント番号
+  nettool_ip_address: IPアドレス
+  nettool_message: メッセージ
+  nettool_new_password: 新しいパスワード
+  nettool_close: 閉じる
+  nettool_no_output: 出力はありません。
+  nettool_command_failed: '{command} の送信に失敗しました（終了コード: {code}）。{output}'
+  nettool_shutdown_warning: サーバーを終了します。本当に送信しますか？
+  nettool_help_kick-client: 指定したクライアントを切断します。クライアント番号はclientsで確認できます。
+  nettool_help_ban-client: 指定したクライアントをBANします。クライアント番号はclientsで確認できます。
+  nettool_help_force-sync: セーブと再ロードのため、サーバーに同期を要求します。
+  nettool_help_shutdown: サーバーを終了します。
   exit_app: らくらくNS+を終了
   update_application: 本体を更新する
   select_application: 本体ファイルを選択

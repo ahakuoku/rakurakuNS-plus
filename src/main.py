@@ -985,6 +985,11 @@ class window_main(tk.Frame):
         )
         self.update_schedule_button.grid(row=3, column=0, columnspan=2, padx=5, pady=(0, 10), sticky="ew")
 
+        self.nettool_button = ttk.Button(
+            self, text=t('nettool_commands'), command=self.nettool_start
+        )
+        self.nettool_button.grid(row=4, column=0, columnspan=2, padx=5, pady=(0, 10), sticky="ew")
+
         self.settings_button = ttk.Button(self, text=t('settings'), command=self.open_settings)
         self.settings_button.grid(row=4, column=2, padx=5, pady=(0, 10), sticky="ew")
 
@@ -1007,6 +1012,7 @@ class window_main(tk.Frame):
         self.server_stop_button.config(text=t('close_session'))
         self.rollback_button.config(text=t('rollback_data'))
         self.update_schedule_button.config(text=t('schedule_update'))
+        self.nettool_button.config(text=t('nettool_commands'))
         self.settings_button.config(text=t('settings'))
         self.exit_button.config(text=t('exit_app'))
         self.update_maintenance_button()
@@ -1018,6 +1024,14 @@ class window_main(tk.Frame):
         self.newWindow = tk.Toplevel(self.master)
         self.newWindow.grab_set()
         update_schedule_window(self.newWindow)
+
+    def nettool_start(self):
+        if hasattr(self, "newWindow") and self.newWindow.winfo_exists():
+            self.newWindow.lift()
+            return
+        self.newWindow = tk.Toplevel(self.master)
+        self.newWindow.grab_set()
+        nettool_window(self.newWindow)
 
     def rollback_start(self):
         if hasattr(self, "newWindow") and self.newWindow.winfo_exists():
@@ -1169,6 +1183,223 @@ class window_main(tk.Frame):
 
         self.log_text.configure(state="disabled")
         self.log_text.see("end")
+
+class nettool_window(tk.Frame):
+    """nettoolの全管理コマンドを送信する画面。"""
+    COMMAND_GROUPS = (
+        ('nettool_group_information', ('announce', 'clients', 'companies', 'info-company', 'blacklist')),
+        ('nettool_group_company', ('lock-company', 'unlock-company', 'remove-company')),
+        ('nettool_group_connection', ('kick-client', 'ban-client', 'ban-ip', 'unban-ip', 'say')),
+        ('nettool_group_server', ('force-sync', 'shutdown')),
+    )
+    ARGUMENT_LABELS = {
+        'info-company': 'nettool_company_number', 'lock-company': 'nettool_company_number',
+        'unlock-company': 'nettool_company_number', 'remove-company': 'nettool_company_number',
+        'kick-client': 'nettool_client_number', 'ban-client': 'nettool_client_number',
+        'ban-ip': 'nettool_ip_address', 'unban-ip': 'nettool_ip_address', 'say': 'nettool_message',
+    }
+
+    def __init__(self, master):
+        super().__init__(master)
+        self.master = master
+        self.master.title(t('nettool_commands'))
+        self.master.geometry('800x720')
+        self.master.minsize(720, 620)
+        self.master.protocol('WM_DELETE_WINDOW', self.close_window)
+        self.grid(row=0, column=0, sticky='nsew', padx=12, pady=12)
+        self.master.grid_rowconfigure(0, weight=1)
+        self.master.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+        self.inputs = {}
+        self.command_results = queue.Queue()
+        ttk.Label(self, text=t('nettool_description'), wraplength=760).grid(row=0, column=0, sticky='w', pady=(0, 8))
+        commands_area = ttk.Frame(self)
+        commands_area.grid(row=1, column=0, sticky='nsew')
+        commands_area.grid_columnconfigure(0, weight=1)
+        commands_area.grid_rowconfigure(0, weight=1)
+        self.commands_canvas = tk.Canvas(commands_area, highlightthickness=0)
+        self.commands_canvas.grid(row=0, column=0, sticky='nsew')
+        commands_scrollbar = ttk.Scrollbar(commands_area, orient='vertical', command=self.commands_canvas.yview)
+        commands_scrollbar.grid(row=0, column=1, sticky='ns')
+        self.commands_canvas.configure(yscrollcommand=commands_scrollbar.set)
+        commands_frame = ttk.Frame(self.commands_canvas)
+        commands_window = self.commands_canvas.create_window((0, 0), window=commands_frame, anchor='nw')
+        commands_frame.bind('<Configure>', lambda event: self.commands_canvas.configure(scrollregion=self.commands_canvas.bbox('all')))
+        self.commands_canvas.bind('<Configure>', lambda event: self.commands_canvas.itemconfigure(commands_window, width=event.width))
+        self.commands_canvas.bind('<MouseWheel>', self._scroll_commands)
+        self.commands_canvas.bind('<Button-4>', lambda event: self.commands_canvas.yview_scroll(-1, 'units'))
+        self.commands_canvas.bind('<Button-5>', lambda event: self.commands_canvas.yview_scroll(1, 'units'))
+        for row, (group_key, commands) in enumerate(self.COMMAND_GROUPS):
+            group = ttk.LabelFrame(commands_frame, text=t(group_key), padding=8)
+            group.grid(row=row, column=0, sticky='ew', pady=4)
+            group.grid_columnconfigure(1, weight=1)
+            self._bind_command_scroll(group)
+            for command_row, command in enumerate(commands):
+                self._add_command_row(group, command_row, command)
+        self.apply_ban_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(self, text=t('nettool_apply_ban_setting'), variable=self.apply_ban_var,
+                        style='Switch.TCheckbutton').grid(row=2, column=0, sticky='w', pady=(8, 4))
+        output_frame = ttk.LabelFrame(self, text=t('nettool_result'), padding=6)
+        output_frame.grid(row=3, column=0, sticky='nsew', pady=(4, 0))
+        output_frame.grid_columnconfigure(0, weight=1)
+        output_frame.grid_rowconfigure(0, weight=1)
+        self.output = tk.Text(output_frame, height=10, wrap='word', state='disabled')
+        self.output.grid(row=0, column=0, sticky='nsew')
+        scrollbar = ttk.Scrollbar(output_frame, orient='vertical', command=self.output.yview)
+        scrollbar.grid(row=0, column=1, sticky='ns')
+        self.output.configure(yscrollcommand=scrollbar.set)
+        self.grid_rowconfigure(1, weight=1)
+        button_frame = ttk.Frame(self)
+        button_frame.grid(row=4, column=0, sticky='e', pady=(8, 0))
+        ttk.Button(button_frame, text=t('nettool_close'), command=self.close_window).pack()
+        self.after(GUI_LOG_FLUSH_INTERVAL_MS, self._flush_command_results)
+
+    def _add_command_row(self, parent, row, command):
+        label = ttk.Label(parent, text=command, width=17)
+        label.grid(row=row, column=0, sticky='w', pady=3)
+        self._bind_command_scroll(label)
+        if command in self.ARGUMENT_LABELS:
+            entry = ttk.Entry(parent)
+            entry.grid(row=row, column=1, sticky='ew', padx=(4, 6))
+            entry.insert(0, t(self.ARGUMENT_LABELS[command]))
+            entry.bind('<FocusIn>', lambda event, e=entry, key=self.ARGUMENT_LABELS[command]: self._clear_hint(e, t(key)))
+            self._bind_command_scroll(entry)
+            self.inputs[command] = entry
+        else:
+            no_argument = ttk.Label(parent, text=t('nettool_no_argument'))
+            no_argument.grid(row=row, column=1, sticky='w', padx=(4, 6))
+            self._bind_command_scroll(no_argument)
+        if command == 'lock-company':
+            password_label = ttk.Label(parent, text=t('nettool_new_password'))
+            password_label.grid(row=row, column=2, sticky='e', padx=(0, 4))
+            password = ttk.Entry(parent, width=16, show='*')
+            password.grid(row=row, column=3, sticky='ew', padx=(0, 6))
+            self._bind_command_scroll(password_label)
+            self._bind_command_scroll(password)
+            self.inputs['lock-company_password'] = password
+        else:
+            spacer = ttk.Label(parent, text='')
+            spacer.grid(row=row, column=2, sticky='ew')
+            self._bind_command_scroll(spacer)
+        send_button = ttk.Button(parent, text=t('send'), command=lambda c=command: self.send(c))
+        send_button.grid(row=row, column=4, padx=2)
+        help_button = ttk.Button(parent, text=t('help'), command=lambda c=command: self.show_command_help(c))
+        help_button.grid(row=row, column=5, padx=2)
+        self._bind_command_scroll(send_button)
+        self._bind_command_scroll(help_button)
+
+    def _bind_command_scroll(self, widget):
+        widget.bind('<MouseWheel>', self._scroll_commands, add='+')
+        widget.bind('<Button-4>', lambda event: self.commands_canvas.yview_scroll(-1, 'units'), add='+')
+        widget.bind('<Button-5>', lambda event: self.commands_canvas.yview_scroll(1, 'units'), add='+')
+
+    def _scroll_commands(self, event):
+        self.commands_canvas.yview_scroll(-int(event.delta / 120), 'units')
+
+    def _flush_command_results(self):
+        try:
+            while True:
+                text = self.command_results.get_nowait()
+                self.output.configure(state='normal')
+                self.output.insert('end', str(text).rstrip() + '\n')
+                self.output.see('end')
+                self.output.configure(state='disabled')
+        except queue.Empty:
+            pass
+        if self.winfo_exists():
+            self.after(GUI_LOG_FLUSH_INTERVAL_MS, self._flush_command_results)
+
+    def close_window(self):
+        self.master.grab_release()
+        self.master.destroy()
+
+    @staticmethod
+    def _clear_hint(entry, hint):
+        if entry.get() == hint:
+            entry.delete(0, 'end')
+
+    def show_command_help(self, command):
+        messagebox.showinfo(command, t(f'nettool_help_{command}'), parent=self.master)
+
+    def send(self, command):
+        argument = self.inputs.get(command)
+        value = argument.get().strip() if argument else ''
+        if argument and value == t(self.ARGUMENT_LABELS[command]):
+            value = ''
+        if command == 'announce' and not messagebox.askyesno(t('confirm'), t('nettool_announce_warning'), parent=self.master):
+            return
+        if command == 'shutdown' and not messagebox.askyesno(t('confirm'), t('nettool_shutdown_warning'), parent=self.master):
+            return
+        if command in self.ARGUMENT_LABELS and not value:
+            messagebox.showerror(t('input_error'), t('nettool_argument_required'), parent=self.master)
+            return
+        if command == 'lock-company' and not self.inputs['lock-company_password'].get().strip():
+            messagebox.showerror(t('input_error'), t('nettool_argument_required'), parent=self.master)
+            return
+        password = self.inputs['lock-company_password'].get().strip() if command == 'lock-company' else None
+        apply_ban_setting = self.apply_ban_var.get()
+        sender = getattr(self, f'send_{command.replace("-", "_")}')
+        threading.Thread(target=sender, args=(value, password, apply_ban_setting), daemon=True).start()
+
+    def send_announce(self, value, password, apply): self._send_command('announce', value, apply=apply)
+    def send_clients(self, value, password, apply): self._send_command('clients', value, apply=apply)
+    def send_companies(self, value, password, apply): self._send_command('companies', value, apply=apply)
+    def send_info_company(self, value, password, apply): self._send_command('info-company', value, apply=apply)
+    def send_blacklist(self, value, password, apply): self._send_command('blacklist', value, apply=apply)
+    def send_lock_company(self, value, password, apply): self._send_command('lock-company', value, password, apply)
+    def send_unlock_company(self, value, password, apply): self._send_command('unlock-company', value, apply=apply)
+    def send_remove_company(self, value, password, apply): self._send_command('remove-company', value, apply=apply)
+    def send_kick_client(self, value, password, apply): self._send_command('kick-client', value, apply=apply)
+    def send_ban_client(self, value, password, apply): self._send_command('ban-client', value, apply=apply)
+    def send_ban_ip(self, value, password, apply): self._send_command('ban-ip', value, apply=apply)
+    def send_unban_ip(self, value, password, apply): self._send_command('unban-ip', value, apply=apply)
+    def send_say(self, value, password, apply): self._send_command('say', value, apply=apply)
+    def send_force_sync(self, value, password, apply): self._send_command('force-sync', value, apply=apply)
+    def send_shutdown(self, value, password, apply): self._send_command('shutdown', value, apply=apply)
+
+    def _send_command(self, command, value, extra=None, apply=False):
+        try:
+            args = [run_nettool(), '-p', str(nettool_pw), '-s', server_ip + str(config.port_number), command]
+            if value:
+                args.append(value)
+            if extra:
+                args.append(extra)
+            if command in ('lock-company', 'unlock-company', 'remove-company'):
+                check = subprocess.run([run_nettool(), '-p', str(nettool_pw), '-s', server_ip + str(config.port_number), 'info-company', value], capture_output=True, text=True, encoding='utf-8', errors='replace')
+                if check.stdout == 'Nothing received.\n':
+                    self._write_output(t('nettool_company_missing'))
+                    return
+            result = subprocess.run(args, capture_output=True, text=True, encoding='utf-8', errors='replace')
+            response = result.stdout or result.stderr
+            if result.returncode != 0:
+                self._write_output(t('nettool_command_failed', command=command, code=result.returncode, output=response))
+            elif command in ('clients', 'companies', 'info-company', 'blacklist'):
+                self._write_output(response or t('nettool_no_output'))
+            else:
+                self._write_output(response or t('nettool_sent', command=command))
+            if result.returncode == 0 and command in ('ban-ip', 'unban-ip') and apply:
+                self._update_ban_setting(value, command == 'ban-ip')
+        except Exception as error:
+            self._write_output(t('nettool_failed', error=error))
+
+    def _write_output(self, text):
+        self.command_results.put(text)
+
+    def _update_ban_setting(self, ip, enabled):
+        values = [getattr(config, f'banip_{i}', '') for i in range(63)]
+        if enabled and ip not in values:
+            try:
+                index = values.index('')
+                values[index] = ip
+            except ValueError:
+                return
+        elif not enabled:
+            values = ['' if item == ip else item for item in values]
+        config_data.setdefault('network', {}).setdefault('ban_ips', {}).update({i: values[i] for i in range(63)})
+        with open(config_path, 'w', encoding='utf-8') as config_file:
+            yaml.safe_dump(config_data, config_file, allow_unicode=True, sort_keys=False)
+        load_config()
+
 
 class update_schedule_window(tk.Frame):
     def __init__(self, master):

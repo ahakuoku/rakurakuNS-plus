@@ -622,7 +622,8 @@ class config_window:
     def show_help(self, key):
         descriptions = {
             'path': 'help_server_executable', 'port': 'help_port',
-            'restart_time': 'help_restart_time', 'response_monitor_enabled': 'help_response_monitor',
+            'restart_time': 'help_restart_time', 'restart_enabled': 'help_restart_enabled',
+            'response_monitor_enabled': 'help_response_monitor',
             'response_timeout': 'help_response_timeout', 'press_space_after_start': 'help_press_space',
             'mode': 'help_autosave_mode', 'backup_count': 'help_backup_count',
             'interval': 'help_autosave_interval', 'long_term_keep_days': 'help_long_term_keep_days',

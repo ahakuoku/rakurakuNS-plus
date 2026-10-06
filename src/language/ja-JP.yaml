@@ -226,6 +226,7 @@ strings:
   help_server_executable: 起動するSimutransサーバーの実行ファイルを、フォルダを含むフルパスで指定します。
   help_port: サーバーが使用するポート番号を指定します。
   help_restart_time: 毎日自動再起動する時刻を0～24で指定します。-1で無効です。
+  help_restart_enabled: 有効にすると、指定した時刻にサーバーを毎日自動再起動します。
   help_response_monitor: 有効にすると、サーバーのclients応答を常時監視します。応答失敗が指定時間続くとサーバーを強制終了します。
   help_response_timeout: サーバー起動後、clientsコマンドが正常終了するまで待機する最大時間を分で指定します。0で無効です。超過するとサーバーを強制終了します。
   help_press_space: 有効にすると、Simutransの起動開始から30秒後にスペースキーを1回送信します。Standard以外の本体では通常必要ありません。

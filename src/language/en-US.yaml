@@ -226,6 +226,7 @@ strings:
   help_server_executable: Specify the full path to the Simutrans server executable.
   help_port: Specify the port number used by the server.
   help_restart_time: Specify the daily restart time from 0 to 24; use -1 to disable.
+  help_restart_enabled: When enabled, automatically restart the server every day at the specified time.
   help_response_monitor: Monitor the server clients response and force-stop it after a sustained failure.
   help_response_timeout: Maximum wait time in minutes for the clients command after startup; 0 disables this.
   help_press_space: Send one Space key 30 seconds after Simutrans starts.

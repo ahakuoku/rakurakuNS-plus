@@ -3,7 +3,7 @@ locale: ja-JP
 language_name: 日本語
 strings:
   language_tab: Language
-  translation_accuracy_notice: 翻訳は間違っている場合があります。
+  translation_accuracy_notice: "翻訳は間違っている場合があります。\n一部のエラーメッセージでは日本語が表示されることがあります。"
   settings: 設定
   server: サーバー
   save_data: セーブデータ

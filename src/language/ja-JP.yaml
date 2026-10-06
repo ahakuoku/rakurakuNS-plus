@@ -113,10 +113,10 @@ strings:
   sve_file_required: .sveファイルを指定してください。
   confirm_restart_server: "サーバーを再起動します。\nよろしいですか？"
   select_legacy_config: インポートするconfig.pyを選択
-  legacy_import_complete: config.pyの設定を画面に反映しました。保存するとconfig.yamlが作成されます。
+  legacy_import_complete: config.pyの設定をインポートしました。保存すると反映されます。
   legacy_import_failed: "config.pyを読み込めませんでした。\n{error}"
   select_bat_settings: インポートするsetting.batを選択
-  bat_import_complete: setting.batの設定を画面に反映しました。保存するとconfig.yamlが作成されます。
+  bat_import_complete: setting.batの設定をインポートしました。保存すると反映されます。
   bat_import_failed: "setting.batを読み込めませんでした。\n{error}"
   select_rollback_save_file: ロールバック先のセーブデータを選択
   simutrans_save_data: Simutrans save data

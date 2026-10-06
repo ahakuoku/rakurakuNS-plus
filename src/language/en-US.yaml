@@ -118,10 +118,10 @@ strings:
   sve_file_required: Specify an .sve file.
   confirm_restart_server: "Restart the server.\nAre you sure?"
   select_legacy_config: Select config.py to import
-  legacy_import_complete: config.py settings were loaded. Save to create config.yaml.
+  legacy_import_complete: The settings from config.py have been imported. They will take effect upon saving.
   legacy_import_failed: "Could not read config.py.\n{error}"
   select_bat_settings: Select setting.bat to import
-  bat_import_complete: setting.bat settings were loaded. Save to create config.yaml.
+  bat_import_complete: The settings from setting.bat have been imported. They will take effect upon saving.
   bat_import_failed: "Could not read setting.bat.\n{error}"
   server_path_required: "Enter the path for {field}."
   server_path_missing: "The specified {field} does not exist."

@@ -2,7 +2,7 @@
 locale: de-DE
 language_name: Deutsch (Deutschland)
 strings:
-  language_tab: Sprache
+  language_tab: Language
   translation_accuracy_notice: "Die Übersetzung ist möglicherweise falsch.\nEinige Fehlermeldungen werden möglicherweise auf Japanisch angezeigt."
   settings: Einstellungen
   server: Server

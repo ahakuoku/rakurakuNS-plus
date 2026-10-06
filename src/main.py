@@ -988,7 +988,7 @@ class window_main(tk.Frame):
         self.nettool_button = ttk.Button(
             self, text=t('nettool_commands'), command=self.nettool_start
         )
-        self.nettool_button.grid(row=4, column=0, columnspan=2, padx=5, pady=(0, 10), sticky="ew")
+        self.nettool_button.grid(row=4, column=0, padx=5, pady=(0, 10), sticky="ew")
 
         self.settings_button = ttk.Button(self, text=t('settings'), command=self.open_settings)
         self.settings_button.grid(row=4, column=2, padx=5, pady=(0, 10), sticky="ew")

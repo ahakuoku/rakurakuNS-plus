@@ -50,6 +50,45 @@ strings:
   close_session: Close session
   rollback_data: Roll back data
   schedule_update: Schedule Simutrans application/Pak update
+  nettool_commands: nettool commands
+  send: Send
+  nettool_apply_ban_setting: Apply to BAN IP settings and reload
+  nettool_announce_warning: "This publishes the map thumbnail and connection information. Send this command?"
+  nettool_argument_required: Enter an argument.
+  nettool_company_missing: The specified company does not exist.
+  nettool_sent: 'Sent {command}.'
+  nettool_failed: 'Send failed: {error}'
+  nettool_help_announce: Publishes server information.
+  nettool_help_clients: Shows connected clients.
+  nettool_help_companies: Shows companies.
+  nettool_help_info-company: Shows information for a company.
+  nettool_help_blacklist: Shows the blacklist.
+  nettool_help_lock-company: Locks a company with a password.
+  nettool_help_unlock-company: Unlocks a company.
+  nettool_help_remove-company: Removes a company.
+  nettool_help_ban-ip: Bans an IP address.
+  nettool_help_unban-ip: Removes an IP ban.
+  nettool_help_say: Sends a server message. Two-byte characters are not recommended on Windows because they may become garbled.
+  nettool_description: Send nettool commands to administer the server. Results appear below.
+  nettool_group_information: Information and publishing
+  nettool_group_company: Company management
+  nettool_group_connection: Clients and bans
+  nettool_group_server: Server actions
+  nettool_result: Result
+  nettool_no_argument: No argument
+  nettool_company_number: Company number
+  nettool_client_number: Client number
+  nettool_ip_address: IP address
+  nettool_message: Message
+  nettool_new_password: New password
+  nettool_close: Close
+  nettool_no_output: There was no output.
+  nettool_command_failed: '{command} failed (exit code: {code}). {output}'
+  nettool_shutdown_warning: This shuts down the server. Send this command?
+  nettool_help_kick-client: Disconnects a client. Use clients to find the client number.
+  nettool_help_ban-client: Bans a client. Use clients to find the client number.
+  nettool_help_force-sync: Requests a sync so the server saves and reloads the game.
+  nettool_help_shutdown: Shuts down the server.
   exit_app: Exit Rakuraku NS+
   update_application: Update the Simutrans application
   select_application: Select the Simutrans application

@@ -2563,7 +2563,21 @@ def get_nettool_pw(output):
 def print_with_date(content):
     # 日時とcontentを表示する
     date_time = datetime.datetime.now()
-    print(date_time.strftime('[%Y/%m/%d %H:%M:%S] ' + content))
+    message = date_time.strftime('[%Y/%m/%d %H:%M:%S] ' + content)
+    try:
+        # Windowsの既定コードページでは、中国語などの翻訳ログを出力できない
+        # 場合があるため、標準出力をUTF-8へ切り替える。
+        if hasattr(sys.stdout, 'reconfigure'):
+            sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        print(message)
+    except UnicodeEncodeError:
+        # reconfigureできない出力先（テストランナー等）でも処理を止めない。
+        stream = getattr(sys.stdout, 'buffer', None)
+        if stream is not None:
+            stream.write((message + '\n').encode('utf-8', errors='replace'))
+            stream.flush()
+        else:
+            print(message.encode('utf-8', errors='replace').decode('utf-8'))
     return None
 
 def invalidate_pid_cache(target_name=None):

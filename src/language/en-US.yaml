@@ -3,7 +3,7 @@ locale: en-US
 language_name: English (US)
 strings:
   language_tab: Language
-  translation_accuracy_notice: "The translation may be incorrect.\nSome error messages may appear in Japanese.""
+  translation_accuracy_notice: "The translation may be incorrect.\nSome error messages may appear in Japanese."
   settings: Settings
   server: Server
   save_data: Save Data

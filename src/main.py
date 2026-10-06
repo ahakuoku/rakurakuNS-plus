@@ -212,8 +212,13 @@ CONFIG_DISPLAY_NAMES = {
 
 def load_config():
     global config, config_data
-    with open(config_path, 'r', encoding='utf-8') as config_file:
-        config_data = yaml.safe_load(config_file) or {}
+    if os.path.exists(config_path):
+        with open(config_path, 'r', encoding='utf-8') as config_file:
+            config_data = yaml.safe_load(config_file) or {}
+    else:
+        # 初回起動時は設定ファイルがまだ存在しないため、既定値から
+        # アプリ内の設定オブジェクトを構築する。
+        config_data = default_config_data()
     config = type('Config', (), {})()
     server = config_data.get('server', {})
     server_path = server.get('path')
@@ -3290,13 +3295,15 @@ if __name__ == "__main__":
     # GUI初期化関数の戻り値が失われた場合でも、以降の初期設定画面を表示できるようにする。
     if root is None:
         root = tk.Tk()
+    # 設定画面の初期表示でも config を参照するため、ファイルの有無に
+    # かかわらず先に設定オブジェクトを初期化する。
+    load_config()
     if not os.path.exists(config_path):
         dialog = config_window(root, first_run=True)
         root.wait_window(dialog.window)
         if not os.path.exists(config_path):
             root.destroy()
             sys.exit()
-    load_config()
     check_config()
     check_nettool()
     nettool_pw = get_nettool_pw(0)

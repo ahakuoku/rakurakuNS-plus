@@ -1,0 +1,243 @@
+# Rakuraku NS+ English UI language pack
+locale: en-US
+language_name: English (US)
+strings:
+  language_tab: Language
+  translation_accuracy_notice: "The translation may be incorrect.\nSome error messages may appear in Japanese.""
+  settings: Settings
+  server: Server
+  save_data: Save Data
+  discord: Discord
+  players: Players
+  ban_ip: Banned IPs
+  fixed_interval: Fixed interval
+  elapsed_since_last_load: Time elapsed since the last load
+  disabled: Disabled
+  unlimited: Unlimited
+  specify_days: Specify days
+  day: day(s)
+  use: Use
+  enable: Enable
+  browse: Browse...
+  show: Show
+  help: Help
+  numbered_value_per_line: number=value (one entry per line)
+  company_passwords_notice: Company passwords (company 15 and later require OTRP v59_0_2 or later)
+  show_password: Show passwords
+  company_number: Company {i}
+  save: Save
+  cancel: Cancel
+  import_legacy_config: Import a pre-v0.2.0 Rakuraku NS+ configuration
+  import_bat_settings: Import Rakuraku NS (bat version) settings
+  setting_help_title: Setting item description
+  no_description: No description is available for this item.
+  select_server_executable: Select the server executable
+  executable: Executable
+  all_files: All files
+  config_file: Configuration file
+  batch_file: Batch file
+  python_config_file: Python configuration file
+  python_file: Python file
+  import_complete: Import complete
+  import_failed: Import failed
+  input_error: Input error
+  app_name: Rakuraku NS+
+  managed_server: "Managed server: "
+  restart_server: Restart server
+  manual_save: Manual save
+  pause_server: Pause server
+  force_stop_server: Force stop server
+  close_session: Close session
+  rollback_data: Roll back data
+  schedule_update: Schedule Simutrans application/Pak update
+  exit_app: Exit Rakuraku NS+
+  update_application: Update the Simutrans application
+  select_application: Select the Simutrans application
+  update_pakset: Update the Pakset
+  select_pakset: Select the Pakset folder
+  update_datetime: Update time (YYYY/MM/DD HH:MM; omit the date for today)
+  backup_before_update: Create a long-term backup before updating
+  post_discord_notice: Post a notice to Discord
+  update_after_action: Action after update
+  restart_after_update: Restart the server after the update
+  exit_after_update: Exit Rakuraku NS+ without restarting the server after the update
+  register_schedule: Register schedule
+  update_now: Update now
+  cancel_schedule: Cancel schedule
+  confirm: Confirm
+  "yes": "Yes"
+  "no": "No"
+  input_confirmation: Input confirmation
+  registration_complete: Registration complete
+  cancellation_complete: Cancellation complete
+  resume_server: Resume server
+  config_server_executable: Server executable
+  config_port: Port
+  config_response_monitor: Server response monitoring
+  config_response_timeout: Response wait time (minutes)
+  config_restart_time: Time (hours)
+  config_restart_enabled: Use automatic restart
+  config_press_space_after_start: Press Space 30 seconds after startup
+  config_autosave_mode: Autosave mode
+  config_backup_count: Number of save backups
+  config_autosave_interval: Autosave interval (seconds)
+  config_long_term_keep_days: Long-term backup retention (days)
+  config_long_term_time: Long-term backup time
+  config_discord_enabled: Use Discord bot
+  config_autosave_notice: Announce autosaves on Discord
+  config_discord_token: Discord bot token
+  config_discord_channel: Discord channel ID
+  config_player_passwords: Player passwords
+  select_update_application: Select the Simutrans application to update
+  select_update_pakset: Select the Pakset folder to update
+  select_rollback_save_file: Select the save data for rollback
+  simutrans_save_data: Simutrans save data
+  update_kind_application_and_pak: Simutrans application and Pak
+  update_kind_application: Simutrans application
+  update_kind_pak: Pak
+  pakset_validation_title: Pakset validation
+  pakset_validation_message: This is not a Pakset. Check whether ground.Outside.pak exists and is correctly named. File names are case-sensitive.
+  invalid_update_datetime: Enter the update time as YYYY/MM/DD HH:MM or HH:MM.
+  future_datetime_required: Specify a future date and time.
+  update_registered: Update scheduled for {when}.
+  update_target_required: Select either the Simutrans application or Pakset to update.
+  update_application_required: Select the Simutrans application to update.
+  update_pakset_required: Select the Pakset folder to update.
+  confirm_update_now: Start the Simutrans application/Pak update now?
+  no_update_schedule: There is no update schedule to cancel.
+  update_schedule_cancelled: The update schedule was cancelled.
+  confirm_pause_server: "Pause the server.\nAre you sure?"
+  confirm_resume_server: "Resume the server.\nAre you sure?"
+  backup_at_maintenance_start: "Create a long-term backup of the data at the start of maintenance"
+  confirm_exit_app: "Exit Rakuraku NS+?"
+  confirm_close_session: "Close the server session and exit Rakuraku NS+?"
+  confirm_force_stop_server: "Force stop the server.\nData since the last load will be lost.\nAre you sure?"
+  confirm_manual_save: "Perform a manual save.\nThe save will start 30 seconds after the notice.\nAre you sure?"
+  rollback_save_file: Save data to roll back (.sve)
+  perform_rollback: Roll back
+  sve_file_required: Specify an .sve file.
+  confirm_restart_server: "Restart the server.\nAre you sure?"
+  select_legacy_config: Select config.py to import
+  legacy_import_complete: The settings from config.py have been imported. They will take effect upon saving.
+  legacy_import_failed: "Could not read config.py.\n{error}"
+  select_bat_settings: Select setting.bat to import
+  bat_import_complete: The settings from setting.bat have been imported. They will take effect upon saving.
+  bat_import_failed: "Could not read setting.bat.\n{error}"
+  server_path_required: "Enter the path for {field}."
+  server_path_missing: "The specified {field} does not exist."
+  integer_required: "Enter an integer for {field}."
+  value_out_of_range: "The value for {field} is out of range."
+  discord_token_required: "Enter {token} when {enabled} is enabled."
+  confirm_rollback: "Roll back the save data.\nAll work after {timestamp} will be lost.\nAre you sure?"
+  log_manual_save_notice_sent: Manual save notice sent.
+  log_saving: Saving.
+  log_save_completed: Save completed.
+  log_discord_channel_integer_required: The Discord channel setting must be an integer.
+  log_discord_channel_permission_denied: No permission to send to the specified Discord channel.
+  log_update_scheduled: Simutrans application/Pak update scheduled.
+  log_update_schedule_cancelled: Simutrans application/Pak update schedule cancelled.
+  log_scheduled_update_started: Scheduled update started.
+  log_update_completed_resume_server: Update completed. Resuming the server.
+  log_update_completed_exit_app: Update completed. Exiting without restarting the server.
+  log_application_updated: Simutrans application updated.
+  log_pakset_updated: Pakset updated.
+  log_nettool_detected: nettool detected successfully.
+  log_supported_os_confirmed: A supported operating system was confirmed.
+  log_configuration_validated: Configuration values are valid.
+  log_nettool_password_obtained: nettool password obtained.
+  log_server_not_found_for_force_stop: No server found to force stop.
+  log_force_stop_unsupported_os: This operating system cannot force stop the server.
+  log_server_force_stopped: Server force-stopped.
+  log_server_force_stop_failed: Failed to force stop the server.
+  log_company_passwords_set: Company passwords set.
+  log_space_key_sent: Space key sent.
+  log_waiting_for_simutrans: Waiting for Simutrans to respond. Please wait.
+  log_simutrans_responded: Simutrans responded. Resuming operation.
+  log_ban_users_set: BAN users configured.
+  log_deleting_old_backups: Deleting old long-term backups.
+  log_backup_deletion_skipped_unlimited: Skipping deletion because long-term backups are kept indefinitely.
+  log_old_backups_deleted: Old long-term backups deleted.
+  log_backup_started: Backing up save data.
+  log_autosave_folder_created: The autosave folder does not exist. Creating it.
+  log_backup_completed: Backup completed.
+  log_long_term_backup_disabled: Long-term backups are disabled.
+  log_creating_long_term_backup: Creating a long-term backup.
+  log_long_term_backup_created: Long-term backup created.
+  log_backup_file_missing: Backup file does not exist.
+  discord_rollback_title: Maintenance notice for save rollback
+  discord_rollback_description: "The save data will be rolled back to {timestamp}; maintenance starts now.\nWe apologize for the inconvenience and appreciate your understanding."
+  log_rollback_completed: Save data rolled back. Resuming the server.
+  log_rollback_failed: "Save rollback failed: {error}"
+  log_discord_channel_not_found: The specified Discord channel does not exist.
+  log_discord_post_failed: "Failed to send Discord notification: {error}"
+  discord_autosave_soon_title: Autosave soon.
+  discord_autosave_soon_description: Please do not enter the server until autosave is complete.
+  discord_autosave_completed_title: Autosave completed.
+  discord_autosave_completed_description: Please avoid a login rush when entering the server.
+  log_discord_token_invalid: The Discord bot token is invalid. The bot could not start.
+  log_discord_bot_start_failed: "Discord bot startup failed: {error}"
+  log_discord_bot_started: "Discord bot started: {user}"
+  log_restart_notice_sent: Restart notice sent.
+  log_maintenance_notice_sent: Maintenance notice sent.
+  log_server_close_notice_sent: Server shutdown notice sent.
+  log_restarting_notice_sent: Restart status notice sent.
+  log_maintenance_status_sent: Maintenance status notice sent.
+  log_server_closed_notice_sent: Server shutdown status notice sent.
+  log_autosave_notice_sent: Autosave notice sent.
+  log_autosaving: Autosaving.
+  log_autosave_completed: Autosave completed.
+  log_notification_send_error: "Notification send error: {error}"
+  discord_maintenance_schedule_title: Maintenance schedule notice
+  discord_maintenance_schedule_description: "Maintenance for {kind} will begin at {time} and last about five minutes."
+  log_scheduled_update_failed: "Scheduled update failed: {error}"
+  log_player_password_missing: "Setting {attribute} is undefined. No password will be set for player {player}."
+  log_discord_setting_missing: Discord bot setting is undefined. The Discord bot will not be used.
+  log_space_key_send_failed: "Failed to send the Space key: {error}"
+  log_response_timeout_force_stop: "Simutrans did not respond for {timeout} minutes; force-stopping the server."
+  log_long_term_backup_failed: "Long-term backup failed: {error}"
+  discord_restart_soon_title: Server restart soon.
+  discord_maintenance_soon_title: Maintenance soon.
+  discord_server_close_soon_title: Server shutdown soon.
+  discord_no_login_description: Please do not log in from now.
+  log_server_already_running: Server is already running.
+  log_server_starting: Starting the server.
+  log_server_down_manual_recovery: Server down detected. Place recovery data and recover manually.
+  log_server_down_restarting: Server down detected. Restarting.
+  log_server_restarted: Server restarted.
+  log_server_started: Server started.
+  log_server_resuming: Resuming the server.
+  log_server_resumed: Server resumed.
+  log_scheduled_backup_started: Scheduled backup started.
+  log_scheduled_backup_completed: Scheduled backup completed.
+  discord_maintenance_active_title: Maintenance in progress.
+  discord_maintenance_active_description: The server may be accessible during maintenance; do not enter without permission.
+  discord_server_closed_title: Server has shut down.
+  discord_server_closed_description: Thank you for participating.
+  discord_server_down_title: Server is down.
+  discord_server_down_manual_recovery: "Automatic recovery is unavailable because recovery data is missing.\nPlease wait while recovery is performed."
+  discord_server_down_auto_recovery: "The server will recover automatically. Please wait.\nData will roll back to {timestamp}."
+  discord_server_recovered_title: Server recovered.
+  discord_server_restarted_title: Server restarted.
+  discord_orderly_login_description: Please enter in an orderly manner without a login rush.
+  discord_maintenance_completed_title: Maintenance completed.
+  discord_thanks_description: Thank you for your cooperation.
+  discord_server_resumed_title: Server resumed.
+  discord_server_resumed_description: Thank you for waiting.
+  help_server_executable: Specify the full path to the Simutrans server executable.
+  help_port: Specify the port number used by the server.
+  help_restart_time: Specify the daily restart time from 0 to 24; use -1 to disable.
+  help_restart_enabled: When enabled, automatically restart the server every day at the specified time.
+  help_response_monitor: Monitor the server clients response and force-stop it after a sustained failure.
+  help_response_timeout: Maximum wait time in minutes for the clients command after startup; 0 disables this.
+  help_press_space: Send one Space key 30 seconds after Simutrans starts.
+  help_autosave_mode: Select whether autosave uses a fixed interval or elapsed time since the last load.
+  help_backup_count: Specify the number of autosave backups to retain.
+  help_autosave_interval: Specify the autosave interval in seconds; use 60 or more.
+  help_long_term_keep_days: Configure whether long-term backups are retained and for how many days.
+  help_long_term_time: Specify the time from 0 to 24 at which long-term backups run.
+  help_discord_enabled: Enable or disable use of the Discord bot.
+  help_autosave_notice: Post an autosave warning to Discord 30 seconds before autosave.
+  help_discord_token: Specify the Discord bot token.
+  help_discord_channel: Specify the channel ID where the Discord bot posts.
+  help_player_passwords: Enter a password for each company; blank companies have no password.
+  help_ban_ips: Enter one IP address per line. You can enter up to 63 addresses.

@@ -26,6 +26,7 @@ try:
         base_dir = os.path.dirname(os.path.realpath(__file__))
 
     config_path = os.path.join(base_dir, 'config.yaml')
+    language_dir = os.path.join(base_dir, 'language')
 
     if os.path.exists(config_path):
         with open(config_path, 'r', encoding='utf-8') as config_file:
@@ -41,6 +42,50 @@ except Exception:
     )
 
     sys.exit()
+
+language_code = 'en-US'
+translations = {}
+translation_aliases = {}
+
+def load_language(code='en-US'):
+    global language_code, translations, translation_aliases
+    requested = str(code or 'ja-JP')
+    path = os.path.join(language_dir, f'{requested}.yaml')
+    fallback = os.path.join(language_dir, 'ja-JP.yaml')
+    try:
+        with open(path if os.path.exists(path) else fallback, 'r', encoding='utf-8') as language_file:
+            document = yaml.safe_load(language_file) or {}
+        language_code = document.get('locale', requested)
+        translations = document.get('strings', {})
+        translation_aliases = document.get('aliases', {})
+    except (OSError, yaml.YAMLError):
+        language_code, translations, translation_aliases = 'en-US', {}, {}
+
+def t(key, **values):
+    value = translations.get(translation_aliases.get(key, key), key)
+    return value.format(**values) if values else value
+
+def available_languages():
+    """Return language choices discovered from language/*.yaml."""
+    choices = []
+    try:
+        filenames = sorted(name for name in os.listdir(language_dir) if name.endswith('.yaml'))
+    except OSError:
+        filenames = []
+    for filename in filenames:
+        path = os.path.join(language_dir, filename)
+        try:
+            with open(path, 'r', encoding='utf-8') as language_file:
+                document = yaml.safe_load(language_file) or {}
+            locale = str(document.get('locale') or os.path.splitext(filename)[0])
+            language_name = document.get('language_name')
+            if language_name:
+                choices.append((locale, str(language_name)))
+        except (OSError, yaml.YAMLError):
+            continue
+    return choices
+
+load_language(config_data.get('language', 'en-US'))
 
 try:
     import psutil
@@ -79,6 +124,7 @@ import datetime
 import platform
 import shutil
 import threading
+import queue
 import sched
 import asyncio
 import ctypes
@@ -97,26 +143,71 @@ from tkinter import ttk, filedialog, messagebox
 import array
 import tempfile
 
+# UI部品の文字列を一か所で言語パックへ接続する。既存画面の文言も
+# widget生成時に通過するため、新しい画面を追加する際の漏れを防ぐ。
+def _localized_widget_factory(widget_class):
+    def factory(*args, **kwargs):
+        if isinstance(kwargs.get('text'), str):
+            kwargs['text'] = t(kwargs['text'])
+        return widget_class(*args, **kwargs)
+    return factory
+
+for _widget_name in ('Label', 'Button', 'Checkbutton', 'Radiobutton'):
+    setattr(ttk, _widget_name, _localized_widget_factory(getattr(ttk, _widget_name)))
+
+_messagebox_functions = ('showinfo', 'showwarning', 'showerror', 'askyesno')
+for _messagebox_name in _messagebox_functions:
+    _messagebox_function = getattr(messagebox, _messagebox_name)
+    def _localized_messagebox(*args, _function=_messagebox_function, **kwargs):
+        if args:
+            args = (t(args[0]),) + tuple(t(value) if isinstance(value, str) else value for value in args[1:])
+        for _key in ('title', 'message'):
+            if isinstance(kwargs.get(_key), str):
+                kwargs[_key] = t(kwargs[_key])
+        return _function(*args, **kwargs)
+    setattr(messagebox, _messagebox_name, _localized_messagebox)
+
+for _filedialog_name in ('askopenfilename', 'askdirectory', 'asksaveasfilename'):
+    _filedialog_function = getattr(filedialog, _filedialog_name)
+    def _localized_filedialog(*args, _function=_filedialog_function, **kwargs):
+        if isinstance(kwargs.get('title'), str):
+            kwargs['title'] = t(kwargs['title'])
+        return _function(*args, **kwargs)
+    setattr(filedialog, _filedialog_name, _localized_filedialog)
+
 # 変数定義
 intents = discord.Intents.default()
 bot = discord.Client(intents=intents)
+pending_discord_notifications = []
+pending_discord_notifications_lock = threading.Lock()
+gui_log_queue = queue.Queue()
+
+# 常駐処理がGUIスレッドやOSへ細かくアクセスし続けないように、更新をまとめる。
+GUI_LOG_FLUSH_INTERVAL_MS = 100
+GUI_LOG_BATCH_SIZE = 200
+GUI_LOG_MAX_LINES = 2000
+PROCESS_SCAN_CACHE_SECONDS = 2.0
+RESPONSE_MONITOR_INTERVAL_SECONDS = 5.0
+
+_nettool_path_cache = None
+_nettool_path_lock = threading.Lock()
+_pid_cache = {}
+_pid_cache_lock = threading.Lock()
 
 CONFIG_DISPLAY_NAMES = {
-    'path': 'サーバー実行ファイル',
-    'port': 'ポート',
-    'restart_time': '自動再起動時刻',
-    'press_space_after_start': '起動30秒後にスペースキーを押す',
-    'mode': 'オートセーブモード',
-    'backup_count': 'バックアップ数',
-    'interval': 'オートセーブ間隔',
-    'long_term_keep_days': '長期バックアップ保存日数',
-    'long_term_time': '長期バックアップ実行時刻',
-    'enabled': 'Discord botの使用設定',
-    'autosave_notice': 'Discordでオートセーブを告知する',
-    'token': 'Discord botトークン',
-    'channel': 'DiscordチャンネルID',
-    'passwords': 'プレイヤーパスワード',
-    'ban_ips': 'BAN IP',
+    'path': 'config_server_executable', 'port': 'config_port',
+    'response_monitor_enabled': 'config_response_monitor',
+    'response_timeout': 'config_response_timeout',
+    'restart_time': 'config_restart_time',
+    'restart_enabled': 'config_restart_enabled',
+    'press_space_after_start': 'config_press_space_after_start',
+    'mode': 'config_autosave_mode', 'backup_count': 'config_backup_count',
+    'interval': 'config_autosave_interval',
+    'long_term_keep_days': 'config_long_term_keep_days',
+    'long_term_time': 'config_long_term_time',
+    'enabled': 'config_discord_enabled', 'autosave_notice': 'config_autosave_notice',
+    'token': 'config_discord_token', 'channel': 'config_discord_channel',
+    'passwords': 'config_player_passwords', 'ban_ips': 'ban_ip',
 }
 
 def load_config():
@@ -138,12 +229,27 @@ def load_config():
     config.server_folder_path = server_path[:separator_position] if separator_position >= 0 else ''
     config.server_name = server_path[separator_position + 1:] if separator_position >= 0 else server_path
     config.port_number = server.get('port')
+    config.response_monitor_enabled = server.get('response_monitor_enabled', 0)
+    config.response_timeout = server.get('response_timeout', 0)
     config.restart_time = server.get('restart_time')
+    runtime = config_data.get('runtime', {})
+    saved_auto_restart = runtime.get('auto_restart_enabled')
+    try:
+        restart_disabled = int(config.restart_time) == -1
+    except (TypeError, ValueError):
+        restart_disabled = False
+    config.restart_enabled = int(
+        0 if restart_disabled else
+        (config.restart_time != -1 if saved_auto_restart is None else saved_auto_restart)
+    )
     config.press_space_after_start = server.get('press_space_after_start', 0)
     autosave = config_data.get('autosave', {})
     config.autosave_mode = autosave.get('mode')
     config.autosave_backup = autosave.get('backup_count')
-    config.autosave_interval = autosave.get('interval')
+    try:
+        config.autosave_interval = int(autosave.get('interval', 1200))
+    except (TypeError, ValueError):
+        config.autosave_interval = 1200
     backup = config_data.get('backup', {})
     config.long_backup_keep = backup.get('long_term_keep_days')
     config.long_backup_time = backup.get('long_term_time')
@@ -153,14 +259,25 @@ def load_config():
         setattr(config, f'player_{i}_pw', players.get(i, players.get(str(i), '')))
         setattr(config, f'banip_{i}', ban_ips.get(i, ban_ips.get(str(i), '')))
     discord_settings = config_data.get('discord', {})
-    config.use_discord_bot = discord_settings.get('enabled', 0)
+    try:
+        config.use_discord_bot = int(discord_settings.get('enabled', 0) or 0)
+    except (TypeError, ValueError):
+        config.use_discord_bot = 0
     config.discord_token = discord_settings.get('token', '')
     config.discord_channel = discord_settings.get('channel', '')
-    config.discord_autosave_notice = discord_settings.get('autosave_notice', 0)
+    try:
+        config.discord_autosave_notice = int(discord_settings.get('autosave_notice', 0) or 0)
+    except (TypeError, ValueError):
+        config.discord_autosave_notice = 0
 
 def default_config_data():
     return {
-        'server': {'path': '', 'port': '13353', 'restart_time': -1, 'press_space_after_start': 0},
+        'language': 'en-US',
+        'server': {
+            'path': '', 'port': '13353', 'restart_time': -1,
+            'response_monitor_enabled': 0, 'response_timeout': 0,
+            'press_space_after_start': 0,
+        },
         'autosave': {'mode': 0, 'backup_count': 80, 'interval': 1200},
         'backup': {'long_term_keep_days': 0, 'long_term_time': 5},
         'players': {'passwords': {i: '' for i in range(63)}},
@@ -171,6 +288,7 @@ def default_config_data():
             'maintenance_mode': 0,
             'update_schedule': None,
             'next_autosave_at': None,
+            'auto_restart_enabled': None,
         },
     }
 
@@ -222,15 +340,32 @@ class config_window:
         self.master = master
         self.first_run = first_run
         self.window = tk.Toplevel(master)
-        self.window.title('設定')
+        self.window.title(t('settings'))
         self.window.geometry('980x620')
         self.window.protocol('WM_DELETE_WINDOW', self.close)
         self.fields = {}
+        self.long_term_keep_mode = None
+        self.long_term_keep_days_entry = None
         self.secret_entries = {'token': [], 'passwords': []}
         self.secret_visibility = {'token': tk.IntVar(value=0), 'passwords': tk.IntVar(value=0)}
         data = config_data if config_data else default_config_data()
         notebook = ttk.Notebook(self.window)
         notebook.pack(fill='both', expand=True, padx=8, pady=8)
+        language_frame = ttk.Frame(notebook)
+        notebook.add(language_frame, text=t('language_tab'))
+        ttk.Label(language_frame, text=t('language_tab')).grid(row=0, column=0, sticky='w', padx=10, pady=12)
+        # 言語名は選択中の言語で翻訳せず、各YAMLの固定表記を使う。
+        languages = available_languages()
+        self.language_var = tk.StringVar(value=config_data.get('language', 'en-US'))
+        language_box = ttk.Combobox(
+            language_frame, textvariable=self.language_var,
+            values=[f'{code} - {name}' for code, name in languages],
+            state='readonly', width=28,
+        )
+        language_box.set(next((f'{code} - {name}' for code, name in languages if code == self.language_var.get()), ''))
+        language_box.grid(row=0, column=1, sticky='w', padx=10, pady=12)
+        language_box.bind('<<ComboboxSelected>>', self.apply_language)
+        ttk.Label(language_frame, text=t('translation_accuracy_notice')).grid(row=1, column=0, columnspan=2, sticky='w', padx=10, pady=8)
         server_values = data.get('server', {})
         if 'path' not in server_values:
             folder = server_values.get('folder_path', '')
@@ -238,30 +373,92 @@ class config_window:
             separator = '\\' if '\\' in str(folder) and '/' not in str(folder) else '/'
             server_values = dict(server_values)
             server_values['path'] = f'{folder}{separator}{name}' if folder or name else ''
-        self.add_tab(notebook, 'サーバー', ['path', 'port', 'restart_time', 'press_space_after_start'], server_values)
-        self.add_tab(notebook, 'オートセーブ', ['mode', 'backup_count', 'interval'], data.get('autosave', {}))
-        self.add_tab(notebook, 'バックアップ', ['long_term_keep_days', 'long_term_time'], data.get('backup', {}))
-        self.add_tab(notebook, 'Discord', ['enabled', 'autosave_notice', 'token', 'channel'], data.get('discord', {}))
+        server_values.setdefault('response_timeout', 0)
+        server_values.setdefault('response_monitor_enabled', 0)
+        server_values['restart_enabled'] = int(getattr(config, 'restart_enabled', server_values.get('restart_time') != -1))
+        self.add_tab(
+            notebook,
+            t('server'),
+            [
+                'path', 'port', 'restart_time', 'restart_enabled', 'response_monitor_enabled',
+                'response_timeout', 'press_space_after_start',
+            ],
+            server_values,
+        )
+        save_data_values = {}
+        save_data_values.update(data.get('autosave', {}))
+        save_data_values.update(data.get('backup', {}))
+        self.add_tab(
+            notebook,
+            t('save_data'),
+            ['mode', 'backup_count', 'interval', 'long_term_keep_days', 'long_term_time'],
+            save_data_values,
+        )
+        self.add_tab(notebook, t('discord'), ['enabled', 'autosave_notice', 'token', 'channel'], data.get('discord', {}))
         self.add_password_tab(notebook, data.get('players', {}).get('passwords', {}))
-        self.add_multiline_tab(notebook, 'BAN IP', 'ban_ips', data.get('network', {}).get('ban_ips', {}))
+        self.add_multiline_tab(notebook, t('ban_ip'), 'ban_ips', data.get('network', {}).get('ban_ips', {}))
         button_frame = ttk.Frame(self.window)
         button_frame.pack(fill='x', padx=8, pady=(0, 8))
-        ttk.Button(button_frame, text='らくらくNS+ v0.2.0以前の設定ファイルをインポート', command=self.import_legacy_config).pack(side='left')
-        ttk.Button(button_frame, text='らくらくNS（bat版）の設定をインポート', command=self.import_setting_bat).pack(side='left', padx=(8, 0))
-        ttk.Button(button_frame, text='保存', style='Accent.TButton', command=self.save).pack(side='right', padx=(8, 0))
-        ttk.Button(button_frame, text='キャンセル', command=self.close).pack(side='right')
+        ttk.Button(button_frame, text=t('import_legacy_config'), command=self.import_legacy_config).pack(side='left')
+        ttk.Button(button_frame, text=t('import_bat_settings'), command=self.import_setting_bat).pack(side='left', padx=(8, 0))
+        ttk.Button(button_frame, text=t('save'), style='Accent.TButton', command=self.save).pack(side='right', padx=(8, 0))
+        ttk.Button(button_frame, text=t('cancel'), command=self.close).pack(side='right')
         self.window.transient(master)
         self.window.grab_set()
+
+    def apply_language(self, event=None):
+        """Apply a language selection immediately by rebuilding the settings UI."""
+        selected = self.language_var.get().split(' - ', 1)[0]
+        config_data['language'] = selected
+        with open(config_path, 'w', encoding='utf-8') as config_file:
+            yaml.safe_dump(config_data, config_file, allow_unicode=True, sort_keys=False)
+        load_language(selected)
+        if 'app' in globals() and app is not None:
+            app.apply_language()
+        self.window.grab_release()
+        self.window.destroy()
+        config_window(self.master, first_run=self.first_run)
 
     def add_tab(self, notebook, title, fields, values):
         frame = ttk.Frame(notebook)
         notebook.add(frame, text=title)
-        is_server_tab = title == 'サーバー'
-        is_discord_tab = title == 'Discord'
+        is_server_tab = title == t('server')
+        is_discord_tab = title == t('discord')
         if is_server_tab or is_discord_tab:
             frame.grid_columnconfigure(1, weight=1)
+        if is_server_tab:
+            frame.grid_columnconfigure(0, minsize=180)
         for row, key in enumerate(fields):
-            ttk.Label(frame, text=CONFIG_DISPLAY_NAMES[key]).grid(row=row, column=0, sticky='w', padx=10, pady=8)
+            if is_server_tab and key in ('response_monitor_enabled', 'response_timeout', 'restart_enabled', 'restart_time'):
+                if key in ('response_timeout', 'restart_time'):
+                    continue
+                paired_key = 'response_timeout' if key == 'response_monitor_enabled' else 'restart_time'
+                ttk.Label(frame, text=t(CONFIG_DISPLAY_NAMES[key])).grid(
+                    row=row, column=0, sticky='w', padx=10, pady=8
+                )
+                pair_frame = ttk.Frame(frame)
+                pair_frame.grid(row=row, column=1, columnspan=4, sticky='ew', padx=10, pady=8)
+                pair_frame.grid_columnconfigure(1, minsize=150)
+                pair_frame.grid_columnconfigure(2, weight=1)
+                variable = tk.IntVar(value=1 if int(values.get(key, 0) or 0) in (1, 2) else 0)
+                ttk.Checkbutton(
+                    pair_frame, text=t('use'), style='Switch.TCheckbutton', variable=variable
+                ).grid(row=0, column=0, sticky='w', padx=(0, 16))
+                self.fields[key] = variable
+                ttk.Label(pair_frame, text=t(CONFIG_DISPLAY_NAMES[paired_key])).grid(
+                    row=0, column=1, sticky='w', padx=(0, 8)
+                )
+                paired_entry = ttk.Entry(pair_frame, width=12)
+                paired_entry.insert(0, str(values.get(paired_key, '')))
+                paired_entry.grid(
+                    row=0, column=2, sticky='ew'
+                )
+                self.fields[paired_key] = paired_entry
+                ttk.Button(
+                    frame, text=t('help'), command=lambda k=key: self.show_help(k)
+                ).grid(row=row, column=5, padx=3, pady=6)
+                continue
+            ttk.Label(frame, text=t(CONFIG_DISPLAY_NAMES[key])).grid(row=row, column=0, sticky='w', padx=10, pady=8)
             if key == 'mode':
                 try:
                     mode = int(values.get(key, 0) or 0)
@@ -271,15 +468,43 @@ class config_window:
                 mode_frame = ttk.Frame(frame)
                 mode_frame.grid(row=row, column=1, sticky='w', padx=10, pady=8)
                 ttk.Radiobutton(
-                    mode_frame, text='一定間隔', variable=variable, value=0
+                    mode_frame, text=t('fixed_interval'), variable=variable, value=0
                 ).pack(side='left', padx=(0, 16))
                 ttk.Radiobutton(
-                    mode_frame, text='最後のロードからの経過時間', variable=variable, value=1
+                    mode_frame, text=t('elapsed_since_last_load'), variable=variable, value=1
                 ).pack(side='left')
                 self.fields[key] = variable
-            elif key in ('enabled', 'autosave_notice', 'press_space_after_start'):
+            elif key == 'long_term_keep_days':
+                try:
+                    keep_days = int(values.get(key, 0) or 0)
+                except (TypeError, ValueError):
+                    keep_days = 0
+                mode = tk.StringVar(
+                    value='disabled' if keep_days == 0 else
+                    'unlimited' if keep_days == -1 else 'days'
+                )
+                mode_frame = ttk.Frame(frame)
+                mode_frame.grid(row=row, column=1, sticky='w', padx=10, pady=8)
+                ttk.Radiobutton(
+                    mode_frame, text=t('disabled'), variable=mode, value='disabled'
+                ).pack(side='left', padx=(0, 12))
+                ttk.Radiobutton(
+                    mode_frame, text=t('unlimited'), variable=mode, value='unlimited'
+                ).pack(side='left', padx=(0, 12))
+                ttk.Radiobutton(
+                    mode_frame, text=t('specify_days'), variable=mode, value='days'
+                ).pack(side='left', padx=(0, 6))
+                days_entry = ttk.Entry(mode_frame, width=10)
+                if keep_days > 0:
+                    days_entry.insert(0, str(keep_days))
+                days_entry.pack(side='left')
+                ttk.Label(mode_frame, text=t('day')).pack(side='left', padx=(4, 0))
+                self.long_term_keep_mode = mode
+                self.long_term_keep_days_entry = days_entry
+                self.fields[key] = mode
+            elif key in ('enabled', 'autosave_notice', 'press_space_after_start', 'response_monitor_enabled', 'restart_enabled'):
                 variable = tk.IntVar(value=1 if int(values.get(key, 0) or 0) in (1, 2) else 0)
-                text = '使用する' if key == 'enabled' else '有効にする'
+                text = t('use') if key in ('enabled', 'response_monitor_enabled', 'restart_enabled') else t('enable')
                 entry = ttk.Checkbutton(frame, text=text, style='Switch.TCheckbutton', variable=variable)
                 entry.grid(row=row, column=1, sticky='w', padx=10, pady=8)
                 self.fields[key] = variable
@@ -288,23 +513,25 @@ class config_window:
                 entry.insert(0, str(values.get(key, '')))
                 entry.grid(
                     row=row, column=1,
-                    columnspan=2 if (is_server_tab and key != 'path') or (is_discord_tab and key != 'token') else 1,
+                    columnspan=3 if is_server_tab and key == 'path' else
+                    4 if is_server_tab else
+                    2 if is_discord_tab and key != 'token' else 1,
                     sticky='ew', padx=10, pady=8
                 )
                 self.fields[key] = entry
                 if key == 'path':
                     ttk.Button(
-                        frame, text='参照…', command=self.select_server_executable
-                    ).grid(row=row, column=2, padx=5, pady=8)
+                        frame, text=t('browse'), command=self.select_server_executable
+                    ).grid(row=row, column=4, padx=5, pady=8)
                 if key == 'token':
                     self.secret_entries['token'].append(entry)
                     ttk.Checkbutton(
-                        frame, text='表示', variable=self.secret_visibility['token'],
+                        frame, text=t('show'), variable=self.secret_visibility['token'],
                         style='Switch.TCheckbutton',
                         command=lambda: self.toggle_secret('token')
                     ).grid(row=row, column=2 if is_discord_tab else 3, padx=5, pady=8)
-            help_column = 3 if is_server_tab or is_discord_tab else 2
-            ttk.Button(frame, text='説明', command=lambda k=key: self.show_help(k)).grid(row=row, column=help_column, padx=5, pady=8)
+            help_column = 5 if is_server_tab else 3 if is_discord_tab else 2
+            ttk.Button(frame, text=t('help'), command=lambda k=key: self.show_help(k)).grid(row=row, column=help_column, padx=5, pady=8)
 
     def select_server_executable(self):
         """ファイル選択ダイアログでサーバー実行ファイルを指定する。"""
@@ -312,15 +539,15 @@ class config_window:
         initial_dir = os.path.dirname(current_path) if current_path else ''
         if platform.system() == 'Windows':
             filetypes = [
-                ('実行ファイル', '*.exe'),
-                ('すべてのファイル', '*.*'),
+                (t('executable'), '*.exe'),
+                (t('all_files'), '*.*'),
             ]
         else:
             # Linux/macOSの実行ファイルは拡張子を持たないことが多いため、
             # 拡張子では絞り込まず、すべてのファイルを選択対象にする。
-            filetypes = [('実行ファイル', '*')]
+            filetypes = [(t('executable'), '*')]
         path = filedialog.askopenfilename(
-            title='サーバー実行ファイルを選択',
+            title=t('select_server_executable'),
             initialdir=initial_dir if os.path.isdir(initial_dir) else None,
             filetypes=filetypes,
             parent=self.window,
@@ -332,8 +559,8 @@ class config_window:
     def add_multiline_tab(self, notebook, title, key, values):
         frame = ttk.Frame(notebook)
         notebook.add(frame, text=title)
-        ttk.Label(frame, text='番号=値（1行に1件）').pack(anchor='w', padx=10, pady=8)
-        ttk.Button(frame, text='説明', command=lambda k=key: self.show_help(k)).pack(anchor='e', padx=10)
+        ttk.Label(frame, text=t('numbered_value_per_line')).pack(anchor='w', padx=10, pady=8)
+        ttk.Button(frame, text=t('help'), command=lambda k=key: self.show_help(k)).pack(anchor='e', padx=10)
         text = tk.Text(frame, width=65, height=25)
         text.pack(fill='both', expand=True, padx=10, pady=5)
         for i in range(63):
@@ -344,15 +571,15 @@ class config_window:
 
     def add_password_tab(self, notebook, values):
         frame = ttk.Frame(notebook)
-        notebook.add(frame, text='プレイヤー')
+        notebook.add(frame, text=t('players'))
         frame.grid_rowconfigure(1, weight=1)
         frame.grid_columnconfigure(0, weight=1)
         ttk.Label(
             frame,
-            text='会社ごとのパスワード（15番以降はOTRP v59_0_2以降専用）'
+            text=t('company_passwords_notice')
         ).grid(row=0, column=0, sticky='w', padx=10, pady=8)
         ttk.Checkbutton(
-            frame, text='パスワードを表示', variable=self.secret_visibility['passwords'],
+            frame, text=t('show_password'), variable=self.secret_visibility['passwords'],
             style='Switch.TCheckbutton',
             command=lambda: self.toggle_secret('passwords')
         ).grid(row=0, column=1, sticky='w', padx=10, pady=8)
@@ -379,7 +606,7 @@ class config_window:
         for i in range(63):
             column = (i // 21) * 2
             row = (i % 21) + 1
-            ttk.Label(contents, text=f'会社 {i}').grid(row=row, column=column, sticky='w', padx=(10, 4), pady=3)
+            ttk.Label(contents, text=t('company_number', i=i)).grid(row=row, column=column, sticky='w', padx=(10, 4), pady=3)
             entry = ttk.Entry(contents, width=22, show='*')
             value = values.get(i, values.get(str(i), ''))
             entry.insert(0, str(value or ''))
@@ -389,7 +616,7 @@ class config_window:
             entry.bind('<Button-5>', lambda event: canvas.yview_scroll(1, 'units'))
             password_fields[i] = entry
             self.secret_entries['passwords'].append(entry)
-        ttk.Button(frame, text='説明', command=lambda: self.show_help('passwords')).grid(row=2, column=0, padx=10, pady=8, sticky='w')
+        ttk.Button(frame, text=t('help'), command=lambda: self.show_help('passwords')).grid(row=2, column=0, padx=10, pady=8, sticky='w')
         self.fields['passwords'] = password_fields
 
     def toggle_secret(self, key):
@@ -399,28 +626,23 @@ class config_window:
 
     def show_help(self, key):
         descriptions = {
-            'path': '起動するSimutransサーバーの実行ファイルを、フォルダを含むフルパスで指定します。',
-            'port': 'サーバーが使用するポート番号を指定します。',
-            'restart_time': '毎日自動再起動する時刻を0～24で指定します。-1で無効です。',
-            'press_space_after_start': '有効にすると、Simutransの起動開始から30秒後にスペースキーを1回送信します。Standard以外の本体では通常必要ありません。',
-            'mode': 'オートセーブのモードを選択します。「一定間隔」は指定した間隔ごとに、「最後のロードからの経過時間」は最後にロードしてから指定した時間が経過した時点でオートセーブします。',
-            'backup_count': 'オートセーブのバックアップ保存数を指定します。',
-            'interval': 'オートセーブの間隔を秒で指定します。60以上を指定してください。',
-            'long_term_keep_days': '長期バックアップの保存日数です。0で無効、-1で無期限です。',
-            'long_term_time': '長期バックアップを実行する時刻を0～24で指定します。',
-            'enabled': 'Discord botを使用するか切り替えます。オンにすると有効です。',
-            'autosave_notice': '有効にすると、オートセーブ開始30秒前の予告をDiscordに投稿します。Discord botの使用設定が有効な場合に利用できます。なお、Discordの通知が非常に多くなるため利用は推奨しません。',
-            'token': 'Discord botのトークンを指定します。',
-            'channel': 'Discord botが書き込むチャンネルIDを指定します。',
-            'passwords': '会社番号ごとのパスワードを入力します。空欄の会社にはパスワードを設定しません。',
-            'ban_ips': '番号=IPアドレスの形式で入力します。1行に1件、番号は0～62です。',
+            'path': 'help_server_executable', 'port': 'help_port',
+            'restart_time': 'help_restart_time', 'restart_enabled': 'help_restart_enabled',
+            'response_monitor_enabled': 'help_response_monitor',
+            'response_timeout': 'help_response_timeout', 'press_space_after_start': 'help_press_space',
+            'mode': 'help_autosave_mode', 'backup_count': 'help_backup_count',
+            'interval': 'help_autosave_interval', 'long_term_keep_days': 'help_long_term_keep_days',
+            'long_term_time': 'help_long_term_time', 'enabled': 'help_discord_enabled',
+            'autosave_notice': 'help_autosave_notice', 'token': 'help_discord_token',
+            'channel': 'help_discord_channel', 'passwords': 'help_player_passwords',
+            'ban_ips': 'help_ban_ips',
         }
-        messagebox.showinfo('設定項目の説明', descriptions.get(key, 'この項目の説明はありません。'), parent=self.window)
+        messagebox.showinfo(t('setting_help_title'), t(descriptions.get(key, 'no_description')), parent=self.window)
 
     def import_legacy_config(self):
         path = filedialog.askopenfilename(
-            title='インポートするconfig.pyを選択',
-            filetypes=[('Python設定ファイル', 'config.py'), ('Pythonファイル', '*.py')],
+            title=t('select_legacy_config'),
+            filetypes=[(t('python_config_file'), 'config.py'), (t('python_file'), '*.py')],
             parent=self.window,
         )
         if not path:
@@ -455,11 +677,34 @@ class config_window:
                 'channel': getattr(legacy, 'discord_channel', ''),
             }
             for key, value in values.items():
-                if key in ('enabled', 'autosave_notice', 'press_space_after_start'):
+                if key == 'mode':
+                    # mode is represented by radio buttons backed by IntVar.
+                    self.fields[key].set(1 if int(value or 0) == 1 else 0)
+                elif key == 'long_term_keep_days':
+                    try:
+                        keep_days = int(value or 0)
+                    except (TypeError, ValueError):
+                        keep_days = 0
+                    self.long_term_keep_mode.set(
+                        'disabled' if keep_days == 0 else
+                        'unlimited' if keep_days == -1 else 'days'
+                    )
+                    self.long_term_keep_days_entry.delete(0, 'end')
+                    if keep_days > 0:
+                        self.long_term_keep_days_entry.insert(0, str(keep_days))
+                elif key in ('enabled', 'autosave_notice', 'press_space_after_start'):
                     self.fields[key].set(1 if int(value or 0) in (1, 2) else 0)
                 else:
                     self.fields[key].delete(0, 'end')
                     self.fields[key].insert(0, str(value))
+            try:
+                restart_disabled = int(self.fields['restart_time'].get()) == -1
+            except (TypeError, ValueError):
+                restart_disabled = False
+            if restart_disabled:
+                self.fields['restart_enabled'].set(0)
+                self.fields['restart_time'].delete(0, 'end')
+                self.fields['restart_time'].insert(0, '0')
             for i in range(63):
                 value = getattr(legacy, f'player_{i}_pw', '')
                 self.fields['passwords'][i].delete(0, 'end')
@@ -470,14 +715,14 @@ class config_window:
                 value = getattr(legacy, f'banip_{i}', '')
                 if value not in ('', None):
                     text.insert('end', f'{i}={value}\n')
-            messagebox.showinfo('インポート完了', 'config.pyの設定を画面に反映しました。保存するとconfig.yamlが作成されます。', parent=self.window)
+            messagebox.showinfo(t('import_complete'), t('legacy_import_complete'), parent=self.window)
         except Exception as error:
-            messagebox.showerror('インポート失敗', f'config.pyを読み込めませんでした。\n{error}', parent=self.window)
+            messagebox.showerror(t('import_failed'), t('legacy_import_failed', error=error), parent=self.window)
 
     def import_setting_bat(self):
         path = filedialog.askopenfilename(
-            title='インポートするsetting.batを選択',
-            filetypes=[('設定ファイル', 'setting.bat'), ('バッチファイル', '*.bat')],
+            title=t('select_bat_settings'),
+            filetypes=[(t('config_file'), 'setting.bat'), (t('batch_file'), '*.bat')],
             parent=self.window,
         )
         if not path:
@@ -534,17 +779,34 @@ class config_window:
                 address = settings.get(f'ban_address_{i}', '')
                 if address:
                     ban_text.insert('end', f'{i - 1}={address}\n')
-            messagebox.showinfo('インポート完了', 'setting.batの設定を画面に反映しました。保存するとconfig.yamlが作成されます。', parent=self.window)
+            messagebox.showinfo(t('import_complete'), t('bat_import_complete'), parent=self.window)
         except Exception as error:
-            messagebox.showerror('インポート失敗', f'setting.batを読み込めませんでした。\n{error}', parent=self.window)
+            messagebox.showerror(t('import_failed'), t('bat_import_failed', error=error), parent=self.window)
 
     def save(self):
         data = default_config_data()
+        data['language'] = self.language_var.get().split(' - ', 1)[0]
         # 設定画面にない内部状態を保持する。
         data['runtime'] = config_data.get('runtime', data['runtime'])
+        try:
+            restart_disabled = int(self.fields['restart_time'].get()) == -1
+        except (TypeError, ValueError):
+            restart_disabled = False
+        if restart_disabled:
+            self.fields['restart_enabled'].set(0)
+        data['runtime']['auto_restart_enabled'] = self.fields['restart_enabled'].get()
         for key in ('server', 'autosave', 'backup', 'discord'):
             for name in data[key]:
-                data[key][name] = self.fields[name].get()
+                if name == 'long_term_keep_days':
+                    mode = self.long_term_keep_mode.get()
+                    if mode == 'disabled':
+                        data[key][name] = 0
+                    elif mode == 'unlimited':
+                        data[key][name] = -1
+                    else:
+                        data[key][name] = self.long_term_keep_days_entry.get()
+                else:
+                    data[key][name] = self.fields[name].get()
         for i, entry in self.fields['passwords'].items():
             data['players']['passwords'][i] = entry.get()
         for line in self.fields['ban_ips'].get('1.0', 'end').splitlines():
@@ -554,27 +816,29 @@ class config_window:
                     data['network']['ban_ips'][int(index)] = value
         error = self.validate_config_data(data)
         if error:
-            messagebox.showerror('入力エラー', error, parent=self.window)
+            messagebox.showerror(t('input_error'), error, parent=self.window)
             return
         with open(config_path, 'w', encoding='utf-8') as config_file:
             yaml.safe_dump(data, config_file, allow_unicode=True, sort_keys=False)
         # 保存直後にYAMLを読み込み直し、アプリ内の設定も更新する。
         load_config()
         if not self.first_run:
-            check_config()
-            app.server_name_label.config(text='管理対象のサーバー：' + config.server_name)
+            check_config(initialize_runtime=False)
+            app.server_name_label.config(text=t('managed_server') + config.server_name)
         self.close()
 
     def validate_config_data(self, data):
         server_path = str(data['server']['path']).strip()
         if not server_path:
-            return f'「{CONFIG_DISPLAY_NAMES["path"]}」のパスを入力してください。'
+            return t('server_path_required', field=t(CONFIG_DISPLAY_NAMES['path']))
         if not os.path.isfile(server_path):
-            return f'指定された「{CONFIG_DISPLAY_NAMES["path"]}」が存在しません。'
+            return t('server_path_missing', field=t(CONFIG_DISPLAY_NAMES['path']))
 
         integer_rules = (
             ('server.port', data['server']['port'], 0, 65535),
             ('server.restart_time', data['server']['restart_time'], -1, 24),
+            ('server.response_monitor_enabled', data['server']['response_monitor_enabled'], 0, 1),
+            ('server.response_timeout', data['server']['response_timeout'], 0, None),
             ('server.press_space_after_start', data['server']['press_space_after_start'], 0, 1),
             ('autosave.mode', data['autosave']['mode'], 0, 1),
             ('autosave.backup_count', data['autosave']['backup_count'], 1, None),
@@ -585,20 +849,20 @@ class config_window:
             ('discord.autosave_notice', data['discord']['autosave_notice'], 0, 1),
         )
         for name, value, minimum, maximum in integer_rules:
-            display_name = CONFIG_DISPLAY_NAMES[name.split('.')[-1]]
+            display_name = t(CONFIG_DISPLAY_NAMES[name.split('.')[-1]])
             try:
                 number = int(value)
             except (TypeError, ValueError):
-                return f'設定「{display_name}」には整数を入力してください。'
+                return t('integer_required', field=display_name)
             if number < minimum or (maximum is not None and number > maximum):
-                return f'設定「{display_name}」の値が範囲外です。'
+                return t('value_out_of_range', field=display_name)
         if int(data['discord']['enabled']) in (1, 2):
             if not str(data['discord']['token']).strip():
-                return f'{CONFIG_DISPLAY_NAMES["enabled"]}を有効にする場合は、{CONFIG_DISPLAY_NAMES["token"]}を入力してください。'
+                return t('discord_token_required', enabled=t(CONFIG_DISPLAY_NAMES['enabled']), token=t(CONFIG_DISPLAY_NAMES['token']))
             try:
                 int(data['discord']['channel'])
             except (TypeError, ValueError):
-                return f'設定「{CONFIG_DISPLAY_NAMES["channel"]}」には整数を入力してください。'
+                return t('integer_required', field=t(CONFIG_DISPLAY_NAMES['channel']))
         return None
 
     def close(self):
@@ -611,60 +875,116 @@ class window_main(tk.Frame):
         global os_type
         super().__init__(master)
         self.grid(row=0, column=0, sticky="nsew")
-        self.master.title("らくらくNS+")
+        self.master.title(t('app_name'))
         self.master.resizable(False, False)
         if os_type == "Linux":
-            self.master.geometry("550x370")
+            self.master.geometry("680x370")
         else:
-            self.master.geometry("550x330")
+            self.master.geometry("680x330")
         self.maintenance_mode = 0  # メンテナンスモードの状態（0:通常, 1:メンテナンス中）
         self.create_widgets()
+        self.after(GUI_LOG_FLUSH_INTERVAL_MS, self.flush_gui_log_queue)
+
+    def flush_gui_log_queue(self):
+        """WorkerスレッドのログをまとめてTkへ反映する。"""
+        messages = []
+        for _ in range(GUI_LOG_BATCH_SIZE):
+            try:
+                messages.append(gui_log_queue.get_nowait())
+            except queue.Empty:
+                break
+
+        if messages:
+            self._log_text_insert_batch(messages)
+
+        # 大量のログが来ても1回のコールバックでGUIを占有し続けない。
+        delay = 0 if not gui_log_queue.empty() else GUI_LOG_FLUSH_INTERVAL_MS
+        self.after(delay, self.flush_gui_log_queue)
 
     def create_widgets(self):
         # Gridの設定
         self.master.grid_rowconfigure(0, weight=1)
         self.master.grid_columnconfigure(0, weight=1)
+        for column in range(4):
+            self.grid_columnconfigure(column, weight=1, uniform="main_buttons")
+        self.grid_rowconfigure(1, weight=1)
 
         # GUIの配置
-        self.server_name_label = ttk.Label(self, text="管理対象のサーバー：" + config.server_name, anchor="w")
+        self.server_name_label = ttk.Label(self, text=t('managed_server') + config.server_name, anchor="w")
         self.server_name_label.grid(row=0, column=0, columnspan=4, sticky="w")
 
-        self.log_text = tk.Text(self, width=40, height=10, wrap="word")
+        # ログ欄とスクロールバーを専用フレームに収め、5列目にはみ出さないようにする。
+        self.log_frame = ttk.Frame(self)
+        self.log_frame.grid(row=1, column=0, columnspan=4, sticky="nsew")
+        self.log_frame.grid_columnconfigure(0, weight=1)
+        self.log_frame.grid_rowconfigure(0, weight=1)
+
+        self.log_text = tk.Text(self.log_frame, width=40, height=10, wrap="word")
         self.log_text.configure(state="disabled")
-        self.log_text.grid(row=1, column=0, columnspan=4, sticky="nsew")
+        self.log_text.grid(row=0, column=0, sticky="nsew")
         
-        self.scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.log_text.yview)
-        self.scrollbar.grid(row=1, column=4, sticky="ns")
+        self.scrollbar = ttk.Scrollbar(self.log_frame, orient="vertical", command=self.log_text.yview)
+        self.scrollbar.grid(row=0, column=1, sticky="ns")
         self.log_text.config(yscrollcommand=self.scrollbar.set)
 
-        self.restart_button = ttk.Button(self, text="サーバー再起動", command=self.server_restart_check_start)
-        self.restart_button.grid(row=2, column=0, padx=5, pady=10, sticky="w")
+        self.restart_button = ttk.Button(self, text=t('restart_server'), command=self.server_restart_check_start)
+        self.restart_button.grid(row=2, column=0, padx=5, pady=10, sticky="ew")
+
+        self.manual_save_button = ttk.Button(self, text=t('manual_save'), command=self.manual_save_start)
+        self.manual_save_button.grid(row=2, column=1, padx=5, pady=10, sticky="ew")
 
         # メンテナンスモードボタン
         self.maintenance_mode_button = ttk.Button(
-            self, text="サーバーを一時停止", command=self.maintenance_check_start
+            self, text=t('pause_server'), command=self.maintenance_check_start
         )
-        self.maintenance_mode_button.grid(row=2, column=1, padx=5, pady=10, sticky="w")
+        self.maintenance_mode_button.grid(row=2, column=2, padx=5, pady=10, sticky="ew")
 
-        self.server_stop_button = ttk.Button(self, text="会期終了", command=self.server_close_check_start)
-        self.server_stop_button.grid(row=2, column=2, padx=5, pady=10, sticky="w")
+        self.server_force_stop_button = ttk.Button(
+            self,
+            text=t('force_stop_server'),
+            style="Danger.TButton",
+            command=self.server_force_stop_check_start,
+        )
+        self.server_force_stop_button.grid(row=2, column=3, padx=5, pady=10, sticky="ew")
 
-        self.exit_button = ttk.Button(self, text="らくらくNS+を終了", style='Accent.TButton', command=self.exit_check_start)
-        self.exit_button.grid(row=2, column=3, padx=5, pady=10, sticky="w")
+        self.server_stop_button = ttk.Button(self, text=t('close_session'), command=self.server_close_check_start)
+        self.server_stop_button.grid(row=3, column=3, padx=5, pady=(0, 10), sticky="ew")
+
+        self.rollback_button = ttk.Button(
+            self, text=t('rollback_data'), command=self.rollback_start
+        )
+        self.rollback_button.grid(row=3, column=2, padx=5, pady=(0, 10), sticky="ew")
 
         self.update_schedule_button = ttk.Button(
-            self, text="本体・Pakの更新をスケジュール", command=self.update_schedule_start
+            self, text=t('schedule_update'), command=self.update_schedule_start
         )
-        self.update_schedule_button.grid(row=3, column=0, columnspan=3, padx=5, pady=(0, 10), sticky="ew")
+        self.update_schedule_button.grid(row=3, column=0, columnspan=2, padx=5, pady=(0, 10), sticky="ew")
 
-        self.settings_button = ttk.Button(self, text="設定", command=self.open_settings)
-        self.settings_button.grid(row=3, column=3, padx=5, pady=(0, 10), sticky="ew")
+        self.settings_button = ttk.Button(self, text=t('settings'), command=self.open_settings)
+        self.settings_button.grid(row=4, column=2, padx=5, pady=(0, 10), sticky="ew")
+
+        self.exit_button = ttk.Button(self, text=t('exit_app'), style='Accent.TButton', command=self.exit_check_start)
+        self.exit_button.grid(row=4, column=3, padx=5, pady=(0, 10), sticky="ew")
 
     def open_settings(self):
         if hasattr(self, "newWindow") and self.newWindow.winfo_exists():
             self.newWindow.lift()
             return
         self.newWindow = config_window(self.master).window
+
+    def apply_language(self):
+        """Refresh the already-open main window after a language change."""
+        self.master.title(t('app_name'))
+        self.server_name_label.config(text=t('managed_server') + config.server_name)
+        self.restart_button.config(text=t('restart_server'))
+        self.manual_save_button.config(text=t('manual_save'))
+        self.server_force_stop_button.config(text=t('force_stop_server'))
+        self.server_stop_button.config(text=t('close_session'))
+        self.rollback_button.config(text=t('rollback_data'))
+        self.update_schedule_button.config(text=t('schedule_update'))
+        self.settings_button.config(text=t('settings'))
+        self.exit_button.config(text=t('exit_app'))
+        self.update_maintenance_button()
 
     def update_schedule_start(self):
         if hasattr(self, "newWindow") and self.newWindow.winfo_exists():
@@ -673,6 +993,22 @@ class window_main(tk.Frame):
         self.newWindow = tk.Toplevel(self.master)
         self.newWindow.grab_set()
         update_schedule_window(self.newWindow)
+
+    def rollback_start(self):
+        if hasattr(self, "newWindow") and self.newWindow.winfo_exists():
+            self.newWindow.lift()
+            return
+        self.newWindow = tk.Toplevel(self.master)
+        self.newWindow.grab_set()
+        rollback_window(self.newWindow, self)
+
+    def rollback_execute(self, save_path, timestamp):
+        self.rollback_button.config(state="disabled")
+        threading.Thread(
+            target=rollback_server,
+            args=(save_path, timestamp),
+            daemon=True,
+        ).start()
 
     def server_restart_check_start(self):
         # 確認ダイアログを開く
@@ -683,6 +1019,34 @@ class window_main(tk.Frame):
         self.newWindow = tk.Toplevel(self.master)
         self.newWindow.grab_set()
         server_restart_check(self.newWindow)
+
+    def manual_save_start(self):
+        # 手動セーブの確認ダイアログを開く
+        if hasattr(self, "newWindow") and self.newWindow.winfo_exists():
+            self.newWindow.lift()
+            return
+
+        self.newWindow = tk.Toplevel(self.master)
+        self.newWindow.grab_set()
+        manual_save_check(self.newWindow, self)
+
+    def manual_save_execute(self):
+        """確認後、告知して30秒待機した手動セーブを実行する。"""
+        if hasattr(self, "manual_save_thread") and self.manual_save_thread.is_alive():
+            return
+
+        self.manual_save_button.config(state="disabled")
+        self.manual_save_thread = threading.Thread(
+            target=self.manual_save_threaded,
+            daemon=True,
+        )
+        self.manual_save_thread.start()
+
+    def manual_save_threaded(self):
+        try:
+            manual_save()
+        finally:
+            self.after(0, lambda: self.manual_save_button.config(state="normal"))
 
     def exit_check_start(self):
         # 確認ダイアログを開く
@@ -714,13 +1078,23 @@ class window_main(tk.Frame):
         self.newWindow.grab_set()
         maintenance_check(self.newWindow, self)  # 自分自身を渡す
 
+    def server_force_stop_check_start(self):
+        # サーバー強制終了の確認ダイアログを開く
+        if hasattr(self, "newWindow") and self.newWindow.winfo_exists():
+            self.newWindow.lift()
+            return
+
+        self.newWindow = tk.Toplevel(self.master)
+        self.newWindow.grab_set()
+        server_force_stop_check(self.newWindow)
+
     def update_maintenance_button(self):
             if self.maintenance_mode == 0:
-                text = "サーバーを一時停止"
+                text = t('pause_server')
             elif self.maintenance_mode == 1:
-                text = "サーバーを再開"
+                text = t('resume_server')
             elif self.maintenance_mode == 2:
-                text = "サーバーを再開"
+                text = t('resume_server')
 
             self.maintenance_mode_button.config(text=text)
             self.maintenance_mode_button.update_idletasks()
@@ -751,13 +1125,23 @@ class window_main(tk.Frame):
         persist_runtime_state()
 
     def log_text_insert(self, content):
-        # 他スレッドからも呼び出せる安全な方法
-        self.master.after(0, self._log_text_insert, content)
+        # 呼び出し元に関係なくキューへ入れ、GUI更新回数を抑える。
+        gui_log_queue.put(content)
 
     def _log_text_insert(self, content):
+        self._log_text_insert_batch([content])
+
+    def _log_text_insert_batch(self, messages):
         # 実際にTkinterのUIを更新する処理（必ずメインスレッドで実行）
         self.log_text.configure(state="normal")
-        self.log_text.insert('end', content + '\n')
+        self.log_text.insert('end', '\n'.join(messages) + '\n')
+
+        # 長時間運用時もTextウィジェットの再描画コストが増え続けないようにする。
+        line_count = int(self.log_text.index('end-1c').split('.')[0])
+        excess_lines = line_count - GUI_LOG_MAX_LINES - 1
+        if excess_lines > 0:
+            self.log_text.delete('1.0', f'{excess_lines + 1}.0')
+
         self.log_text.configure(state="disabled")
         self.log_text.see("end")
 
@@ -765,7 +1149,7 @@ class update_schedule_window(tk.Frame):
     def __init__(self, master):
         super().__init__(master)
         self.master = master
-        self.master.title("本体・Pakの更新をスケジュール")
+        self.master.title(t('schedule_update'))
         # 下部の通知設定・操作ボタンが画面外へ出ないよう、内容に合わせて高さを確保する
         self.master.geometry("620x500")
         self.master.minsize(620, 500)
@@ -783,38 +1167,38 @@ class update_schedule_window(tk.Frame):
         self.pak_path = tk.StringVar()
         self.time_var = tk.StringVar(value=datetime.datetime.now().strftime('%Y/%m/%d %H:%M'))
 
-        ttk.Checkbutton(self.master, text="本体を更新する", style='Switch.TCheckbutton', variable=self.body_var).grid(row=0, column=0, padx=10, pady=8, sticky='w')
+        ttk.Checkbutton(self.master, text=t('update_application'), style='Switch.TCheckbutton', variable=self.body_var).grid(row=0, column=0, padx=10, pady=8, sticky='w')
         ttk.Entry(self.master, textvariable=self.body_path, width=55).grid(row=1, column=0, padx=10, sticky='w')
-        ttk.Button(self.master, text="本体ファイルを選択", command=self.choose_body).grid(row=1, column=1, padx=5)
+        ttk.Button(self.master, text=t('select_application'), command=self.choose_body).grid(row=1, column=1, padx=5)
 
-        ttk.Checkbutton(self.master, text="Paksetを更新する", style='Switch.TCheckbutton', variable=self.pak_var).grid(row=2, column=0, padx=10, pady=8, sticky='w')
+        ttk.Checkbutton(self.master, text=t('update_pakset'), style='Switch.TCheckbutton', variable=self.pak_var).grid(row=2, column=0, padx=10, pady=8, sticky='w')
         ttk.Entry(self.master, textvariable=self.pak_path, width=55).grid(row=3, column=0, padx=10, sticky='w')
-        ttk.Button(self.master, text="Paksetフォルダを選択", command=self.choose_pak).grid(row=3, column=1, padx=5)
+        ttk.Button(self.master, text=t('select_pakset'), command=self.choose_pak).grid(row=3, column=1, padx=5)
 
-        ttk.Label(self.master, text="更新日時（YYYY/MM/DD HH:MM、日付省略時は当日）").grid(row=4, column=0, padx=10, pady=(15, 2), sticky='w')
+        ttk.Label(self.master, text=t('update_datetime')).grid(row=4, column=0, padx=10, pady=(15, 2), sticky='w')
         ttk.Entry(self.master, textvariable=self.time_var, width=25).grid(row=5, column=0, padx=10, sticky='w')
-        ttk.Checkbutton(self.master, text="更新直前のセーブデータを長期バックアップする", style='Switch.TCheckbutton', variable=self.backup_var).grid(row=6, column=0, padx=10, pady=12, sticky='w')
-        ttk.Checkbutton(self.master, text="Discordに予告を投稿", style='Switch.TCheckbutton', variable=self.discord_notice_var).grid(row=7, column=0, padx=10, pady=4, sticky='w')
-        ttk.Label(self.master, text="更新後の動作").grid(row=8, column=0, padx=10, pady=(8, 2), sticky='w')
-        ttk.Radiobutton(self.master, text="更新完了後、サーバーを再起動する", variable=self.restart_server_var, value=1).grid(row=9, column=0, padx=25, sticky='w')
-        ttk.Radiobutton(self.master, text="更新完了後、サーバーの再起動をせずにらくらくNS+を終了する", variable=self.restart_server_var, value=0).grid(row=10, column=0, padx=25, sticky='w')
+        ttk.Checkbutton(self.master, text=t('backup_before_update'), style='Switch.TCheckbutton', variable=self.backup_var).grid(row=6, column=0, padx=10, pady=12, sticky='w')
+        ttk.Checkbutton(self.master, text=t('post_discord_notice'), style='Switch.TCheckbutton', variable=self.discord_notice_var).grid(row=7, column=0, padx=10, pady=4, sticky='w')
+        ttk.Label(self.master, text=t('update_after_action')).grid(row=8, column=0, padx=10, pady=(8, 2), sticky='w')
+        ttk.Radiobutton(self.master, text=t('restart_after_update'), variable=self.restart_server_var, value=1).grid(row=9, column=0, padx=25, sticky='w')
+        ttk.Radiobutton(self.master, text=t('exit_after_update'), variable=self.restart_server_var, value=0).grid(row=10, column=0, padx=25, sticky='w')
         button_frame = ttk.Frame(self.master)
         button_frame.grid(row=11, column=0, columnspan=3, padx=10, pady=5, sticky='w')
-        ttk.Button(button_frame, text="スケジュール登録", style='Accent.TButton', command=self.register).pack(side='left', padx=(0, 5))
-        ttk.Button(button_frame, text="今すぐ更新する", command=self.update_now).pack(side='left', padx=5)
-        ttk.Button(button_frame, text="スケジュールをキャンセル", command=self.cancel_schedule).pack(side='left', padx=5)
-        ttk.Button(button_frame, text="キャンセル", command=self.close_window).pack(side='left', padx=(20, 5))
+        ttk.Button(button_frame, text=t('register_schedule'), style='Accent.TButton', command=self.register).pack(side='left', padx=(0, 5))
+        ttk.Button(button_frame, text=t('update_now'), command=self.update_now).pack(side='left', padx=5)
+        ttk.Button(button_frame, text=t('cancel_schedule'), command=self.cancel_schedule).pack(side='left', padx=5)
+        ttk.Button(button_frame, text=t('cancel'), command=self.close_window).pack(side='left', padx=(20, 5))
 
     def choose_body(self):
-        path = filedialog.askopenfilename(title="更新する本体ファイルを選択")
+        path = filedialog.askopenfilename(title=t('select_update_application'))
         if path:
             self.body_path.set(path)
 
     def choose_pak(self):
-        path = filedialog.askdirectory(title="更新するPaksetフォルダを選択")
+        path = filedialog.askdirectory(title=t('select_update_pakset'))
         if path:
             if not os.path.isfile(os.path.join(path, 'ground.Outside.pak')):
-                messagebox.showerror("Pakset確認", "これはPaksetではありません。ground.Outside.pakがあるかどうか、名前は正しいかどうかをご確認ください。（ファイル名は大文字と小文字を区別します。）", parent=self.master)
+                messagebox.showerror(t('pakset_validation_title'), t('pakset_validation_message'), parent=self.master)
                 return
             self.pak_path.set(path)
 
@@ -828,25 +1212,25 @@ class update_schedule_window(tk.Frame):
                 raw = datetime.datetime.now().strftime('%Y/%m/%d ') + raw
             when = datetime.datetime.strptime(raw, '%Y/%m/%d %H:%M')
         except ValueError:
-            messagebox.showerror("入力確認", "更新日時は YYYY/MM/DD HH:MM または HH:MM で入力してください。", parent=self.master)
+            messagebox.showerror(t('input_confirmation'), t('invalid_update_datetime'), parent=self.master)
             return
         if when <= datetime.datetime.now():
-            messagebox.showerror("入力確認", "未来の日時を指定してください。", parent=self.master)
+            messagebox.showerror(t('input_confirmation'), t('future_datetime_required'), parent=self.master)
             return
         body, pak = update_data
         schedule_update(when, body, pak, self.backup_var.get(), self.discord_notice_var.get(), self.restart_server_var.get())
-        messagebox.showinfo("登録完了", when.strftime('%Y/%m/%d %H:%M') + " に更新します。", parent=self.master)
+        messagebox.showinfo(t('registration_complete'), t('update_registered', when=when.strftime('%Y/%m/%d %H:%M')), parent=self.master)
         self.close_window()
 
     def validate_update_inputs(self):
         if not self.body_var.get() and not self.pak_var.get():
-            messagebox.showwarning("入力確認", "本体またはPaksetのどちらかを更新する設定にしてください。", parent=self.master)
+            messagebox.showwarning(t('input_confirmation'), t('update_target_required'), parent=self.master)
             return None
         if self.body_var.get() and not os.path.isfile(self.body_path.get()):
-            messagebox.showerror("入力確認", "更新する本体ファイルを選択してください。", parent=self.master)
+            messagebox.showerror(t('input_confirmation'), t('update_application_required'), parent=self.master)
             return None
         if self.pak_var.get() and (not os.path.isdir(self.pak_path.get()) or not os.path.isfile(os.path.join(self.pak_path.get(), 'ground.Outside.pak'))):
-            messagebox.showerror("入力確認", "更新するPaksetフォルダを選択してください。", parent=self.master)
+            messagebox.showerror(t('input_confirmation'), t('update_pakset_required'), parent=self.master)
             return None
         return (self.body_path.get() if self.body_var.get() else None,
                 self.pak_path.get() if self.pak_var.get() else None)
@@ -855,7 +1239,7 @@ class update_schedule_window(tk.Frame):
         update_data = self.validate_update_inputs()
         if update_data is None:
             return
-        if not messagebox.askyesno("確認", "今すぐ本体・Pakの更新を開始しますか？", parent=self.master):
+        if not messagebox.askyesno(t('confirm'), t('confirm_update_now'), parent=self.master):
             return
         body, pak = update_data
         threading.Thread(target=execute_scheduled_update, args=({
@@ -866,9 +1250,9 @@ class update_schedule_window(tk.Frame):
 
     def cancel_schedule(self):
         if not cancel_scheduled_update():
-            messagebox.showinfo("確認", "キャンセルする更新スケジュールはありません。", parent=self.master)
+            messagebox.showinfo(t('confirm'), t('no_update_schedule'), parent=self.master)
             return
-        messagebox.showinfo("キャンセル完了", "更新スケジュールをキャンセルしました。", parent=self.master)
+        messagebox.showinfo(t('cancellation_complete'), t('update_schedule_cancelled'), parent=self.master)
         self.close_window()
 
     def close_window(self):
@@ -881,7 +1265,7 @@ class maintenance_check(tk.Frame):
         super().__init__(master)
         self.master = master  # 既存のToplevelを受け取る
         self.main_window = main_window  # メインウィンドウの参照
-        self.master.title("らくらくNS+")
+        self.master.title(t('app_name'))
         self.master.resizable(False, False)
         mode = self.main_window.maintenance_mode
         os_system = platform.system()
@@ -900,13 +1284,13 @@ class maintenance_check(tk.Frame):
 
         # 状態ごとにメッセージを変更
         if mode == 0:
-            text = "サーバーを一時中断します。\nよろしいですか？"
+            text = t('confirm_pause_server')
 
         elif mode == 1:
-            text = "サーバーを再開します。\nよろしいですか？"
+            text = t('confirm_resume_server')
 
         elif mode == 2:
-            text = "サーバーを再開します。\nよろしいですか？"
+            text = t('confirm_resume_server')
 
         self.label = ttk.Label(self.master, text=text)
         self.label.pack(padx=10, pady=10, fill="both", expand=True)
@@ -916,7 +1300,7 @@ class maintenance_check(tk.Frame):
 
         self.exit_button = ttk.Button(
             button_frame,
-            text="はい",
+            text=t('yes'),
             style='Accent.TButton',
             command=self.maintenance_mode_check
         )
@@ -924,7 +1308,7 @@ class maintenance_check(tk.Frame):
 
         self.cancel_button = ttk.Button(
             button_frame,
-            text="いいえ",
+            text=t('no'),
             command=self.close_window
         )
         self.cancel_button.pack(side="right", padx=5, expand=True)
@@ -934,7 +1318,7 @@ class maintenance_check(tk.Frame):
         if mode == 0:
             self.switch = ttk.Checkbutton(
                 self.master,
-                text="メンテナンス開始時点のデータを\n長期バックアップする",
+                text=t('backup_at_maintenance_start'),
                 style="Switch.TCheckbutton",
                 variable=self.long_backup_var
             )
@@ -979,7 +1363,7 @@ class exit_check(tk.Frame):
     def __init__(self, master):
         super().__init__(master)
         self.master = master  # 既存のToplevelを受け取る
-        self.master.title("らくらくNS+")
+        self.master.title(t('app_name'))
         self.master.resizable(False, False)
         self.master.geometry("250x120")
         self.master.protocol('WM_DELETE_WINDOW', self.close_window)
@@ -988,16 +1372,16 @@ class exit_check(tk.Frame):
 
     def create_widgets(self):
         # ダイアログのウィジェットを配置
-        self.label = ttk.Label(self.master, text="らくらくNS+を終了します。\nよろしいですか？")
+        self.label = ttk.Label(self.master, text=t('confirm_exit_app'))
         self.label.pack(padx=10, pady=10, fill="both", expand=True)
 
         button_frame = ttk.Frame(self.master)
         button_frame.pack(pady=10, fill="x")
 
-        self.exit_button = ttk.Button(button_frame, text="はい", style='Accent.TButton', command=self.exit_app)
+        self.exit_button = ttk.Button(button_frame, text=t('yes'), style='Accent.TButton', command=self.exit_app)
         self.exit_button.pack(side="left", padx=5, expand=True)
 
-        self.cancel_button = ttk.Button(button_frame, text="いいえ", command=self.close_window)
+        self.cancel_button = ttk.Button(button_frame, text=t('no'), command=self.close_window)
         self.cancel_button.pack(side="right", padx=5, expand=True)
 
     def close_window(self):
@@ -1014,7 +1398,7 @@ class server_close_check(tk.Frame):
     def __init__(self, master):
         super().__init__(master)
         self.master = master  # 既存のToplevelを受け取る
-        self.master.title("らくらくNS+")
+        self.master.title(t('app_name'))
         self.master.resizable(False, False)
         self.master.geometry("320x120")
         self.master.protocol('WM_DELETE_WINDOW', self.close_window)
@@ -1023,16 +1407,16 @@ class server_close_check(tk.Frame):
 
     def create_widgets(self):
         # ダイアログのウィジェットを配置
-        self.label = ttk.Label(self.master, text="サーバー会期を終了し、らくらくNS+を終了します。\nよろしいですか？")
+        self.label = ttk.Label(self.master, text=t('confirm_close_session'))
         self.label.pack(padx=10, pady=10, fill="both", expand=True)
 
         button_frame = ttk.Frame(self.master)
         button_frame.pack(pady=10, fill="x")
 
-        self.exit_button = ttk.Button(button_frame, text="はい", style='Accent.TButton', command=self.exit_server)
+        self.exit_button = ttk.Button(button_frame, text=t('yes'), style='Accent.TButton', command=self.exit_server)
         self.exit_button.pack(side="left", padx=5, expand=True)
 
-        self.cancel_button = ttk.Button(button_frame, text="いいえ", command=self.close_window)
+        self.cancel_button = ttk.Button(button_frame, text=t('no'), command=self.close_window)
         self.cancel_button.pack(side="right", padx=5, expand=True)
 
     def close_window(self):
@@ -1055,12 +1439,190 @@ class server_close_check(tk.Frame):
         self.master.master.quit()
         self.master.master.destroy()
 
+class server_force_stop_check(tk.Frame):
+    # サーバー強制終了確認ダイアログウィンドウ
+    def __init__(self, master):
+        super().__init__(master)
+        self.master = master
+        self.master.title(t('app_name'))
+        self.master.resizable(False, False)
+        self.master.geometry("430x140")
+        self.master.protocol('WM_DELETE_WINDOW', self.close_window)
+
+        self.create_widgets()
+
+    def create_widgets(self):
+        self.label = ttk.Label(
+            self.master,
+            text=t('confirm_force_stop_server'),
+        )
+        self.label.pack(padx=10, pady=10, fill="both", expand=True)
+
+        button_frame = ttk.Frame(self.master)
+        button_frame.pack(pady=10, fill="x")
+
+        self.force_stop_button = ttk.Button(
+            button_frame,
+            text=t('yes'),
+            style='Accent.TButton',
+            command=self.force_stop_server,
+        )
+        self.force_stop_button.pack(side="left", padx=5, expand=True)
+
+        self.cancel_button = ttk.Button(
+            button_frame, text=t('no'), command=self.close_window
+        )
+        self.cancel_button.pack(side="right", padx=5, expand=True)
+
+    def close_window(self):
+        self.master.destroy()
+
+    def force_stop_server(self):
+        force_stop_thread = threading.Thread(
+            target=force_stop_server,
+            daemon=True,
+        )
+        force_stop_thread.start()
+        self.master.destroy()
+
+class manual_save_check(tk.Frame):
+    # 手動セーブ確認ダイアログウィンドウ
+    def __init__(self, master, app):
+        super().__init__(master)
+        self.master = master
+        self.app = app
+        self.master.title(t('app_name'))
+        self.master.resizable(False, False)
+        self.master.geometry("320x160")
+        self.master.protocol('WM_DELETE_WINDOW', self.close_window)
+
+        self.create_widgets()
+
+    def create_widgets(self):
+        self.label = ttk.Label(
+            self.master,
+            text=t('confirm_manual_save'),
+        )
+        self.label.pack(padx=10, pady=10, fill="both", expand=True)
+
+        button_frame = ttk.Frame(self.master)
+        button_frame.pack(pady=10, fill="x")
+
+        self.save_button = ttk.Button(
+            button_frame,
+            text=t('yes'),
+            style='Accent.TButton',
+            command=self.start_save,
+        )
+        self.save_button.pack(side="left", padx=5, expand=True)
+
+        self.cancel_button = ttk.Button(
+            button_frame,
+            text=t('no'),
+            command=self.close_window,
+        )
+        self.cancel_button.pack(side="right", padx=5, expand=True)
+
+    def close_window(self):
+        self.master.destroy()
+
+    def start_save(self):
+        self.app.manual_save_execute()
+        self.close_window()
+
+class rollback_window(tk.Frame):
+    """ロールバック対象のセーブデータを選択する画面。"""
+    def __init__(self, master, app):
+        super().__init__(master)
+        self.master = master
+        self.app = app
+        self.master.title(t('rollback_data'))
+        self.master.resizable(False, False)
+        self.master.geometry("610x150")
+        self.master.protocol('WM_DELETE_WINDOW', self.close_window)
+        self.path_var = tk.StringVar()
+
+        ttk.Label(self.master, text=t('rollback_save_file')).pack(
+            padx=10, pady=(10, 4), anchor="w"
+        )
+        path_frame = ttk.Frame(self.master)
+        path_frame.pack(fill="x", padx=10)
+        ttk.Entry(path_frame, textvariable=self.path_var, width=60).pack(
+            side="left", fill="x", expand=True
+        )
+        ttk.Button(path_frame, text=t('browse'), command=self.choose_file).pack(
+            side="right", padx=(5, 0)
+        )
+        button_frame = ttk.Frame(self.master)
+        button_frame.pack(fill="x", padx=10, pady=12)
+        ttk.Button(
+            button_frame, text=t('perform_rollback'), style="Danger.TButton",
+            command=self.confirm
+        ).pack(side="left", expand=True, padx=5)
+        ttk.Button(button_frame, text=t('cancel'), command=self.close_window).pack(
+            side="right", expand=True, padx=5
+        )
+
+    def choose_file(self):
+        path = filedialog.askopenfilename(
+            title=t('select_rollback_save_file'),
+            filetypes=[(t('simutrans_save_data'), "*.sve"), (t('all_files'), "*.*")],
+            initialdir=server_folder_path,
+            parent=self.master,
+        )
+        if path:
+            self.path_var.set(path)
+
+    def confirm(self):
+        path = self.path_var.get().strip()
+        if not path or not os.path.isfile(path) or not path.lower().endswith('.sve'):
+            messagebox.showerror(t('input_confirmation'), t('sve_file_required'), parent=self.master)
+            return
+        timestamp = datetime.datetime.fromtimestamp(os.path.getctime(path)).strftime('%Y/%m/%d %H:%M:%S')
+        message = t('confirm_rollback', timestamp=timestamp)
+        if messagebox.askyesno(t('confirm'), message, parent=self.master):
+            self.app.rollback_execute(path, timestamp)
+            self.close_window()
+
+    def close_window(self):
+        self.master.destroy()
+
+def rollback_server(save_path, timestamp):
+    """通知、停止、現行データのバックアップ、置換、再起動を行う。"""
+    global start_code
+    try:
+        nettool_say('Maintenance soon.')
+        discord_post(
+            t('discord_rollback_title'),
+            t('discord_rollback_description', timestamp=timestamp.rsplit(' ', 1)[-1]),
+            0xff0000,
+        )
+        time.sleep(30)
+        nettool_forcesync()
+        subprocess.run(
+            [run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'shutdown'],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        deadline = time.time() + 60
+        while get_pid(config.server_name) is not None and time.time() < deadline:
+            time.sleep(1)
+        if get_pid(config.server_name) is not None:
+            raise RuntimeError('Simutransの終了を確認できませんでした。')
+
+        long_backup(1)
+        shutil.copy2(save_path, os.path.join(server_folder_path, server_save))
+        print_gui_log(t('log_rollback_completed'))
+        start_code = 7
+    except Exception as error:
+        print_gui_log(t('log_rollback_failed', error=error))
+        start_code = 6
+
 class server_restart_check(tk.Frame):
     # 確認ダイアログウィンドウ
     def __init__(self, master):
         super().__init__(master)
         self.master = master  # 既存のToplevelを受け取る
-        self.master.title("らくらくNS+")
+        self.master.title(t('app_name'))
         self.master.resizable(False, False)
         self.master.geometry("250x120")
         self.master.protocol('WM_DELETE_WINDOW', self.close_window)
@@ -1069,16 +1631,16 @@ class server_restart_check(tk.Frame):
 
     def create_widgets(self):
         # ダイアログのウィジェットを配置
-        self.label = ttk.Label(self.master, text="サーバーを再起動します。\nよろしいですか？")
+        self.label = ttk.Label(self.master, text=t('confirm_restart_server'))
         self.label.pack(padx=10, pady=10, fill="both", expand=True)
 
         button_frame = ttk.Frame(self.master)
         button_frame.pack(pady=10, fill="x")
 
-        self.exit_button = ttk.Button(button_frame, text="はい", style='Accent.TButton', command=self.restart_server)
+        self.exit_button = ttk.Button(button_frame, text=t('yes'), style='Accent.TButton', command=self.restart_server)
         self.exit_button.pack(side="left", padx=5, expand=True)
 
-        self.cancel_button = ttk.Button(button_frame, text="いいえ", command=self.close_window)
+        self.cancel_button = ttk.Button(button_frame, text=t('no'), command=self.close_window)
         self.cancel_button.pack(side="right", padx=5, expand=True)
 
     def close_window(self):
@@ -1121,6 +1683,8 @@ def gui_main(create_app=True):
     root.tk.call("source", resource_path("azure.tcl"))
     root.tk.call("set_theme", "light")
 
+    ttk.Style(root).configure("Danger.TButton", foreground="#d13438")
+
     root.grid_rowconfigure(0, weight=1)
     root.grid_columnconfigure(0, weight=1)
 
@@ -1140,6 +1704,26 @@ def restart_server_threaded(set_code):
     thread = threading.Thread(target=server_stop, args=(set_code, 0))
     thread.start()
 
+def discord_is_enabled():
+    """Treat YAML values such as 1 and \"1\" as enabled."""
+    try:
+        return int(getattr(config, 'use_discord_bot', 0) or 0) in (1, 2)
+    except (TypeError, ValueError):
+        return False
+
+def manual_save():
+    """告知して30秒待機した後、サーバーを停止せずにセーブする。"""
+    post_autosave_notice()
+    nettool_say('Autosave soon.')
+    print_gui_log(t('log_manual_save_notice_sent'))
+    time.sleep(30)
+
+    print_gui_log(t('log_saving'))
+    nettool_forcesync()
+    set_company_pw()
+    post_autosave_completed()
+    print_gui_log(t('log_save_completed'))
+
 # 関数定義（Discord関連）
 async def send_notification(
     title,
@@ -1147,7 +1731,7 @@ async def send_notification(
     color=0x00ff00
 ):
 
-    if config.use_discord_bot not in (1, 2):
+    if not discord_is_enabled():
         return
 
     try:
@@ -1160,11 +1744,7 @@ async def send_notification(
 
         # チャンネル取得失敗
         if channel is None:
-
-            print_gui_log(
-                '指定されたDiscordのチャンネルはありません。'
-            )
-
+            print_with_date(t('log_discord_channel_not_found'))
             return
 
         embed = discord.Embed(
@@ -1176,45 +1756,57 @@ async def send_notification(
         await channel.send(embed=embed)
 
     except ValueError:
-        print_gui_log('設定「discord_channel」には整数を入力してください。')
+        print_with_date(t('log_discord_channel_integer_required'))
 
     except discord.errors.Forbidden:
-        print_gui_log('指定されたDiscordのチャンネルへの送信権限がありません。')
+        print_with_date(t('log_discord_channel_permission_denied'))
 
     except Exception as e:
-        print_gui_log(f'Discordへの通知送信中にエラーが発生しました: {e}')
+        print_with_date(t('log_discord_post_failed', error=e))
 
 def discord_post(title, description, color=0x00ff00):
-    if config.use_discord_bot in (1, 2):
-        coro = send_notification(title, description, color)
-        future = asyncio.run_coroutine_threadsafe(coro, bot.loop)
+    if not discord_is_enabled():
+        return
+    if not bot.is_ready():
+        with pending_discord_notifications_lock:
+            pending_discord_notifications.append((title, description, color))
+        return
+    try:
+        future = asyncio.run_coroutine_threadsafe(
+            send_notification(title, description, color), bot.loop
+        )
+    except RuntimeError as error:
+        print_with_date(t('log_notification_send_error', error=error))
+        return
+
+    def report_failure(completed_future):
         try:
-            future.result(timeout=10)
-        except Exception as e:
-            print_with_date(f"通知送信エラー: {e}")
+            completed_future.result()
+        except Exception as error:
+            print_with_date(t('log_notification_send_error', error=error))
+
+    future.add_done_callback(report_failure)
 
 def post_autosave_notice():
     """設定が有効な場合だけ、オートセーブ予告をDiscordへ送信する。"""
-    if getattr(config, 'discord_autosave_notice', 0) in (1, 2):
+    if str(getattr(config, 'discord_autosave_notice', 0)).strip() in ('1', '2'):
         discord_post(
-            'まもなくオートセーブです。',
-            'オートセーブ完了まで、サーバーに入らないでください。',
+            t('discord_autosave_soon_title'), t('discord_autosave_soon_description'),
             0xffbf00,
         )
 
 def post_autosave_completed():
     """設定が有効な場合だけ、オートセーブ完了をDiscordへ送信する。"""
-    if getattr(config, 'discord_autosave_notice', 0) in (1, 2):
+    if str(getattr(config, 'discord_autosave_notice', 0)).strip() in ('1', '2'):
         discord_post(
-            'オートセーブが完了しました。',
-            'サーバーに入る際は、過度なログインラッシュのないようにお願いします。',
+            t('discord_autosave_completed_title'), t('discord_autosave_completed_description'),
             0x00ff00,
         )
 
 # Bot用のスレッドターゲット
 def run_discord_bot():
 
-    if config.use_discord_bot not in (1, 2):
+    if not discord_is_enabled():
         return
 
     try:
@@ -1223,35 +1815,41 @@ def run_discord_bot():
     except discord.errors.LoginFailure:
 
         print_gui_log(
-            'Discordのbotのトークンが不正です。'
-            'Discordのbotを起動できませんでした。'
+            t('log_discord_token_invalid')
         )
 
     except Exception as e:
 
         print_gui_log(
-            f'Discordのbotを起動中にエラーが発生しました: {e}'
+            t('log_discord_bot_start_failed', error=e)
         )
 
 @bot.event
 async def on_ready():
-    if config.use_discord_bot in (1, 2):
-            print_gui_log(f'Discordのbotを起動しました。: {bot.user}')
+    if discord_is_enabled():
+            print_with_date(t('log_discord_bot_started', user=bot.user))
 
             channel = bot.get_channel(
                 int(config.discord_channel)
             )
 
             if channel is None:
-                print_gui_log('指定されたDiscordのチャンネルはありません。')
+                print_with_date(t('log_discord_channel_not_found'))
+
+            with pending_discord_notifications_lock:
+                pending = list(pending_discord_notifications)
+                pending_discord_notifications.clear()
+            for title, description, color in pending:
+                await send_notification(title, description, color)
 
 # 関数定義（一般）
 
 def start_threads():
     threading.Thread(target=monitoring, daemon=True).start()
+    threading.Thread(target=monitor_server_response, daemon=True).start()
     threading.Thread(target=autosave, daemon=True).start()
     threading.Thread(target=auto_restart, daemon=True).start()
-    if config.use_discord_bot in (1, 2):
+    if discord_is_enabled():
         threading.Thread(target=run_discord_bot, daemon=True).start()
     threading.Thread(target=auto_long_backup, daemon=True).start()
     threading.Thread(target=scheduled_update_loop, daemon=True).start()
@@ -1272,14 +1870,14 @@ def schedule_update(when, body_source, pak_source, long_backup_code, discord_not
     persist_runtime_state()
     if discord_notice_code:
         if body_source and pak_source:
-            update_kind = '本体・Pak更新'
+            update_kind = t('update_kind_application_and_pak')
         elif body_source:
-            update_kind = '本体更新'
+            update_kind = t('update_kind_application')
         else:
-            update_kind = 'Pak更新'
+            update_kind = t('update_kind_pak')
         time_text = when.strftime('%H:%M') if when.date() == datetime.datetime.now().date() else when.strftime('%Y/%m/%d %H:%M')
-        discord_post('メンテナンス開始時刻のお知らせ', f'{update_kind}のため、{time_text}より5分ほどメンテナンスを行います。', 0xffbf00)
-    print_gui_log('本体・Pakの更新をスケジュールしました。')
+        discord_post(t('discord_maintenance_schedule_title'), t('discord_maintenance_schedule_description', kind=update_kind, time=time_text), 0xffbf00)
+    print_gui_log(t('log_update_scheduled'))
 
 def cancel_scheduled_update():
     """登録済みの更新スケジュールを取り消す。取り消せた場合はTrueを返す。"""
@@ -1289,7 +1887,7 @@ def cancel_scheduled_update():
             return False
         scheduled_updates = None
     persist_runtime_state()
-    print_gui_log('本体・Pakの更新スケジュールをキャンセルしました。')
+    print_gui_log(t('log_update_schedule_cancelled'))
     return True
 
 def scheduled_update_loop():
@@ -1309,7 +1907,7 @@ def scheduled_update_loop():
 def execute_scheduled_update(item):
     global start_code
     try:
-        print_gui_log('スケジュールされた更新を開始します。')
+        print_gui_log(t('log_scheduled_update_started'))
         # 既存の停止処理で同期・バックアップ・サーバー停止を行う
         server_stop(3, item['backup'])
         time.sleep(2)
@@ -1317,20 +1915,20 @@ def execute_scheduled_update(item):
         if item.get('restart_server', 1):
             # 監視ループに通常起動を依頼する
             start_code = 2
-            print_gui_log('更新が完了しました。サーバーを再開します。')
+            print_gui_log(t('log_update_completed_resume_server'))
         else:
             # 監視ループがサーバーを起動しないようにしてからGUIを終了する。
             start_code = 8
-            print_gui_log('更新が完了しました。サーバーを再起動せず、らくらくNS+を終了します。')
+            print_gui_log(t('log_update_completed_exit_app'))
             app.master.after(0, app.master.destroy)
     except Exception as e:
-        print_gui_log(f'スケジュール更新に失敗しました: {e}')
+        print_gui_log(t('log_scheduled_update_failed', error=e))
         start_code = 2
 
 def replace_update_files(body_source, pak_source):
     if body_source:
         shutil.copy2(body_source, server_path)
-        print_gui_log('本体を更新しました。')
+        print_gui_log(t('log_application_updated'))
     if pak_source:
         target = os.path.join(server_folder_path, 'pakset')
         os.makedirs(target, exist_ok=True)
@@ -1343,7 +1941,7 @@ def replace_update_files(body_source, pak_source):
                 shutil.copytree(src, dst)
             else:
                 shutil.copy2(src, dst)
-        print_gui_log('Paksetを更新しました。')
+        print_gui_log(t('log_pakset_updated'))
 
 def resource_path(filename):
     # pyinstaller対策
@@ -1374,7 +1972,7 @@ def check_nettool():
         )
         sys.exit()
 
-    print_with_date('nettoolの認識に成功しました。')
+    print_with_date(t('log_nettool_detected'))
 
     return None
 
@@ -1382,14 +1980,14 @@ def check_os():
     # 実行OSがWindows、Mac、Linuxのいずれかであることを確認する
     os_system = platform.system()
     if os_system == 'Windows' or os_system == 'Linux' or os_system == 'Darwin':
-        print_with_date('動作可能OSであることを確認しました。')
+        print_with_date(t('log_supported_os_confirmed'))
     else:
         keywait = input(f'らくらくNS+はお使いのOSには対応していません。らくらくNS+はWindows、Mac、Linuxに対応しています。\n（らくらくNS+を終了します。Enterキーを押してください。）')
         sys.exit()
     return os_system
 
 # 初期化・設定チェック
-def check_config():
+def check_config(initialize_runtime=True):
     global server_folder_path
     global server_path
     global server_save
@@ -1493,10 +2091,7 @@ def check_config():
         if not hasattr(config, attr_name):
             setattr(config, attr_name, '')
             if i < 15:
-                print_with_date(
-                    f'設定「{attr_name}」が定義されていません。'
-                    f'プレイヤー{i}にパスワードはかけません。'
-                )
+                print_with_date(t('log_player_password_missing', attribute=attr_name, player=i))
 
     # ====================================================
     # IPBANユーザー
@@ -1691,6 +2286,44 @@ def check_config():
         sys.exit()
 
     # ====================================================
+    # response_monitor_enabled
+    # ====================================================
+
+    try:
+        response_monitor_enabled = int(getattr(config, 'response_monitor_enabled', 0))
+
+        if response_monitor_enabled not in (0, 1):
+            raise ValueError
+
+    except (NameError, ValueError, TypeError):
+        input(
+            '設定「response_monitor_enabled」に不正な値が設定されています。'
+            '0または1を入力してください。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
+        sys.exit()
+    config.response_monitor_enabled = response_monitor_enabled
+
+    # ====================================================
+    # response_timeout
+    # ====================================================
+
+    try:
+        response_timeout = int(getattr(config, 'response_timeout', 0))
+
+        if response_timeout < 0:
+            raise ValueError
+
+    except (NameError, ValueError, TypeError):
+        input(
+            '設定「response_timeout」に不正な値が設定されています。'
+            '0以上の整数（分）を入力してください。0で無効です。\n'
+            '（らくらくNS+を終了します。Enterキーを押してください。）'
+        )
+        sys.exit()
+    config.response_timeout = response_timeout
+
+    # ====================================================
     # autosave_backup
     # ====================================================
 
@@ -1784,10 +2417,7 @@ def check_config():
 
     if not hasattr(config, 'use_discord_bot'):
         config.use_discord_bot = 0
-        print_with_date(
-            '設定「use_discord_bot」が定義されていません。'
-            'Discordのbotは使用しません。'
-        )
+        print_with_date(t('log_discord_setting_missing'))
 
     try:
         use_discord_bot = int(config.use_discord_bot)
@@ -1826,19 +2456,20 @@ def check_config():
     long_backup_folder_path = long_backup_folder_path.replace('\\', '/')
 
     # ====================================================
-    # 初期変数
+    # 初期変数（起動時のみ。設定保存時は監視状態を維持する）
     # ====================================================
 
-    start_code = 0
-    exit_code = 0
-    nettool_pw = 0
+    if initialize_runtime:
+        start_code = 0
+        exit_code = 0
+        nettool_pw = 0
 
-    scheduler = sched.scheduler(time.time, time.sleep)
-    scheduler_running = False
+        scheduler = sched.scheduler(time.time, time.sleep)
+        scheduler_running = False
 
-    server_ip = '127.0.0.1:'
+        server_ip = '127.0.0.1:'
 
-    print_with_date('設定に正常な値が入力されていることを確認しました。')
+    print_with_date(t('log_configuration_validated'))
 
     return None
 
@@ -1876,30 +2507,39 @@ def convert_to_time(hour):
     return time(0, 0, 0)
 
 def run_nettool():
-    # Windows
-    if platform.system() == 'Windows':
+    global _nettool_path_cache
 
-        # PyInstaller実行時
-        if getattr(sys, 'frozen', False):
+    if _nettool_path_cache is not None:
+        return _nettool_path_cache
 
-            internal_path = resource_path('nettool.exe')
+    with _nettool_path_lock:
+        # 複数の常駐スレッドが同時に初回呼び出しをしても、準備は1回だけ行う。
+        if _nettool_path_cache is not None:
+            return _nettool_path_cache
 
-            # 一時フォルダへコピー
-            temp_dir = tempfile.gettempdir()
-            external_path = os.path.join(temp_dir, 'nettool.exe')
+        # Windows
+        if platform.system() == 'Windows':
 
-            # 上書きコピー
-            shutil.copy2(internal_path, external_path)
+            # PyInstaller実行時
+            if getattr(sys, 'frozen', False):
 
-            return external_path
+                internal_path = resource_path('nettool.exe')
 
-        # 通常Python実行時
+                # 一時フォルダへのコピーは起動中に1回だけ行う。
+                temp_dir = tempfile.gettempdir()
+                external_path = os.path.join(temp_dir, 'nettool.exe')
+                shutil.copy2(internal_path, external_path)
+                _nettool_path_cache = external_path
+
+            # 通常Python実行時
+            else:
+                _nettool_path_cache = resource_path('nettool.exe')
+
+        # Linux/macOS
         else:
-            return resource_path('nettool.exe')
+            _nettool_path_cache = 'nettool'
 
-    # Linux/macOS
-    else:
-        return 'nettool'
+        return _nettool_path_cache
 
 def get_nettool_pw(output):
     # simuconf.tabを開き、「server_admin_pw」から始まる行を検索
@@ -1915,9 +2555,9 @@ def get_nettool_pw(output):
     nettool_password_tmp2 = re.sub('^server_admin_pw( *= *)', '', nettool_password_tmp)
     nettool_password = nettool_password_tmp2.rstrip('\n')
     if output == 0:
-        print_with_date('nettoolのパスワード取得に成功しました。')
+        print_with_date(t('log_nettool_password_obtained'))
     else:
-        print_gui_log('nettoolのパスワード取得に成功しました。')
+        print_gui_log(t('log_nettool_password_obtained'))
     return nettool_password
 
 def print_with_date(content):
@@ -1926,9 +2566,24 @@ def print_with_date(content):
     print(date_time.strftime('[%Y/%m/%d %H:%M:%S] ' + content))
     return None
 
-def get_pid(target_name):
+def invalidate_pid_cache(target_name=None):
+    """サーバーを起動・停止した直後にプロセス検索結果を破棄する。"""
+    with _pid_cache_lock:
+        if target_name is None:
+            _pid_cache.clear()
+        else:
+            _pid_cache.pop(target_name, None)
+
+def get_pid(target_name, use_cache=True):
 
     # 指定したプロセスのPIDを取得し、ゾンビプロセスがあれば回収する。
+
+    now = time.monotonic()
+    if use_cache:
+        with _pid_cache_lock:
+            cached = _pid_cache.get(target_name)
+        if cached is not None and now - cached[0] < PROCESS_SCAN_CACHE_SECONDS:
+            return cached[1]
 
     target_pid = None
 
@@ -1952,12 +2607,42 @@ def get_pid(target_name):
 
                 # 3. 正常に動作しているプロセスを見つけた場合
                 target_pid = proc.info['pid']
+                break
                 
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             # 権限がないプロセスや、途中で消えたプロセスは無視
             continue
 
+    with _pid_cache_lock:
+        _pid_cache[target_name] = (now, target_pid)
     return target_pid
+
+def force_stop_server():
+    """サーバーのPIDを指定して強制終了する。"""
+    server_pid = get_pid(config.server_name, use_cache=False)
+    if server_pid is None:
+        print_gui_log(t('log_server_not_found_for_force_stop'))
+        return None
+
+    if platform.system() == 'Windows':
+        command = ['taskkill', '/PID', str(server_pid), '/F']
+    elif platform.system() in ('Linux', 'Darwin'):
+        command = ['kill', '-KILL', str(server_pid)]
+    else:
+        print_gui_log(t('log_force_stop_unsupported_os'))
+        return None
+
+    result = subprocess.run(
+        command,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    if result.returncode == 0:
+        invalidate_pid_cache(config.server_name)
+        print_gui_log(t('log_server_force_stopped'))
+    else:
+        print_gui_log(t('log_server_force_stop_failed'))
+    return None
 
 def set_company_pw():
     # パスワードを設定する
@@ -1965,8 +2650,9 @@ def set_company_pw():
     for i in range(63):
         company_id = str(i)
         company_pw = getattr(config, f'player_{i}_pw', '')
-        nettool_lockcompany(company_id, company_pw)
-    print_gui_log('会社にパスワードを設定しました。')
+        if company_pw:
+            nettool_lockcompany(company_id, company_pw)
+    print_gui_log(t('log_company_passwords_set'))
 
 def app_start():
     # Simutransを起動する
@@ -1978,6 +2664,8 @@ def app_start():
         process = subprocess.Popen([server_path, '-server', config.port_number, '-fps', '30', '-nomidi', '-nosound', '-load', launch_save], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
     else:
         return None
+
+    invalidate_pid_cache(config.server_name)
 
     if int(getattr(config, 'press_space_after_start', 0)) == 1:
         space_timer = threading.Timer(30, press_space_key)
@@ -1997,9 +2685,9 @@ def press_space_key():
             subprocess.run(['xdotool', 'key', 'space'], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         elif os_system == 'Darwin':
             subprocess.run(['osascript', '-e', 'tell application "System Events" to key code 49'], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        print_gui_log('Simutrans起動から30秒後にスペースキーを送信しました。')
+        print_gui_log(t('log_space_key_sent'))
     except Exception as error:
-        print_gui_log(f'スペースキーの送信に失敗しました: {error}')
+        print_gui_log(t('log_space_key_send_failed', error=error))
 
 def nettool_say(content):
     # contentにはASCII文字以外を入れないこと（文字化け対策）
@@ -2010,15 +2698,55 @@ def nettool_say(content):
 def wait_simutrans_responce():
     # Simutransの応答を待つ
     global nettool_pw
-    print_gui_log('Simutransの応答を待っています。しばらくお待ちください。')
+    print_gui_log(t('log_waiting_for_simutrans'))
     while True:
         result = subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'clients'], encoding='utf-8', stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
         if result.returncode == 0:
-            print_gui_log('Simutransが応答しました。処理を再開します。')
+            print_gui_log(t('log_simutrans_responded'))
             break
         time.sleep(1)
 
+def monitor_server_response():
+    """有効時、サーバーの応答を常時監視し、無応答が続けば強制終了する。"""
+    global nettool_pw
+    unresponsive_since = None
+    while True:
+        try:
+            response_timeout = int(config.response_timeout)
+        except (AttributeError, TypeError, ValueError):
+            response_timeout = 0
+        response_monitor_enabled = int(getattr(config, 'response_monitor_enabled', 0))
+
+        # 無効時はプロセス一覧も外部ツールも調べない。
+        if response_monitor_enabled == 0 or response_timeout <= 0 or start_code in (3, 6, 8):
+            unresponsive_since = None
+            time.sleep(RESPONSE_MONITOR_INTERVAL_SECONDS)
+            continue
+
+        server_pid = get_pid(config.server_name)
+        if server_pid is None:
+            unresponsive_since = None
+            time.sleep(RESPONSE_MONITOR_INTERVAL_SECONDS)
+            continue
+
+        result = subprocess.run(
+            [run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'clients'],
+            encoding='utf-8', stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
+        )
+        if result.returncode == 0:
+            unresponsive_since = None
+        else:
+            if unresponsive_since is None:
+                unresponsive_since = time.monotonic()
+            elif time.monotonic() - unresponsive_since >= response_timeout * 60:
+                print_gui_log(t('log_response_timeout_force_stop', timeout=response_timeout))
+                force_stop_server()
+                unresponsive_since = None
+        time.sleep(RESPONSE_MONITOR_INTERVAL_SECONDS)
+
 def nettool_lockcompany(company_id, company_pw):
+    if not company_pw:
+        return
     # クラッシュ対策（存在しない会社にパスワードをかけるとクラッシュする）
     result = subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'info-company', company_id], capture_output=True, text=True, encoding='utf-8')
     # Nothing received.の後は改行が必要
@@ -2043,16 +2771,16 @@ def set_ban_user():
     for i in range(63):
         banip = getattr(config, f'banip_{i}', '')
         nettool_banip(banip)
-    print_gui_log('BANユーザーを設定しました。')
+    print_gui_log(t('log_ban_users_set'))
 
 def delete_old_long_backup_files():
     # 指定日数を超えたファイルを削除する
 
-    print_gui_log('古い長期バックアップのデータを削除します。')
+    print_gui_log(t('log_deleting_old_backups'))
 
     # -1なら無期限保管
     if long_backup_keep == -1:
-        print_gui_log('長期バックアップは無期限保管設定のため削除をスキップします。')
+        print_gui_log(t('log_backup_deletion_skipped_unlimited'))
         return
 
     # 現在時刻
@@ -2084,15 +2812,15 @@ def delete_old_long_backup_files():
                     # print_gui_log(f'削除失敗: {e}')
                     pass
 
-    print_gui_log('古い長期バックアップのデータを削除しました。')
+    print_gui_log(t('log_old_backups_deleted'))
 
 def save_backup():
     # バックアップ
-    print_gui_log('セーブデータのバックアップを行います。')
+    print_gui_log(t('log_backup_started'))
     # autosaveフォルダがないなら作る
     path = server_folder_path + '/autosave'
     if not os.path.isdir(path):
-        print_gui_log('autosaveフォルダが存在しません。作成します。')
+        print_gui_log(t('log_autosave_folder_created'))
         os.mkdir(path)
     # バックアップ上限を超えたファイルがあるなら削除
     path = server_folder_path + '/autosave/autosave_' + str(config.autosave_backup) + '.sve'
@@ -2114,15 +2842,15 @@ def save_backup():
         backup_after_number -= 1
     # ファイルをコピー
     shutil.copy(server_folder_path + '/' +  server_save, server_folder_path + '/autosave/autosave_1.sve')
-    print_gui_log('バックアップ処理が終了しました。')
+    print_gui_log(t('log_backup_completed'))
     return None
 
 def long_backup(force_backup):
     # 0なら長期バックアップ無効
     if long_backup_keep == 0 and force_backup == 0:
-        print_gui_log('長期バックアップは無効化されています。')
+        print_gui_log(t('log_long_term_backup_disabled'))
         return
-    print_gui_log('長期バックアップを作成します。')
+    print_gui_log(t('log_creating_long_term_backup'))
 
     try:
         # フォルダ作成
@@ -2145,14 +2873,14 @@ def long_backup(force_backup):
 
         # 本当に存在するか確認
         if os.path.exists(dst):
-            print_gui_log('長期バックアップを作成しました。')
+            print_gui_log(t('log_long_term_backup_created'))
         else:
-            print_gui_log('バックアップファイルが存在しません。')
+            print_gui_log(t('log_backup_file_missing'))
 
         delete_old_long_backup_files()
 
     except Exception as e:
-        print_gui_log(f'長期バックアップの作成に失敗しました。: {e}')
+        print_gui_log(t('log_long_term_backup_failed', error=e))
 
 def auto_long_backup():
     # 指定の時間に長期バックアップする
@@ -2172,40 +2900,41 @@ def server_stop(set_code, long_backup_code):
         if start_code == 3:
             return None
         nettool_say('Server restart soon.')
-        print_gui_log('再起動予告メッセージを送信しました。')
-        discord_post('まもなく再起動を行います。', 'これからのログインはおやめください。', 0xffbf00)
+        print_gui_log(t('log_restart_notice_sent'))
+        discord_post(t('discord_restart_soon_title'), t('discord_no_login_description'), 0xffbf00)
     elif set_code == 3:
         nettool_say('Maintenance soon.')
-        print_gui_log('メンテナンス予告メッセージを送信しました。')
-        discord_post('まもなくメンテナンスです。', 'これからのログインはおやめください。', 0xffbf00)
+        print_gui_log(t('log_maintenance_notice_sent'))
+        discord_post(t('discord_maintenance_soon_title'), t('discord_no_login_description'), 0xffbf00)
     elif set_code == 5:
         nettool_say('Server close soon.')
-        print_gui_log('サーバー終了予告メッセージを送信しました。')
-        discord_post('まもなくサーバーを終了します。', 'これからのログインはおやめください。', 0xffbf00)
+        print_gui_log(t('log_server_close_notice_sent'))
+        discord_post(t('discord_server_close_soon_title'), t('discord_no_login_description'), 0xffbf00)
     time.sleep(30)
     nettool_forcesync()
     if long_backup_code == 1:
         long_backup(1)
     if set_code == 2:
         nettool_say('Server is restarting.')
-        print_gui_log('再起動中告知メッセージを送信しました。')
+        print_gui_log(t('log_restarting_notice_sent'))
     elif set_code == 3:
         nettool_say('Maintenance start.')
-        print_gui_log('メンテナンス告知メッセージを送信しました。')
-        discord_post('ただいまメンテナンス中です。', 'メンテナンス中でもサーバーに入れる場合がありますが、許可なく入らないでください。', 0xffbf00)
+        print_gui_log(t('log_maintenance_status_sent'))
+        discord_post(t('discord_maintenance_active_title'), t('discord_maintenance_active_description'), 0xffbf00)
     elif set_code == 5:
         nettool_say('Server closed. Thank you for playing!')
-        print_gui_log('サーバー終了告知メッセージを送信しました。')
-        discord_post('サーバーは終了しました。', '皆様のご参加ありがとうございました。', 0x00ff00)
+        print_gui_log(t('log_server_closed_notice_sent'))
+        discord_post(t('discord_server_closed_title'), t('discord_server_closed_description'), 0x00ff00)
     start_code = set_code
     subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'shutdown'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    invalidate_pid_cache(config.server_name)
     return None
 
 def auto_restart():
     # サーバー定時再起動
     global nettool_pw
     global start_code
-    if config.restart_time != -1:
+    if config.restart_enabled and config.restart_time != -1:
         if config.restart_time == 0:
             restart_time = 23
         else:
@@ -2222,7 +2951,7 @@ def monitoring():
     server_pid = get_pid(config.server_name)
     if not server_pid is None:
         # 初回起動時、サーバー起動済みであった場合の処理
-        print_gui_log('サーバーは起動済みです。')
+        print_gui_log(t('log_server_already_running'))
         set_ban_user()
         start_code = 1
     while True:
@@ -2235,7 +2964,7 @@ def monitoring():
                 if start_code == 0:
                     # 初回起動時
                     app_start()
-                    print_gui_log('サーバーを起動します。')
+                    print_gui_log(t('log_server_starting'))
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
                     set_company_pw()
@@ -2246,8 +2975,8 @@ def monitoring():
                     save_timestamp = get_savefile_timestamp(0)
                     if save_timestamp == "99:99":
                         # サーバーダウン（手動復旧必要時）
-                        print_gui_log('サーバーダウンを検出しました。復旧用のデータを配置し手動で復旧してください。')
-                        discord_post('サーバーがダウンしました。', '復旧用のデータがないため、今回は自動復旧できません。\nご迷惑をおかけしますが、復旧までしばらくお待ちください。', 0xff0000)
+                        print_gui_log(t('log_server_down_manual_recovery'))
+                        discord_post(t('discord_server_down_title'), t('discord_server_down_manual_recovery'), 0xff0000)
                         start_code = 6
                         app.after(0,app.set_manual_restart_mode)
                         while start_code == 6:
@@ -2256,46 +2985,46 @@ def monitoring():
                     else:
                         # サーバーダウン（自動復旧時）
                         app_start()
-                        print_gui_log('サーバーダウンを検出しました。再起動します。')
-                        discord_post('サーバーがダウンしました。', '自動で復帰します。しばらくお待ちください。\nこれに伴い、' + save_timestamp + 'までデータが巻き戻ります。', 0xff0000)
+                        print_gui_log(t('log_server_down_restarting'))
+                        discord_post(t('discord_server_down_title'), t('discord_server_down_auto_recovery', timestamp=save_timestamp), 0xff0000)
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
                     set_company_pw()
                     set_ban_user()
-                    print_gui_log('サーバーを再起動しました。')
-                    discord_post('サーバーが復旧しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', 0x00ff00)
+                    print_gui_log(t('log_server_restarted'))
+                    discord_post(t('discord_server_recovered_title'), t('discord_orderly_login_description'), 0x00ff00)
                 elif start_code == 2:
                     # 再起動した場合
                     app_start()
-                    print_gui_log('サーバーを起動します。')
+                    print_gui_log(t('log_server_starting'))
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
                     set_company_pw()
                     set_ban_user()
-                    print_gui_log('サーバーを起動しました。')
-                    discord_post('サーバーを再起動しました。', 'サーバーに入る際は、過度なログインラッシュのないよう順序よくお入りください。', 0x00ff00)
+                    print_gui_log(t('log_server_started'))
+                    discord_post(t('discord_server_restarted_title'), t('discord_orderly_login_description'), 0x00ff00)
                     start_code = 1
                 elif start_code == 4:
                     # メンテナンス終了時
                     app_start()
-                    print_gui_log('サーバーを再開します。')
+                    print_gui_log(t('log_server_resuming'))
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
                     set_company_pw()
                     set_ban_user()
-                    print_gui_log('サーバーを再開しました。')
-                    discord_post('メンテナンスを終了しました。', '皆様のご協力ありがとうございました。', 0x00ff00)
+                    print_gui_log(t('log_server_resumed'))
+                    discord_post(t('discord_maintenance_completed_title'), t('discord_thanks_description'), 0x00ff00)
                     start_code = 1
                 elif start_code == 7:
                     # サーバー手動再開時
                     app_start()
-                    print_gui_log('サーバーを再開します。')
+                    print_gui_log(t('log_server_resuming'))
                     nettool_pw = get_nettool_pw(1)
                     wait_simutrans_responce()
                     set_company_pw()
                     set_ban_user()
-                    print_gui_log('サーバーを再開しました。')
-                    discord_post('サーバーを再開しました。', '大変お待たせしました。', 0x00ff00)
+                    print_gui_log(t('log_server_resumed'))
+                    discord_post(t('discord_server_resumed_title'), t('discord_server_resumed_description'), 0x00ff00)
                     start_code = 1
                 elif start_code == 5:
                     app_start()
@@ -2333,14 +3062,14 @@ def autosave():
             # ----------------------------------------
             post_autosave_notice()
             nettool_say('Autosave soon.')
-            print_gui_log('オートセーブ予告メッセージを送信しました。')
+            print_gui_log(t('log_autosave_notice_sent'))
 
             time.sleep(30)
 
             # ----------------------------------------
             # autosave
             # ----------------------------------------
-            print_gui_log('オートセーブ中です。')
+            print_gui_log(t('log_autosaving'))
 
             start_time = time.time()
 
@@ -2349,7 +3078,7 @@ def autosave():
 
             end_time = time.time()
 
-            print_gui_log('オートセーブ処理が完了しました。')
+            print_gui_log(t('log_autosave_completed'))
             post_autosave_completed()
 
             last_backup_time = time.time()
@@ -2379,11 +3108,11 @@ def autosave():
                     >= config.autosave_interval
                 ):
 
-                    print_gui_log('定期バックアップを実行します。')
+                    print_gui_log(t('log_scheduled_backup_started'))
 
                     save_backup()
 
-                    print_gui_log('定期バックアップ処理が完了しました。')
+                    print_gui_log(t('log_scheduled_backup_completed'))
 
                     last_backup_time = time.time()
 
@@ -2455,7 +3184,7 @@ def autosave():
 
             post_autosave_notice()
             nettool_say('Autosave soon.')
-            print_gui_log('オートセーブ予告メッセージを送信しました。')
+            print_gui_log(t('log_autosave_notice_sent'))
 
             autosave_warned = True
 
@@ -2486,12 +3215,12 @@ def autosave():
             # ----------------------------------------
             # autosave
             # ----------------------------------------
-            print_gui_log('オートセーブ中です。')
+            print_gui_log(t('log_autosaving'))
 
             nettool_forcesync()
             set_company_pw()
 
-            print_gui_log('オートセーブ処理が完了しました。')
+            print_gui_log(t('log_autosave_completed'))
             post_autosave_completed()
 
             # autosave後のsave時刻取得
@@ -2524,11 +3253,11 @@ def autosave():
 
         if now_time >= backup_execute_time:
 
-            print_gui_log('定期バックアップを実行します。')
+            print_gui_log(t('log_scheduled_backup_started'))
 
             save_backup()
 
-            print_gui_log('定期バックアップ処理が完了しました。')
+            print_gui_log(t('log_scheduled_backup_completed'))
 
             # backupタイマー更新
             last_backup_time = time.time()

@@ -187,6 +187,7 @@ CONFIG_DISPLAY_NAMES = {
     'response_monitor_enabled': 'config_response_monitor',
     'response_timeout': 'config_response_timeout',
     'restart_time': 'config_restart_time',
+    'restart_enabled': 'config_restart_enabled',
     'press_space_after_start': 'config_press_space_after_start',
     'mode': 'config_autosave_mode', 'backup_count': 'config_backup_count',
     'interval': 'config_autosave_interval',
@@ -219,6 +220,11 @@ def load_config():
     config.response_monitor_enabled = server.get('response_monitor_enabled', 0)
     config.response_timeout = server.get('response_timeout', 0)
     config.restart_time = server.get('restart_time')
+    runtime = config_data.get('runtime', {})
+    saved_auto_restart = runtime.get('auto_restart_enabled')
+    config.restart_enabled = int(
+        config.restart_time != -1 if saved_auto_restart is None else saved_auto_restart
+    )
     config.press_space_after_start = server.get('press_space_after_start', 0)
     autosave = config_data.get('autosave', {})
     config.autosave_mode = autosave.get('mode')
@@ -265,6 +271,7 @@ def default_config_data():
             'maintenance_mode': 0,
             'update_schedule': None,
             'next_autosave_at': None,
+            'auto_restart_enabled': None,
         },
     }
 
@@ -351,11 +358,12 @@ class config_window:
             server_values['path'] = f'{folder}{separator}{name}' if folder or name else ''
         server_values.setdefault('response_timeout', 0)
         server_values.setdefault('response_monitor_enabled', 0)
+        server_values['restart_enabled'] = int(getattr(config, 'restart_enabled', server_values.get('restart_time') != -1))
         self.add_tab(
             notebook,
             t('server'),
             [
-                'path', 'port', 'restart_time', 'response_monitor_enabled',
+                'path', 'port', 'restart_time', 'restart_enabled', 'response_monitor_enabled',
                 'response_timeout', 'press_space_after_start',
             ],
             server_values,
@@ -401,7 +409,38 @@ class config_window:
         is_discord_tab = title == t('discord')
         if is_server_tab or is_discord_tab:
             frame.grid_columnconfigure(1, weight=1)
+        if is_server_tab:
+            frame.grid_columnconfigure(0, minsize=180)
         for row, key in enumerate(fields):
+            if is_server_tab and key in ('response_monitor_enabled', 'response_timeout', 'restart_enabled', 'restart_time'):
+                if key in ('response_timeout', 'restart_time'):
+                    continue
+                paired_key = 'response_timeout' if key == 'response_monitor_enabled' else 'restart_time'
+                ttk.Label(frame, text=t(CONFIG_DISPLAY_NAMES[key])).grid(
+                    row=row, column=0, sticky='w', padx=10, pady=8
+                )
+                pair_frame = ttk.Frame(frame)
+                pair_frame.grid(row=row, column=1, columnspan=4, sticky='ew', padx=10, pady=8)
+                pair_frame.grid_columnconfigure(1, minsize=150)
+                pair_frame.grid_columnconfigure(2, weight=1)
+                variable = tk.IntVar(value=1 if int(values.get(key, 0) or 0) in (1, 2) else 0)
+                ttk.Checkbutton(
+                    pair_frame, text=t('use'), style='Switch.TCheckbutton', variable=variable
+                ).grid(row=0, column=0, sticky='w', padx=(0, 16))
+                self.fields[key] = variable
+                ttk.Label(pair_frame, text=t(CONFIG_DISPLAY_NAMES[paired_key])).grid(
+                    row=0, column=1, sticky='w', padx=(0, 8)
+                )
+                paired_entry = ttk.Entry(pair_frame, width=12)
+                paired_entry.insert(0, str(values.get(paired_key, '')))
+                paired_entry.grid(
+                    row=0, column=2, sticky='ew'
+                )
+                self.fields[paired_key] = paired_entry
+                ttk.Button(
+                    frame, text=t('help'), command=lambda k=key: self.show_help(k)
+                ).grid(row=row, column=5, padx=3, pady=6)
+                continue
             ttk.Label(frame, text=t(CONFIG_DISPLAY_NAMES[key])).grid(row=row, column=0, sticky='w', padx=10, pady=8)
             if key == 'mode':
                 try:
@@ -446,9 +485,9 @@ class config_window:
                 self.long_term_keep_mode = mode
                 self.long_term_keep_days_entry = days_entry
                 self.fields[key] = mode
-            elif key in ('enabled', 'autosave_notice', 'press_space_after_start', 'response_monitor_enabled'):
+            elif key in ('enabled', 'autosave_notice', 'press_space_after_start', 'response_monitor_enabled', 'restart_enabled'):
                 variable = tk.IntVar(value=1 if int(values.get(key, 0) or 0) in (1, 2) else 0)
-                text = t('use') if key in ('enabled', 'response_monitor_enabled') else t('enable')
+                text = t('use') if key in ('enabled', 'response_monitor_enabled', 'restart_enabled') else t('enable')
                 entry = ttk.Checkbutton(frame, text=text, style='Switch.TCheckbutton', variable=variable)
                 entry.grid(row=row, column=1, sticky='w', padx=10, pady=8)
                 self.fields[key] = variable
@@ -457,14 +496,16 @@ class config_window:
                 entry.insert(0, str(values.get(key, '')))
                 entry.grid(
                     row=row, column=1,
-                    columnspan=2 if (is_server_tab and key != 'path') or (is_discord_tab and key != 'token') else 1,
+                    columnspan=3 if is_server_tab and key == 'path' else
+                    4 if is_server_tab else
+                    2 if is_discord_tab and key != 'token' else 1,
                     sticky='ew', padx=10, pady=8
                 )
                 self.fields[key] = entry
                 if key == 'path':
                     ttk.Button(
                         frame, text=t('browse'), command=self.select_server_executable
-                    ).grid(row=row, column=2, padx=5, pady=8)
+                    ).grid(row=row, column=4, padx=5, pady=8)
                 if key == 'token':
                     self.secret_entries['token'].append(entry)
                     ttk.Checkbutton(
@@ -472,7 +513,7 @@ class config_window:
                         style='Switch.TCheckbutton',
                         command=lambda: self.toggle_secret('token')
                     ).grid(row=row, column=2 if is_discord_tab else 3, padx=5, pady=8)
-            help_column = 3 if is_server_tab or is_discord_tab else 2
+            help_column = 5 if is_server_tab else 3 if is_discord_tab else 2
             ttk.Button(frame, text=t('help'), command=lambda k=key: self.show_help(k)).grid(row=row, column=help_column, padx=5, pady=8)
 
     def select_server_executable(self):
@@ -721,6 +762,7 @@ class config_window:
         data['language'] = self.language_var.get().split(' - ', 1)[0]
         # 設定画面にない内部状態を保持する。
         data['runtime'] = config_data.get('runtime', data['runtime'])
+        data['runtime']['auto_restart_enabled'] = self.fields['restart_enabled'].get()
         for key in ('server', 'autosave', 'backup', 'discord'):
             for name in data[key]:
                 if name == 'long_term_keep_days':
@@ -2806,7 +2848,7 @@ def auto_restart():
     # サーバー定時再起動
     global nettool_pw
     global start_code
-    if config.restart_time != -1:
+    if config.restart_enabled and config.restart_time != -1:
         if config.restart_time == 0:
             restart_time = 23
         else:

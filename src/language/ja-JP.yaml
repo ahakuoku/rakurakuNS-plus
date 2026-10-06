@@ -74,8 +74,9 @@ strings:
   config_server_executable: サーバー実行ファイル
   config_port: ポート
   config_response_monitor: サーバー応答監視
-  config_response_timeout: サーバー応答待機時間（分）
-  config_restart_time: 自動再起動時刻
+  config_response_timeout: 応答待機時間（分）
+  config_restart_time: 時刻（時）
+  config_restart_enabled: 自動再起動を使用
   config_press_space_after_start: 起動30秒後にスペースキーを押す
   config_autosave_mode: オートセーブモード
   config_backup_count: セーブデータバックアップ数

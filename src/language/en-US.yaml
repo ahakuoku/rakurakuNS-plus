@@ -74,8 +74,9 @@ strings:
   config_server_executable: Server executable
   config_port: Port
   config_response_monitor: Server response monitoring
-  config_response_timeout: Server response timeout (minutes)
-  config_restart_time: Automatic restart time
+  config_response_timeout: Response wait time (minutes)
+  config_restart_time: Time (hours)
+  config_restart_enabled: Use automatic restart
   config_press_space_after_start: Press Space 30 seconds after startup
   config_autosave_mode: Autosave mode
   config_backup_count: Number of save backups

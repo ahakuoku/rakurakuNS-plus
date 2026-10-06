@@ -414,9 +414,29 @@ class config_window:
     def apply_language(self, event=None):
         """Apply a language selection immediately by rebuilding the settings UI."""
         selected = self.language_var.get().split(' - ', 1)[0]
+        # 言語変更時は設定画面を作り直すため、入力途中の値を先に保持する。
+        # これを行わないと、初回起動時に既定値で上書きされ、サーバーの
+        # パスや名前が空のまま保存されてしまう。
         config_data['language'] = selected
-        with open(config_path, 'w', encoding='utf-8') as config_file:
-            yaml.safe_dump(config_data, config_file, allow_unicode=True, sort_keys=False)
+        for key in ('server', 'autosave', 'backup', 'discord'):
+            for name in config_data.get(key, {}):
+                field = self.fields.get(name)
+                if field is not None:
+                    config_data[key][name] = field.get()
+        for i, entry in self.fields.get('passwords', {}).items():
+            config_data.setdefault('players', {}).setdefault('passwords', {})[i] = entry.get()
+        ban_ips = config_data.setdefault('network', {}).setdefault('ban_ips', {})
+        for line in self.fields.get('ban_ips').get('1.0', 'end').splitlines():
+            if '=' in line:
+                index, value = line.split('=', 1)
+                if index.strip().isdigit() and 0 <= int(index) < 63:
+                    ban_ips[int(index)] = value
+        # 初回起動中は、言語変更だけで設定ファイルを作成しない。
+        # ファイルが先に作られると、保存前でもメイン処理が初期設定済みと
+        # 判断し、空の server.path を check_config() で検証してしまう。
+        if not self.first_run:
+            with open(config_path, 'w', encoding='utf-8') as config_file:
+                yaml.safe_dump(config_data, config_file, allow_unicode=True, sort_keys=False)
         load_language(selected)
         if 'app' in globals() and app is not None:
             app.apply_language()
@@ -3300,7 +3320,21 @@ if __name__ == "__main__":
     load_config()
     if not os.path.exists(config_path):
         dialog = config_window(root, first_run=True)
-        root.wait_window(dialog.window)
+        dialog_window = dialog.window
+        # 言語変更時は config_window が現在のウィンドウを閉じて新しい
+        # ウィンドウを作るため、最初の wait_window だけでは初回設定完了を
+        # 判定できない。設定ファイルが作成されるまで現在の設定画面を待つ。
+        while not os.path.exists(config_path):
+            root.wait_window(dialog_window)
+            if os.path.exists(config_path):
+                break
+            open_dialogs = [
+                child for child in root.winfo_children()
+                if isinstance(child, tk.Toplevel)
+            ]
+            if not open_dialogs:
+                break
+            dialog_window = open_dialogs[-1]
         if not os.path.exists(config_path):
             root.destroy()
             sys.exit()

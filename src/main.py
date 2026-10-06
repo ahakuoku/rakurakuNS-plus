@@ -182,6 +182,18 @@ pending_discord_notifications = []
 pending_discord_notifications_lock = threading.Lock()
 gui_log_queue = queue.Queue()
 
+# 常駐処理がGUIスレッドやOSへ細かくアクセスし続けないように、更新をまとめる。
+GUI_LOG_FLUSH_INTERVAL_MS = 100
+GUI_LOG_BATCH_SIZE = 200
+GUI_LOG_MAX_LINES = 2000
+PROCESS_SCAN_CACHE_SECONDS = 2.0
+RESPONSE_MONITOR_INTERVAL_SECONDS = 5.0
+
+_nettool_path_cache = None
+_nettool_path_lock = threading.Lock()
+_pid_cache = {}
+_pid_cache_lock = threading.Lock()
+
 CONFIG_DISPLAY_NAMES = {
     'path': 'config_server_executable', 'port': 'config_port',
     'response_monitor_enabled': 'config_response_monitor',
@@ -851,16 +863,23 @@ class window_main(tk.Frame):
             self.master.geometry("680x330")
         self.maintenance_mode = 0  # メンテナンスモードの状態（0:通常, 1:メンテナンス中）
         self.create_widgets()
-        self.after(100, self.flush_gui_log_queue)
+        self.after(GUI_LOG_FLUSH_INTERVAL_MS, self.flush_gui_log_queue)
 
     def flush_gui_log_queue(self):
-        """Move worker-thread log messages into Tk from the main thread."""
-        try:
-            while True:
-                self.log_text_insert(gui_log_queue.get_nowait())
-        except queue.Empty:
-            pass
-        self.after(100, self.flush_gui_log_queue)
+        """WorkerスレッドのログをまとめてTkへ反映する。"""
+        messages = []
+        for _ in range(GUI_LOG_BATCH_SIZE):
+            try:
+                messages.append(gui_log_queue.get_nowait())
+            except queue.Empty:
+                break
+
+        if messages:
+            self._log_text_insert_batch(messages)
+
+        # 大量のログが来ても1回のコールバックでGUIを占有し続けない。
+        delay = 0 if not gui_log_queue.empty() else GUI_LOG_FLUSH_INTERVAL_MS
+        self.after(delay, self.flush_gui_log_queue)
 
     def create_widgets(self):
         # Gridの設定
@@ -1086,13 +1105,23 @@ class window_main(tk.Frame):
         persist_runtime_state()
 
     def log_text_insert(self, content):
-        # 他スレッドからも呼び出せる安全な方法
-        self.master.after(0, self._log_text_insert, content)
+        # 呼び出し元に関係なくキューへ入れ、GUI更新回数を抑える。
+        gui_log_queue.put(content)
 
     def _log_text_insert(self, content):
+        self._log_text_insert_batch([content])
+
+    def _log_text_insert_batch(self, messages):
         # 実際にTkinterのUIを更新する処理（必ずメインスレッドで実行）
         self.log_text.configure(state="normal")
-        self.log_text.insert('end', content + '\n')
+        self.log_text.insert('end', '\n'.join(messages) + '\n')
+
+        # 長時間運用時もTextウィジェットの再描画コストが増え続けないようにする。
+        line_count = int(self.log_text.index('end-1c').split('.')[0])
+        excess_lines = line_count - GUI_LOG_MAX_LINES - 1
+        if excess_lines > 0:
+            self.log_text.delete('1.0', f'{excess_lines + 1}.0')
+
         self.log_text.configure(state="disabled")
         self.log_text.see("end")
 
@@ -1648,10 +1677,7 @@ def print_gui_log(content):
     # GUIのログに追記
     date_time = datetime.datetime.now()
     content = date_time.strftime('[%Y/%m/%d %H:%M:%S] ' + content)
-    if threading.current_thread() is threading.main_thread():
-        app.log_text_insert(content)
-    else:
-        gui_log_queue.put(content)
+    app.log_text_insert(content)
     return None
 
 def restart_server_threaded(set_code):
@@ -2461,30 +2487,39 @@ def convert_to_time(hour):
     return time(0, 0, 0)
 
 def run_nettool():
-    # Windows
-    if platform.system() == 'Windows':
+    global _nettool_path_cache
 
-        # PyInstaller実行時
-        if getattr(sys, 'frozen', False):
+    if _nettool_path_cache is not None:
+        return _nettool_path_cache
 
-            internal_path = resource_path('nettool.exe')
+    with _nettool_path_lock:
+        # 複数の常駐スレッドが同時に初回呼び出しをしても、準備は1回だけ行う。
+        if _nettool_path_cache is not None:
+            return _nettool_path_cache
 
-            # 一時フォルダへコピー
-            temp_dir = tempfile.gettempdir()
-            external_path = os.path.join(temp_dir, 'nettool.exe')
+        # Windows
+        if platform.system() == 'Windows':
 
-            # 上書きコピー
-            shutil.copy2(internal_path, external_path)
+            # PyInstaller実行時
+            if getattr(sys, 'frozen', False):
 
-            return external_path
+                internal_path = resource_path('nettool.exe')
 
-        # 通常Python実行時
+                # 一時フォルダへのコピーは起動中に1回だけ行う。
+                temp_dir = tempfile.gettempdir()
+                external_path = os.path.join(temp_dir, 'nettool.exe')
+                shutil.copy2(internal_path, external_path)
+                _nettool_path_cache = external_path
+
+            # 通常Python実行時
+            else:
+                _nettool_path_cache = resource_path('nettool.exe')
+
+        # Linux/macOS
         else:
-            return resource_path('nettool.exe')
+            _nettool_path_cache = 'nettool'
 
-    # Linux/macOS
-    else:
-        return 'nettool'
+        return _nettool_path_cache
 
 def get_nettool_pw(output):
     # simuconf.tabを開き、「server_admin_pw」から始まる行を検索
@@ -2511,9 +2546,24 @@ def print_with_date(content):
     print(date_time.strftime('[%Y/%m/%d %H:%M:%S] ' + content))
     return None
 
-def get_pid(target_name):
+def invalidate_pid_cache(target_name=None):
+    """サーバーを起動・停止した直後にプロセス検索結果を破棄する。"""
+    with _pid_cache_lock:
+        if target_name is None:
+            _pid_cache.clear()
+        else:
+            _pid_cache.pop(target_name, None)
+
+def get_pid(target_name, use_cache=True):
 
     # 指定したプロセスのPIDを取得し、ゾンビプロセスがあれば回収する。
+
+    now = time.monotonic()
+    if use_cache:
+        with _pid_cache_lock:
+            cached = _pid_cache.get(target_name)
+        if cached is not None and now - cached[0] < PROCESS_SCAN_CACHE_SECONDS:
+            return cached[1]
 
     target_pid = None
 
@@ -2537,16 +2587,19 @@ def get_pid(target_name):
 
                 # 3. 正常に動作しているプロセスを見つけた場合
                 target_pid = proc.info['pid']
+                break
                 
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             # 権限がないプロセスや、途中で消えたプロセスは無視
             continue
 
+    with _pid_cache_lock:
+        _pid_cache[target_name] = (now, target_pid)
     return target_pid
 
 def force_stop_server():
     """サーバーのPIDを指定して強制終了する。"""
-    server_pid = get_pid(config.server_name)
+    server_pid = get_pid(config.server_name, use_cache=False)
     if server_pid is None:
         print_gui_log(t('log_server_not_found_for_force_stop'))
         return None
@@ -2565,6 +2618,7 @@ def force_stop_server():
         stderr=subprocess.DEVNULL,
     )
     if result.returncode == 0:
+        invalidate_pid_cache(config.server_name)
         print_gui_log(t('log_server_force_stopped'))
     else:
         print_gui_log(t('log_server_force_stop_failed'))
@@ -2576,7 +2630,8 @@ def set_company_pw():
     for i in range(63):
         company_id = str(i)
         company_pw = getattr(config, f'player_{i}_pw', '')
-        nettool_lockcompany(company_id, company_pw)
+        if company_pw:
+            nettool_lockcompany(company_id, company_pw)
     print_gui_log(t('log_company_passwords_set'))
 
 def app_start():
@@ -2589,6 +2644,8 @@ def app_start():
         process = subprocess.Popen([server_path, '-server', config.port_number, '-fps', '30', '-nomidi', '-nosound', '-load', launch_save], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
     else:
         return None
+
+    invalidate_pid_cache(config.server_name)
 
     if int(getattr(config, 'press_space_after_start', 0)) == 1:
         space_timer = threading.Timer(30, press_space_key)
@@ -2640,10 +2697,16 @@ def monitor_server_response():
             response_timeout = 0
         response_monitor_enabled = int(getattr(config, 'response_monitor_enabled', 0))
 
-        server_pid = get_pid(config.server_name)
-        if response_monitor_enabled == 0 or response_timeout <= 0 or server_pid is None or start_code in (3, 6, 8):
+        # 無効時はプロセス一覧も外部ツールも調べない。
+        if response_monitor_enabled == 0 or response_timeout <= 0 or start_code in (3, 6, 8):
             unresponsive_since = None
-            time.sleep(1)
+            time.sleep(RESPONSE_MONITOR_INTERVAL_SECONDS)
+            continue
+
+        server_pid = get_pid(config.server_name)
+        if server_pid is None:
+            unresponsive_since = None
+            time.sleep(RESPONSE_MONITOR_INTERVAL_SECONDS)
             continue
 
         result = subprocess.run(
@@ -2659,9 +2722,11 @@ def monitor_server_response():
                 print_gui_log(t('log_response_timeout_force_stop', timeout=response_timeout))
                 force_stop_server()
                 unresponsive_since = None
-        time.sleep(1)
+        time.sleep(RESPONSE_MONITOR_INTERVAL_SECONDS)
 
 def nettool_lockcompany(company_id, company_pw):
+    if not company_pw:
+        return
     # クラッシュ対策（存在しない会社にパスワードをかけるとクラッシュする）
     result = subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'info-company', company_id], capture_output=True, text=True, encoding='utf-8')
     # Nothing received.の後は改行が必要
@@ -2842,6 +2907,7 @@ def server_stop(set_code, long_backup_code):
         discord_post(t('discord_server_closed_title'), t('discord_server_closed_description'), 0x00ff00)
     start_code = set_code
     subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'shutdown'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    invalidate_pid_cache(config.server_name)
     return None
 
 def auto_restart():

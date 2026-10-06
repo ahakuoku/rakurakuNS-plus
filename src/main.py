@@ -234,8 +234,13 @@ def load_config():
     config.restart_time = server.get('restart_time')
     runtime = config_data.get('runtime', {})
     saved_auto_restart = runtime.get('auto_restart_enabled')
+    try:
+        restart_disabled = int(config.restart_time) == -1
+    except (TypeError, ValueError):
+        restart_disabled = False
     config.restart_enabled = int(
-        config.restart_time != -1 if saved_auto_restart is None else saved_auto_restart
+        0 if restart_disabled else
+        (config.restart_time != -1 if saved_auto_restart is None else saved_auto_restart)
     )
     config.press_space_after_start = server.get('press_space_after_start', 0)
     autosave = config_data.get('autosave', {})
@@ -692,6 +697,14 @@ class config_window:
                 else:
                     self.fields[key].delete(0, 'end')
                     self.fields[key].insert(0, str(value))
+            try:
+                restart_disabled = int(self.fields['restart_time'].get()) == -1
+            except (TypeError, ValueError):
+                restart_disabled = False
+            if restart_disabled:
+                self.fields['restart_enabled'].set(0)
+                self.fields['restart_time'].delete(0, 'end')
+                self.fields['restart_time'].insert(0, '0')
             for i in range(63):
                 value = getattr(legacy, f'player_{i}_pw', '')
                 self.fields['passwords'][i].delete(0, 'end')
@@ -775,6 +788,12 @@ class config_window:
         data['language'] = self.language_var.get().split(' - ', 1)[0]
         # 設定画面にない内部状態を保持する。
         data['runtime'] = config_data.get('runtime', data['runtime'])
+        try:
+            restart_disabled = int(self.fields['restart_time'].get()) == -1
+        except (TypeError, ValueError):
+            restart_disabled = False
+        if restart_disabled:
+            self.fields['restart_enabled'].set(0)
         data['runtime']['auto_restart_enabled'] = self.fields['restart_enabled'].get()
         for key in ('server', 'autosave', 'backup', 'discord'):
             for name in data[key]:

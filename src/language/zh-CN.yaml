@@ -1,0 +1,244 @@
+# Rakuraku NS+ Simplified Chinese UI language pack
+locale: zh-CN
+language_name: 简体中文（中国）
+strings:
+  language_tab: Language
+  translation_accuracy_notice: "翻译可能不正确。\n某些错误消息可能会以日语显示。"
+  settings: 设置
+  server: 服务器
+  save_data: 保存数据
+  discord: 不和谐
+  players: 玩家
+  ban_ip: 被禁止的IP
+  fixed_interval: 固定间隔
+  elapsed_since_last_load: 自上次加载以来经过的时间
+  disabled: 残疾人
+  unlimited: 无限
+  specify_days: 指定日期
+  day: 天）
+  use: 使用
+  enable: 使能够
+  browse: 浏览...
+  show: 展示
+  help: 帮助
+  numbered_value_per_line: 数字=值（每行一个条目）
+  company_passwords_notice: 公司密码（公司 15 及更高版本需要 OTRP v59_0_2 或更高版本）
+  show_password: 显示密码
+  company_number: 公司 {i}
+  save: 节省
+  cancel: 取消
+  import_legacy_config: 导入 v0.2.0 之前的 Rakuraku NS+ 配置
+  import_bat_settings: 导入 Rakuraku NS（bat 版本）设置
+  setting_help_title: 设置项目说明
+  no_description: 该项目没有可用的描述。
+  select_server_executable: 选择服务器可执行文件
+  executable: 可执行文件
+  all_files: 所有文件
+  config_file: 配置文件
+  batch_file: 批处理文件
+  python_config_file: Python配置文件
+  python_file: Python文件
+  import_complete: 导入完成
+  import_failed: 导入失败
+  input_error: 输入错误
+  app_name: 乐乐 NS+
+  managed_server: "托管服务器："
+  restart_server: 重启服务器
+  manual_save: 手动保存
+  pause_server: 暂停服务器
+  force_stop_server: 强制停止服务器
+  close_session: 结束会议
+  rollback_data: 回滚数据
+  schedule_update: 安排 Simutrans 应用程序/Pak 更新
+  exit_app: 退出乐乐 NS+
+  update_application: 更新 Simutrans 应用程序
+  select_application: 选择 Simutrans 应用程序
+  update_pakset: 更新包集
+  select_pakset: 选择包集文件夹
+  update_datetime: 更新时间（YYYY/MM/DD HH:MM；省略今天的日期）
+  backup_before_update: 更新前创建长期备份
+  post_discord_notice: 向 Discord 发布通知
+  update_after_action: 更新后的操作
+  restart_after_update: 更新后重启服务器
+  exit_after_update: 更新后无需重新启动服务器即可退出 Rakuraku NS+
+  register_schedule: 登记时间表
+  update_now: 立即更新
+  cancel_schedule: 取消日程
+  confirm: 确认
+  "yes": "是的"
+  "no": "不"
+  input_confirmation: 输入确认
+  registration_complete: 注册完成
+  cancellation_complete: 取消完成
+  resume_server: 恢复服务器
+  config_server_executable: 服务器可执行文件
+  config_port: 港口
+  config_response_monitor: 服务器响应监控
+  config_response_timeout: 响应等待时间（分钟）
+  config_restart_time: 时间（小时）
+  config_restart_enabled: 使用自动重启
+  config_press_space_after_start: 启动后按空格键 30 秒
+  config_autosave_mode: 自动保存模式
+  config_backup_count: 保存备份数量
+  config_autosave_interval: 自动保存间隔（秒）
+  config_long_term_keep_days: 长期备份保留（天）
+  config_long_term_time: 长期备份时间
+  config_discord_enabled: 使用 Discord 机器人
+  config_autosave_notice: 在 Discord 上宣布自动保存
+  config_discord_token: Discord 机器人令牌
+  config_discord_channel: 不和谐频道 ID
+  config_player_passwords: 玩家密码
+  select_update_application: 选择要更新的 Simutrans 应用程序
+  select_update_pakset: 选择要更新的 Pakset 文件夹
+  select_rollback_save_file: 选择要回滚的保存数据
+  simutrans_save_data: Simutrans 保存数据
+  update_kind_application_and_pak: Simutrans 应用程序和 Pak
+  update_kind_application: Simutrans应用程序
+  update_kind_pak: 帕克
+  pakset_validation_title: 数据包验证
+  pakset_validation_message: 这不是一个包。检查ground.Outside.pak是否存在并且命名正确。文件名区分大小写。
+  invalid_update_datetime: 输入更新时间，格式为 YYYY/MM/DD HH:MM 或 HH:MM。
+  future_datetime_required: 指定未来的日期和时间。
+  update_registered: 更新计划为 {when}。
+  update_target_required: 选择要更新的 Simutrans 应用程序或 Pakset。
+  update_application_required: 选择要更新的 Simutrans 应用程序。
+  update_pakset_required: 选择要更新的 Pakset 文件夹。
+  confirm_update_now: 立即启动 Simutrans 应用程序/Pak 更新吗？
+  no_update_schedule: 没有可以取消的更新计划。
+  update_schedule_cancelled: 更新计划被取消。
+  confirm_pause_server: "暂停服务器。\n你确定吗？"
+  confirm_resume_server: "恢复服务器。\n你确定吗？"
+  backup_at_maintenance_start: "在维护开始时创建数据的长期备份"
+  confirm_exit_app: "退出乐乐 NS+？"
+  confirm_close_session: "关闭服务器会话并退出 Rakuraku NS+？"
+  confirm_force_stop_server: "强制停止服务器。\n自上次加载以来的数据将丢失。\n你确定吗？"
+  confirm_manual_save: "执行手动保存。\n保存将在通知后 30 秒开始。\n你确定吗？"
+  rollback_save_file: 保存要回滚的数据 (.sve)
+  perform_rollback: 回滚
+  sve_file_required: 指定 .sve 文件。
+  confirm_restart_server: "重新启动服务器。\n你确定吗？"
+  select_legacy_config: 选择config.py导入
+  legacy_import_complete: config.py 中的设置已导入。它们将在保存后生效。
+  legacy_import_failed: "无法读取 config.py。\n{error}"
+  select_bat_settings: 选择setting.bat导入
+  bat_import_complete: 来自setting.bat 的设置已导入。它们将在保存后生效。
+  bat_import_failed: "无法读取setting.bat。\n{error}"
+  server_path_required: "输入 {field} 的路径。"
+  server_path_missing: "指定的 {field} 不存在。"
+  integer_required: "输入 {field} 的整数。"
+  value_out_of_range: "{field} 的值超出范围。"
+  discord_token_required: "当 {enabled} 启用时，输入 {token}。"
+  confirm_rollback: "回滚保存的数据。\n{timestamp} 之后的所有工作都将丢失。\n你确定吗？"
+  log_manual_save_notice_sent: 已发送手动保存通知。
+  log_saving: 保存。
+  log_save_completed: 保存完成。
+  log_discord_channel_integer_required: Discord 频道设置必须是整数。
+  log_discord_channel_permission_denied: 没有权限发送到指定的 Discord 频道。
+  log_update_scheduled: Simutrans 应用程序/Pak 更新已计划。
+  log_update_schedule_cancelled: Simutrans 应用程序/Pak 更新计划已取消。
+  log_scheduled_update_started: 预定更新开始。
+  log_update_completed_resume_server: 更新完成。正在恢复服务器。
+  log_update_completed_exit_app: 更新完成。退出而不重新启动服务器。
+  log_application_updated: Simutrans 应用程序已更新。
+  log_pakset_updated: 包集已更新。
+  log_nettool_detected: nettool 检测成功。
+  log_supported_os_confirmed: 已确认支持的操作系统。
+  log_configuration_validated: 配置值有效。
+  log_nettool_password_obtained: 获取nettool密码。
+  log_server_not_found_for_force_stop: 未发现服务器强制停止。
+  log_force_stop_unsupported_os: 该操作系统无法强制停止服务器。
+  log_server_force_stopped: 服务器强制停止。
+  log_server_force_stop_failed: 强制停止服务器失败。
+  log_company_passwords_set: 公司密码已设置。
+  log_space_key_sent: 空格键已发送。
+  log_waiting_for_simutrans: 等待 Simutrans 回复。请稍等。
+  log_simutrans_responded: Simutrans 做出了回应。恢复运营。
+  log_ban_users_set: BAN 用户已配置。
+  log_deleting_old_backups: 删除旧的长期备份。
+  log_backup_deletion_skipped_unlimited: 跳过删除，因为长期备份会无限期保留。
+  log_old_backups_deleted: 旧的长期备份已删除。
+  log_backup_started: 备份保存数据。
+  log_autosave_folder_created: 自动保存文件夹不存在。创建它。
+  log_backup_completed: 备份完成。
+  log_long_term_backup_disabled: 长期备份已禁用。
+  log_creating_long_term_backup: 创建长期备份。
+  log_long_term_backup_created: 创建长期备份。
+  log_backup_file_missing: 备份文件不存在。
+  discord_rollback_title: 保存回滚维护通知
+  discord_rollback_description: "保存的数据将回滚到{timestamp}；维护现在开始。\n对于给您带来的不便，我们深表歉意，并感谢您的理解。"
+  log_rollback_completed: 保存回滚的数据。正在恢复服务器。
+  log_rollback_failed: "保存回滚失败：{error}"
+  log_discord_channel_not_found: 指定的 Discord 频道不存在。
+  log_discord_post_failed: "无法发送 Discord 通知：{error}"
+  discord_autosave_soon_title: 很快就会自动保存。
+  discord_autosave_soon_description: 在自动保存完成之前，请不要进入服务器。
+  discord_autosave_completed_title: 自动保存完成。
+  discord_autosave_completed_description: 进入服务器时请避免急于登录。
+  log_discord_token_invalid: Discord 机器人令牌无效。机器人无法启动。
+  log_discord_bot_start_failed: "Discord 机器人启动失败：{error}"
+  log_discord_bot_started: "Discord 机器人已启动：{user}"
+  log_restart_notice_sent: 已发送重启通知。
+  log_maintenance_notice_sent: 已发送维护通知。
+  log_server_close_notice_sent: 已发送服务器关闭通知。
+  log_restarting_notice_sent: 已发送重新启动状态通知。
+  log_maintenance_status_sent: 已发送维护状态通知。
+  log_server_closed_notice_sent: 已发送服务器关闭状态通知。
+  log_autosave_notice_sent: 已发送自动保存通知。
+  log_autosaving: 自动保存。
+  log_autosave_completed: 自动保存完成。
+  log_notification_send_error: "通知发送错误：{error}"
+  discord_maintenance_schedule_title: 维护计划通知
+  discord_maintenance_schedule_description: "{kind} 的维护将于 {time} 开始，持续约五分钟。"
+  log_scheduled_update_failed: "计划更新失败：{error}"
+  log_player_password_missing: "设置 {attribute} 未定义。不会为玩家 {player} 设置密码。"
+  log_discord_setting_missing: Discord 机器人设置未定义。不会使用 Discord 机器人。
+  log_space_key_send_failed: "发送空格键失败：{error}"
+  log_response_timeout_force_stop: "Simutrans 在 {timeout} 分钟内没有回复；强制停止服务器。"
+  log_long_term_backup_failed: "长期备份失败：{error}"
+  discord_restart_soon_title: 服务器很快重启。
+  discord_maintenance_soon_title: 维护很快。
+  discord_server_close_soon_title: 服务器很快就关闭了。
+  discord_no_login_description: 从现在起请不要登录。
+  log_server_already_running: 服务器已经运行。
+  log_server_starting: 启动服务器。
+  log_server_down_manual_recovery: 检测到服务器关闭。放置恢复数据并手动恢复。
+  log_server_down_restarting: 检测到服务器关闭。重新启动。
+  log_server_restarted: 服务器已重新启动。
+  log_server_started: 服务器已启动。
+  log_server_resuming: 正在恢复服务器。
+  log_server_resumed: 服务器恢复。
+  log_scheduled_backup_started: 计划备份已开始。
+  log_scheduled_backup_completed: 计划备份已完成。
+  discord_maintenance_active_title: 维护正在进行中。
+  discord_maintenance_active_description: 在维护期间可以访问服务器；未经许可请勿进入。
+  discord_server_closed_title: 服务器已关闭。
+  discord_server_closed_description: 感谢您的参与。
+  discord_server_down_title: 服务器已关闭。
+  discord_server_down_manual_recovery: "由于恢复数据丢失，自动恢复不可用。\n正在执行恢复，请稍候。"
+  discord_server_down_auto_recovery: "服务器将自动恢复。请稍等。\n数据将回滚到 {timestamp}。"
+  discord_server_recovered_title: 服务器已恢复。
+  discord_server_restarted_title: 服务器已重新启动。
+  discord_orderly_login_description: 请有序进入，切勿急于登录。
+  discord_maintenance_completed_title: 维护完成。
+  discord_thanks_description: 感谢您的合作。
+  discord_server_resumed_title: 服务器恢复。
+  discord_server_resumed_description: 谢谢您的等待。
+  help_server_executable: 指定 Simutrans 服务器可执行文件的完整路径。
+  help_port: 指定服务器使用的端口号。
+  help_restart_time: 指定每天0到24点的重启时间；使用 -1 禁用。
+  help_restart_enabled: 启用后，每天在指定时间自动重启服务器。
+  help_response_monitor: 监视服务器客户端响应并在持续故障后强制停止它。
+  help_response_timeout: 启动后客户端命令的最长等待时间（以分钟为单位）； 0 禁用此功能。
+  help_press_space: Simutrans 启动后 30 秒发送一个空格键。
+  help_autosave_mode: 选择自动保存是使用固定间隔还是自上次加载以来经过的时间。
+  help_backup_count: 指定要保留的自动保存备份的数量。
+  help_autosave_interval: 指定自动保存间隔（以秒为单位）；使用 60 个或更多。
+  help_long_term_keep_days: 配置是否保留长期备份以及保留天数。
+  help_long_term_time: 指定运行长期备份的时间（0 到 24）。
+  help_discord_enabled: 启用或禁用 Discord 机器人的使用。
+  help_autosave_notice: 在自动保存前 30 秒向 Discord 发布自动保存警告。
+  help_discord_token: 指定 Discord 机器人令牌。
+  help_discord_channel: 指定 Discord 机器人发布的频道 ID。
+  help_player_passwords: 输入每个公司的密码；空白公司没有密码。
+  help_ban_ips: 每行输入一个 IP 地址。您最多可以输入 63 个地址。
+

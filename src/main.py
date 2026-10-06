@@ -212,8 +212,13 @@ CONFIG_DISPLAY_NAMES = {
 
 def load_config():
     global config, config_data
-    with open(config_path, 'r', encoding='utf-8') as config_file:
-        config_data = yaml.safe_load(config_file) or {}
+    if os.path.exists(config_path):
+        with open(config_path, 'r', encoding='utf-8') as config_file:
+            config_data = yaml.safe_load(config_file) or {}
+    else:
+        # 初回起動時は設定ファイルがまだ存在しないため、既定値から
+        # アプリ内の設定オブジェクトを構築する。
+        config_data = default_config_data()
     config = type('Config', (), {})()
     server = config_data.get('server', {})
     server_path = server.get('path')
@@ -409,9 +414,29 @@ class config_window:
     def apply_language(self, event=None):
         """Apply a language selection immediately by rebuilding the settings UI."""
         selected = self.language_var.get().split(' - ', 1)[0]
+        # 言語変更時は設定画面を作り直すため、入力途中の値を先に保持する。
+        # これを行わないと、初回起動時に既定値で上書きされ、サーバーの
+        # パスや名前が空のまま保存されてしまう。
         config_data['language'] = selected
-        with open(config_path, 'w', encoding='utf-8') as config_file:
-            yaml.safe_dump(config_data, config_file, allow_unicode=True, sort_keys=False)
+        for key in ('server', 'autosave', 'backup', 'discord'):
+            for name in config_data.get(key, {}):
+                field = self.fields.get(name)
+                if field is not None:
+                    config_data[key][name] = field.get()
+        for i, entry in self.fields.get('passwords', {}).items():
+            config_data.setdefault('players', {}).setdefault('passwords', {})[i] = entry.get()
+        ban_ips = config_data.setdefault('network', {}).setdefault('ban_ips', {})
+        for line in self.fields.get('ban_ips').get('1.0', 'end').splitlines():
+            if '=' in line:
+                index, value = line.split('=', 1)
+                if index.strip().isdigit() and 0 <= int(index) < 63:
+                    ban_ips[int(index)] = value
+        # 初回起動中は、言語変更だけで設定ファイルを作成しない。
+        # ファイルが先に作られると、保存前でもメイン処理が初期設定済みと
+        # 判断し、空の server.path を check_config() で検証してしまう。
+        if not self.first_run:
+            with open(config_path, 'w', encoding='utf-8') as config_file:
+                yaml.safe_dump(config_data, config_file, allow_unicode=True, sort_keys=False)
         load_language(selected)
         if 'app' in globals() and app is not None:
             app.apply_language()
@@ -1696,7 +1721,8 @@ def gui_main(create_app=True):
 def print_gui_log(content):
     # GUIのログに追記
     date_time = datetime.datetime.now()
-    content = date_time.strftime('[%Y/%m/%d %H:%M:%S] ' + content)
+    # WindowsのstrftimeへUnicode本文を渡さず、日時と本文を分けて連結する。
+    content = date_time.strftime('[%Y/%m/%d %H:%M:%S] ') + content
     app.log_text_insert(content)
     return None
 
@@ -2563,7 +2589,23 @@ def get_nettool_pw(output):
 def print_with_date(content):
     # 日時とcontentを表示する
     date_time = datetime.datetime.now()
-    print(date_time.strftime('[%Y/%m/%d %H:%M:%S] ' + content))
+    # 本文をstrftimeの書式文字列に含めると、Windowsでは本文のUnicode文字を
+    # ロケール依存のエンコーディングへ変換しようとして失敗することがある。
+    message = date_time.strftime('[%Y/%m/%d %H:%M:%S] ') + content
+    try:
+        # Windowsの既定コードページでは、中国語などの翻訳ログを出力できない
+        # 場合があるため、標準出力をUTF-8へ切り替える。
+        if hasattr(sys.stdout, 'reconfigure'):
+            sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        print(message)
+    except UnicodeEncodeError:
+        # reconfigureできない出力先（テストランナー等）でも処理を止めない。
+        stream = getattr(sys.stdout, 'buffer', None)
+        if stream is not None:
+            stream.write((message + '\n').encode('utf-8', errors='replace'))
+            stream.flush()
+        else:
+            print(message.encode('utf-8', errors='replace').decode('utf-8'))
     return None
 
 def invalidate_pid_cache(target_name=None):
@@ -3273,13 +3315,29 @@ if __name__ == "__main__":
     # GUI初期化関数の戻り値が失われた場合でも、以降の初期設定画面を表示できるようにする。
     if root is None:
         root = tk.Tk()
+    # 設定画面の初期表示でも config を参照するため、ファイルの有無に
+    # かかわらず先に設定オブジェクトを初期化する。
+    load_config()
     if not os.path.exists(config_path):
         dialog = config_window(root, first_run=True)
-        root.wait_window(dialog.window)
+        dialog_window = dialog.window
+        # 言語変更時は config_window が現在のウィンドウを閉じて新しい
+        # ウィンドウを作るため、最初の wait_window だけでは初回設定完了を
+        # 判定できない。設定ファイルが作成されるまで現在の設定画面を待つ。
+        while not os.path.exists(config_path):
+            root.wait_window(dialog_window)
+            if os.path.exists(config_path):
+                break
+            open_dialogs = [
+                child for child in root.winfo_children()
+                if isinstance(child, tk.Toplevel)
+            ]
+            if not open_dialogs:
+                break
+            dialog_window = open_dialogs[-1]
         if not os.path.exists(config_path):
             root.destroy()
             sys.exit()
-    load_config()
     check_config()
     check_nettool()
     nettool_pw = get_nettool_pw(0)

@@ -1696,7 +1696,8 @@ def gui_main(create_app=True):
 def print_gui_log(content):
     # GUIのログに追記
     date_time = datetime.datetime.now()
-    content = date_time.strftime('[%Y/%m/%d %H:%M:%S] ' + content)
+    # WindowsのstrftimeへUnicode本文を渡さず、日時と本文を分けて連結する。
+    content = date_time.strftime('[%Y/%m/%d %H:%M:%S] ') + content
     app.log_text_insert(content)
     return None
 
@@ -2563,7 +2564,9 @@ def get_nettool_pw(output):
 def print_with_date(content):
     # 日時とcontentを表示する
     date_time = datetime.datetime.now()
-    message = date_time.strftime('[%Y/%m/%d %H:%M:%S] ' + content)
+    # 本文をstrftimeの書式文字列に含めると、Windowsでは本文のUnicode文字を
+    # ロケール依存のエンコーディングへ変換しようとして失敗することがある。
+    message = date_time.strftime('[%Y/%m/%d %H:%M:%S] ') + content
     try:
         # Windowsの既定コードページでは、中国語などの翻訳ログを出力できない
         # 場合があるため、標準出力をUTF-8へ切り替える。

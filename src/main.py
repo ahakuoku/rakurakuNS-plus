@@ -1614,7 +1614,7 @@ class update_schedule_window(tk.Frame):
         self.body_var = tk.IntVar(value=0)
         self.pak_var = tk.IntVar(value=0)
         self.backup_var = tk.IntVar(value=1)
-        self.discord_notice_var = tk.IntVar(value=0)
+        self.discord_notice_var = tk.IntVar(value=1)
         self.restart_server_var = tk.IntVar(value=1)
         self.body_path = tk.StringVar()
         self.pak_path = tk.StringVar()

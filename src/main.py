@@ -2900,20 +2900,30 @@ def scheduled_update_loop():
         now = datetime.datetime.now()
         global scheduled_updates
         with scheduled_updates_lock:
-            if scheduled_updates is not None and scheduled_updates['when'] <= now:
+            # Start the update workflow 30 seconds early so its maintenance
+            # warning is delivered 30 seconds before the registered time.
+            notice_time = scheduled_updates['when'] - datetime.timedelta(seconds=30) if scheduled_updates else None
+            if scheduled_updates is not None and notice_time <= now:
                 due.append(scheduled_updates)
                 scheduled_updates = None
                 persist_runtime_state()
         for item in due:
-            threading.Thread(target=execute_scheduled_update, args=(item,), daemon=True).start()
+            threading.Thread(
+                target=execute_scheduled_update, args=(item,),
+                kwargs={'start_at_scheduled_time': True}, daemon=True,
+            ).start()
         time.sleep(1)
 
-def execute_scheduled_update(item):
+def execute_scheduled_update(item, start_at_scheduled_time=False):
     global start_code
     try:
         print_gui_log(t('log_scheduled_update_started'))
         # 既存の停止処理で同期・バックアップ・サーバー停止を行う
-        server_stop(3, item['backup'])
+        if start_at_scheduled_time:
+            notice_wait_seconds = max(0, (item['when'] - datetime.datetime.now()).total_seconds())
+        else:
+            notice_wait_seconds = 30
+        server_stop(3, item['backup'], notice_wait_seconds=notice_wait_seconds)
         time.sleep(2)
         replace_update_files(item['body'], item['pak'])
         if item.get('restart_server', 1):
@@ -3912,7 +3922,7 @@ def auto_long_backup():
             time.sleep(1)
     return None
 
-def server_stop(set_code, long_backup_code):
+def server_stop(set_code, long_backup_code, notice_wait_seconds=30):
     # サーバーを止める機能
     global nettool_pw
     global start_code
@@ -3934,7 +3944,7 @@ def server_stop(set_code, long_backup_code):
         nettool_say('Server close soon.')
         print_gui_log(t('log_server_close_notice_sent'))
         discord_post(t('discord_server_close_soon_title'), t('discord_no_login_description'), 0xffbf00)
-    time.sleep(30)
+    time.sleep(notice_wait_seconds)
     nettool_forcesync()
     if long_backup_code == 1:
         long_backup(1)

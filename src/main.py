@@ -1657,6 +1657,7 @@ class update_schedule_window(tk.Frame):
         path = filedialog.askopenfilename(title=t('select_update_application'))
         if path:
             self.body_path.set(path)
+            self.body_var.set(1)
 
     def choose_pak(self):
         path = filedialog.askdirectory(title=t('select_update_pakset'))
@@ -1665,6 +1666,7 @@ class update_schedule_window(tk.Frame):
                 messagebox.showerror(t('pakset_validation_title'), t('pakset_validation_message'), parent=self.master)
                 return
             self.pak_path.set(path)
+            self.pak_var.set(1)
 
     def register(self):
         update_data = self.validate_update_inputs()

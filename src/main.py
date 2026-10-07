@@ -2772,7 +2772,7 @@ nettool_discord_group = app_commands.Group(name='nettool', description=discord_l
 admin_discord_group.add_command(nettool_discord_group)
 
 def register_nettool_discord_command(name, argument_name=None, needs_password=False):
-    async def callback(interaction, value: str = '', password: str = '', apply_ban_setting: bool = False):
+    async def execute(interaction, value='', password='', apply_ban_setting=False):
         if not await require_discord_command_permission(interaction): return
         if argument_name and not value.strip():
             await discord_command_response(interaction, t('nettool_argument_required'))
@@ -2783,25 +2783,44 @@ def register_nettool_discord_command(name, argument_name=None, needs_password=Fa
         await interaction.response.defer(ephemeral=True, thinking=True)
         result = await discord_run_nettool(name, value.strip(), password.strip(), apply_ban_setting)
         await discord_command_response(interaction, result)
+
+    descriptions = {}
+    if not argument_name:
+        async def callback(interaction):
+            await execute(interaction)
+    elif needs_password:
+        async def callback(interaction, value: str, password: str):
+            await execute(interaction, value=value, password=password)
+        descriptions.update(
+            value=discord_locale(
+                f'discord_command_argument_nettool_{argument_name}', append_admin_only=False,
+            ),
+            password=discord_locale(
+                'discord_command_argument_nettool_password', append_admin_only=False,
+            ),
+        )
+    elif name in ('ban-ip', 'unban-ip'):
+        async def callback(interaction, value: str, apply_ban_setting: bool = False):
+            await execute(interaction, value=value, apply_ban_setting=apply_ban_setting)
+        descriptions.update(
+            value=discord_locale(
+                f'discord_command_argument_nettool_{argument_name}', append_admin_only=False,
+            ),
+            apply_ban_setting=discord_locale(
+                'discord_command_argument_nettool_apply_ban_setting', append_admin_only=False,
+            ),
+        )
+    else:
+        async def callback(interaction, value: str):
+            await execute(interaction, value=value)
+        descriptions['value'] = discord_locale(
+            f'discord_command_argument_nettool_{argument_name}', append_admin_only=False,
+        )
+
     callback.__name__ = 'nettool_' + name.replace('-', '_')
     callback.__doc__ = 'Run nettool ' + name
-    value_description_key = (
-        f'discord_command_argument_nettool_{argument_name}'
-        if argument_name else 'discord_command_argument_unused'
-    )
-    password_description_key = (
-        'discord_command_argument_nettool_password'
-        if needs_password else 'discord_command_argument_unused'
-    )
-    ban_setting_description_key = (
-        'discord_command_argument_nettool_apply_ban_setting'
-        if name in ('ban-ip', 'unban-ip') else 'discord_command_argument_unused'
-    )
-    callback = app_commands.describe(
-        value=discord_locale(value_description_key, append_admin_only=False),
-        password=discord_locale(password_description_key, append_admin_only=False),
-        apply_ban_setting=discord_locale(ban_setting_description_key, append_admin_only=False),
-    )(callback)
+    if descriptions:
+        callback = app_commands.describe(**descriptions)(callback)
     nettool_discord_group.command(
         name=name, description=discord_locale(f'discord_command_description_nettool_{name.replace("-", "_")}')
     )(callback)

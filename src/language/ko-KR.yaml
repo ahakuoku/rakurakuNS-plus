@@ -318,7 +318,6 @@ strings:
   discord_command_argument_backup: 점검 시작 시 장기 백업을 생성할지 지정합니다.
   discord_command_argument_rollback_when: 롤백 시각을 YYYY/MM/DD HH:MM 또는 HH:MM 형식으로 지정합니다.
   discord_command_argument_schedule_when: 변경할 업데이트 시각을 YYYY/MM/DD HH:MM 또는 HH:MM 형식으로 지정합니다.
-  discord_command_argument_unused: 이 명령에서는 사용하지 않습니다.
   discord_command_argument_nettool_company_number: 회사 번호를 지정합니다.
   discord_command_argument_nettool_client_number: 클라이언트 번호를 지정합니다.
   discord_command_argument_nettool_ip_address: IP 주소를 지정합니다.

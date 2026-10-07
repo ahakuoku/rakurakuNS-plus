@@ -318,7 +318,6 @@ strings:
   discord_command_argument_backup: 指定維護開始時是否建立長期備份。
   discord_command_argument_rollback_when: 以YYYY/MM/DD HH:MM或HH:MM格式指定回復時間。
   discord_command_argument_schedule_when: 以YYYY/MM/DD HH:MM或HH:MM格式指定新的更新時間。
-  discord_command_argument_unused: 此命令不使用此參數。
   discord_command_argument_nettool_company_number: 指定公司編號。
   discord_command_argument_nettool_client_number: 指定客戶端編號。
   discord_command_argument_nettool_ip_address: 指定IP位址。

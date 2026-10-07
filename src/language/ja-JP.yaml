@@ -318,7 +318,6 @@ strings:
   discord_command_argument_backup: メンテナンス開始時に長期バックアップを作成するか指定します。
   discord_command_argument_rollback_when: ロールバック先の時刻をYYYY/MM/DD HH:MMまたはHH:MMで指定します。
   discord_command_argument_schedule_when: 変更後の更新時刻をYYYY/MM/DD HH:MMまたはHH:MMで指定します。
-  discord_command_argument_unused: このコマンドでは使用しません。
   discord_command_argument_nettool_company_number: 会社番号を指定します。
   discord_command_argument_nettool_client_number: クライアント番号を指定します。
   discord_command_argument_nettool_ip_address: IPアドレスを指定します。

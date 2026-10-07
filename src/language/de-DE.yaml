@@ -318,7 +318,6 @@ strings:
   discord_command_argument_backup: Gibt an, ob beim Wartungsbeginn ein Langzeit-Backup erstellt wird.
   discord_command_argument_rollback_when: Rollback-Zeit im Format YYYY/MM/DD HH:MM oder HH:MM.
   discord_command_argument_schedule_when: Neue Update-Zeit im Format YYYY/MM/DD HH:MM oder HH:MM.
-  discord_command_argument_unused: Wird von diesem Befehl nicht verwendet.
   discord_command_argument_nettool_company_number: Unternehmensnummer.
   discord_command_argument_nettool_client_number: Clientnummer.
   discord_command_argument_nettool_ip_address: IP-Adresse.

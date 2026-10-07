@@ -313,6 +313,8 @@ strings:
   discord_rollback_save_changed: The selected save was changed or deleted while awaiting confirmation. Run the rollback command again.
   discord_rollback_started: 'Rollback to {timestamp} has started.'
   discord_rollback_start_failed: 'Could not start rollback: {error}'
+  discord_command_admin_only: Only administrators can run this command.
+  discord_command_description_admin: Run an administrative command.
   discord_command_description_restart: Restart the server.
   discord_command_description_manual_save: Save the server without stopping it.
   discord_command_description_maintenance: Pause or resume the server.

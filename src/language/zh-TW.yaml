@@ -313,6 +313,8 @@ strings:
   discord_rollback_save_changed: 等待確認時，所選儲存資料已被修改或刪除。請重新執行回復命令。
   discord_rollback_started: '已開始回復到 {timestamp}。'
   discord_rollback_start_failed: '無法開始回復: {error}'
+  discord_command_admin_only: 僅限管理員執行此命令。
+  discord_command_description_admin: 執行管理命令。
   discord_command_description_restart: 重新啟動伺服器。
   discord_command_description_manual_save: 不停止伺服器即可儲存。
   discord_command_description_maintenance: 暫停或恢復伺服器。

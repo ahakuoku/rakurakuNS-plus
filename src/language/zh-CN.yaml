@@ -313,6 +313,8 @@ strings:
   discord_rollback_save_changed: 等待确认时，所选保存数据已被修改或删除。请重新执行回滚命令。
   discord_rollback_started: '已开始回滚到 {timestamp}。'
   discord_rollback_start_failed: '无法开始回滚: {error}'
+  discord_command_admin_only: 仅管理员可以执行此命令。
+  discord_command_description_admin: 执行管理命令。
   discord_command_description_restart: 重启服务器。
   discord_command_description_manual_save: 不停止服务器即可保存。
   discord_command_description_maintenance: 暂停或恢复服务器。

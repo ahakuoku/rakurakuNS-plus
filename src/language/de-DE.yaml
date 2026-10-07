@@ -313,6 +313,8 @@ strings:
   discord_rollback_save_changed: Der ausgewählte Spielstand wurde während der Bestätigung geändert oder gelöscht. Führen Sie den Rollback-Befehl erneut aus.
   discord_rollback_started: 'Rollback auf {timestamp} wurde gestartet.'
   discord_rollback_start_failed: 'Rollback konnte nicht gestartet werden: {error}'
+  discord_command_admin_only: Nur Administratoren können diesen Befehl ausführen.
+  discord_command_description_admin: Einen Verwaltungsbefehl ausführen.
   discord_command_description_restart: Server neu starten.
   discord_command_description_manual_save: Server ohne Anhalten speichern.
   discord_command_description_maintenance: Server anhalten oder fortsetzen.

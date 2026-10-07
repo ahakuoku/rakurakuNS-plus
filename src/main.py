@@ -173,11 +173,18 @@ class DiscordYamlTranslator(app_commands.Translator):
         if key is None:
             return None
         code = {'ja': 'ja-JP', 'ko': 'ko-KR', 'de': 'de-DE'}.get(locale.value, locale.value)
-        return self.language_packs.get(code, {}).get(key)
+        language_pack = self.language_packs.get(code, {})
+        translated = language_pack.get(key)
+        admin_only = language_pack.get('discord_command_admin_only')
+        if translated is None:
+            return None
+        return f'{translated} {admin_only}' if admin_only else translated
 
 def discord_locale(key):
     """Provide a readable Discord default while retaining the language-pack key."""
-    return app_commands.locale_str(t(key), translation_key=key)
+    return app_commands.locale_str(
+        f"{t(key)} {t('discord_command_admin_only')}", translation_key=key,
+    )
 
 # UI部品の文字列を一か所で言語パックへ接続する。既存画面の文言も
 # widget生成時に通過するため、新しい画面を追加する際の漏れを防ぐ。
@@ -2534,19 +2541,23 @@ def update_discord_ban_setting(ip, enabled):
         yaml.safe_dump(config_data, config_file, allow_unicode=True, sort_keys=False)
     load_config()
 
-@discord_commands.command(name='restart', description=discord_locale('discord_command_description_restart'))
+admin_discord_group = app_commands.Group(
+    name='admin', description=discord_locale('discord_command_description_admin'),
+)
+
+@admin_discord_group.command(name='restart', description=discord_locale('discord_command_description_restart'))
 async def discord_restart(interaction):
     if not await require_discord_command_permission(interaction): return
     restart_server_threaded(2)
     await discord_command_response(interaction, t('discord_command_accepted'), include_result=False)
 
-@discord_commands.command(name='manual-save', description=discord_locale('discord_command_description_manual_save'))
+@admin_discord_group.command(name='manual-save', description=discord_locale('discord_command_description_manual_save'))
 async def discord_manual_save(interaction):
     if not await require_discord_command_permission(interaction): return
     threading.Thread(target=manual_save, daemon=True).start()
     await discord_command_response(interaction, t('discord_command_accepted'), include_result=False)
 
-@discord_commands.command(name='maintenance', description=discord_locale('discord_command_description_maintenance'))
+@admin_discord_group.command(name='maintenance', description=discord_locale('discord_command_description_maintenance'))
 @app_commands.describe(backup='Create a long-term backup when pausing.')
 async def discord_maintenance(interaction, backup: bool = False):
     global start_code
@@ -2565,13 +2576,13 @@ async def discord_maintenance(interaction, backup: bool = False):
     persist_runtime_state()
     await discord_command_response(interaction, t('discord_command_accepted'), include_result=False)
 
-@discord_commands.command(name='force-stop', description=discord_locale('discord_command_description_force_stop'))
+@admin_discord_group.command(name='force-stop', description=discord_locale('discord_command_description_force_stop'))
 async def discord_force_stop(interaction):
     if not await require_discord_command_permission(interaction): return
     threading.Thread(target=force_stop_server, daemon=True).start()
     await discord_command_response(interaction, t('discord_command_accepted'), include_result=False)
 
-@discord_commands.command(name='close-session', description=discord_locale('discord_command_description_close_session'))
+@admin_discord_group.command(name='close-session', description=discord_locale('discord_command_description_close_session'))
 async def discord_close_session(interaction):
     if not await require_discord_command_permission(interaction): return
     def close_session():
@@ -2580,7 +2591,7 @@ async def discord_close_session(interaction):
     threading.Thread(target=close_session, daemon=True).start()
     await discord_command_response(interaction, t('discord_command_accepted'), include_result=False)
 
-@discord_commands.command(name='exit-app', description=discord_locale('discord_command_description_exit_app'))
+@admin_discord_group.command(name='exit-app', description=discord_locale('discord_command_description_exit_app'))
 async def discord_exit_app(interaction):
     if not await require_discord_command_permission(interaction): return
     await discord_command_response(interaction, t('discord_command_accepted'), include_result=False)
@@ -2677,7 +2688,7 @@ class DiscordRollbackConfirmation(discord.ui.View):
             print_gui_log(t('log_discord_command_result_post_failed', error=response_error))
 
 
-@discord_commands.command(name='rollback', description=discord_locale('discord_command_description_rollback'))
+@admin_discord_group.command(name='rollback', description=discord_locale('discord_command_description_rollback'))
 @app_commands.describe(when='YYYY/MM/DD HH:MM or HH:MM')
 async def discord_rollback(interaction, when: str):
     if not await require_discord_command_permission(interaction): return
@@ -2700,12 +2711,12 @@ async def discord_rollback(interaction, when: str):
         content=t('discord_rollback_confirmation', timestamp=timestamp), view=view,
     )
 
-@discord_commands.command(name='cancel-scheduled-update', description=discord_locale('discord_command_description_cancel_scheduled_update'))
+@admin_discord_group.command(name='cancel-scheduled-update', description=discord_locale('discord_command_description_cancel_scheduled_update'))
 async def discord_cancel_scheduled_update(interaction):
     if not await require_discord_command_permission(interaction): return
     await discord_command_response(interaction, t('cancellation_complete') if cancel_scheduled_update() else t('no_update_schedule'))
 
-@discord_commands.command(name='schedule-update', description=discord_locale('discord_command_description_schedule_update'))
+@admin_discord_group.command(name='schedule-update', description=discord_locale('discord_command_description_schedule_update'))
 @app_commands.describe(when='YYYY/MM/DD HH:MM or HH:MM')
 async def discord_schedule_update(interaction, when: str):
     if not await require_discord_command_permission(interaction): return
@@ -2729,7 +2740,7 @@ async def discord_schedule_update(interaction, when: str):
     persist_runtime_state()
     await discord_command_response(interaction, t('discord_command_accepted'), include_result=False)
 
-@discord_commands.command(name='update-now', description=discord_locale('discord_command_description_update_now'))
+@admin_discord_group.command(name='update-now', description=discord_locale('discord_command_description_update_now'))
 async def discord_update_now(interaction):
     if not await require_discord_command_permission(interaction): return
     global scheduled_updates
@@ -2747,7 +2758,7 @@ async def discord_update_now(interaction):
     await discord_command_response(interaction, t('discord_command_accepted'), include_result=False)
 
 nettool_discord_group = app_commands.Group(name='nettool', description=discord_locale('discord_command_description_nettool'))
-discord_commands.add_command(nettool_discord_group)
+admin_discord_group.add_command(nettool_discord_group)
 
 def register_nettool_discord_command(name, argument_name=None, needs_password=False):
     async def callback(interaction, value: str = '', password: str = '', apply_ban_setting: bool = False):
@@ -2782,6 +2793,7 @@ for _name, _argument, _password in (
 ):
     register_nettool_discord_command(_name, _argument, _password)
 
+discord_commands.add_command(admin_discord_group)
 discord_command_registry = tuple(discord_commands.get_commands())
 
 def set_discord_command_tree_enabled(enabled):

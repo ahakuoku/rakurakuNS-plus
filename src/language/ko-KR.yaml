@@ -313,6 +313,8 @@ strings:
   discord_rollback_save_changed: 확인 대기 중 대상 저장 데이터가 변경되거나 삭제되었습니다. 롤백 명령을 다시 실행하세요.
   discord_rollback_started: '{timestamp} 시점으로 롤백을 시작했습니다.'
   discord_rollback_start_failed: '롤백을 시작하지 못했습니다: {error}'
+  discord_command_admin_only: 관리자만 실행할 수 있습니다.
+  discord_command_description_admin: 관리 명령을 실행합니다.
   discord_command_description_restart: 서버를 다시 시작합니다.
   discord_command_description_manual_save: 서버를 중지하지 않고 저장합니다.
   discord_command_description_maintenance: 서버를 일시 정지하거나 재개합니다.

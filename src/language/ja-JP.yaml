@@ -280,3 +280,56 @@ strings:
   help_discord_channel: Discord botが書き込むチャンネルIDを指定します。
   help_player_passwords: 会社番号ごとのパスワードを入力します。空欄の会社にはパスワードを設定しません。
   help_ban_ips: 1行につき、1つのIPアドレスの形式で入力します。最大63件です。
+  discord_command_users: Discordコマンド許可ユーザー
+  config_discord_command_enabled: Discordからのコマンド入力を受け付ける
+  config_discord_command_users: コマンドを許可するDiscordユーザーID
+  help_discord_command_enabled: 有効にすると、登録したユーザーIDからのDiscordスラッシュコマンドを全チャンネルで受け付けます。
+  help_discord_command_users: DiscordユーザーIDだけを1行に1件入力します。最大63件です。従来の番号=ID形式（番号は0～62）も使用できます。
+  discord_command_users_notice: DiscordユーザーID（1行に1件・最大63件）
+  discord_command_user_line_invalid: '{line}行目の形式が不正です。ユーザーID、または0～62の重複しない番号=IDを入力してください。'
+  discord_command_users_limit: Discordコマンド許可ユーザーは最大63件です。
+  discord_user_id_required: DiscordユーザーIDは17～20桁の数字で入力してください。
+  discord_command_disabled: Discordコマンド入力は無効です。
+  discord_command_not_allowed: このDiscordユーザーにはコマンド実行権限がありません。
+  discord_command_accepted: コマンドを受け付けました。
+  discord_command_result_actor: 実行者
+  discord_command_result_invocation: コマンド
+  discord_command_result_output: 実行結果
+  log_discord_commands_synced: Discordスラッシュコマンドを同期しました。
+  log_discord_command_sync_failed: 'Discordスラッシュコマンドの同期に失敗しました: {error}'
+  config_discord_command_result_enabled: コマンド結果を専用チャンネルへ出力する
+  config_discord_command_result_channel: チャンネルID
+  help_discord_command_result_enabled: 有効にすると、コマンド結果を指定した専用チャンネルへ投稿します。
+  help_discord_command_result_channel: コマンド結果を投稿するDiscordチャンネルIDを指定します。
+  log_discord_command_result_post_failed: 'Discordコマンド結果の投稿に失敗しました: {error}'
+  rollback_datetime: ロールバック先時刻（YYYY/MM/DD HH:MM、日付省略時は当日）
+  rollback_by_time: 時刻指定
+  rollback_by_file: ファイル指定
+  rollback_file_read_failed: 'ロールバック先のセーブデータを読み取れません: {error}'
+  rollback_autosave_not_found: 指定時刻以前のオートセーブデータが見つかりません。
+  discord_command_description_restart: サーバーを再起動します。
+  discord_command_description_manual_save: サーバーを停止せず手動セーブします。
+  discord_command_description_maintenance: サーバーを一時停止または再開します。
+  discord_command_description_force_stop: サーバープロセスを強制終了します。
+  discord_command_description_close_session: サーバーを停止してアプリを終了します。
+  discord_command_description_exit_app: サーバーを停止せずアプリを終了します。
+  discord_command_description_rollback: 指定時刻直前のオートセーブへ戻します。
+  discord_command_description_cancel_scheduled_update: 更新スケジュールを取り消します。
+  discord_command_description_schedule_update: 既存の更新スケジュール時刻を変更します。
+  discord_command_description_update_now: 予約済み更新を直ちに実行します。
+  discord_command_description_nettool: nettoolコマンドを実行します。
+  discord_command_description_nettool_announce: サーバー情報を公開します。
+  discord_command_description_nettool_clients: 接続中のクライアントを表示します。
+  discord_command_description_nettool_companies: 会社一覧を表示します。
+  discord_command_description_nettool_info_company: 会社情報を表示します。
+  discord_command_description_nettool_blacklist: ブラックリストを表示します。
+  discord_command_description_nettool_lock_company: 会社をロックします。
+  discord_command_description_nettool_unlock_company: 会社のロックを解除します。
+  discord_command_description_nettool_remove_company: 会社を削除します。
+  discord_command_description_nettool_kick_client: クライアントを切断します。
+  discord_command_description_nettool_ban_client: クライアントをBANします。
+  discord_command_description_nettool_ban_ip: IPアドレスをBANします。
+  discord_command_description_nettool_unban_ip: IPアドレスのBANを解除します。
+  discord_command_description_nettool_say: サーバー内メッセージを送信します。
+  discord_command_description_nettool_force_sync: セーブと再ロードを要求します。
+  discord_command_description_nettool_shutdown: サーバーを終了します。

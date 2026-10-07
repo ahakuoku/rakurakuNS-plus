@@ -280,5 +280,58 @@ strings:
   help_discord_channel: Specify the channel ID where the Discord bot posts.
   help_player_passwords: Enter a password for each company; blank companies have no password.
   help_ban_ips: Enter one IP address per line. You can enter up to 63 addresses.
+  discord_command_users: Discord command users
+  config_discord_command_enabled: Accept commands from Discord
+  config_discord_command_users: Discord user IDs allowed to run commands
+  help_discord_command_enabled: When enabled, accept Discord slash commands from registered user IDs in every channel.
+  help_discord_command_users: Enter one Discord user ID per line, up to 63 entries. The legacy number=ID format (numbers 0 to 62) is also supported.
+  discord_command_users_notice: Discord user IDs (one per line, up to 63)
+  discord_command_user_line_invalid: 'Invalid format on line {line}. Enter a user ID or unique number=ID with a number from 0 to 62.'
+  discord_command_users_limit: At most 63 Discord command users can be configured.
+  discord_user_id_required: Enter a Discord user ID as a 17 to 20 digit number.
+  discord_command_disabled: Discord command input is disabled.
+  discord_command_not_allowed: This Discord user is not allowed to run commands.
+  discord_command_accepted: Command accepted.
+  discord_command_result_actor: Executed by
+  discord_command_result_invocation: Command
+  discord_command_result_output: Result
+  log_discord_commands_synced: Discord slash commands synchronized.
+  log_discord_command_sync_failed: 'Failed to synchronize Discord slash commands: {error}'
+  config_discord_command_result_enabled: Post command results to a dedicated channel
+  config_discord_command_result_channel: Channel ID
+  help_discord_command_result_enabled: When enabled, post command results to the configured dedicated channel.
+  help_discord_command_result_channel: Specify the Discord channel ID for command results.
+  log_discord_command_result_post_failed: 'Failed to post Discord command result: {error}'
+  rollback_datetime: Rollback time (YYYY/MM/DD HH:MM; today if date is omitted)
+  rollback_by_time: Specify time
+  rollback_by_file: Specify file
+  rollback_file_read_failed: 'Cannot read the rollback save data: {error}'
+  rollback_autosave_not_found: No autosave data exists at or before the specified time.
+  discord_command_description_restart: Restart the server.
+  discord_command_description_manual_save: Save the server without stopping it.
+  discord_command_description_maintenance: Pause or resume the server.
+  discord_command_description_force_stop: Force-stop the server process.
+  discord_command_description_close_session: Stop the server and close this application.
+  discord_command_description_exit_app: Close this application without stopping the server.
+  discord_command_description_rollback: Roll back to the autosave immediately before a time.
+  discord_command_description_cancel_scheduled_update: Cancel the scheduled update.
+  discord_command_description_schedule_update: Change the time of the scheduled update.
+  discord_command_description_update_now: Immediately run the scheduled update.
+  discord_command_description_nettool: Run a nettool command.
+  discord_command_description_nettool_announce: Publish server information.
+  discord_command_description_nettool_clients: Show connected clients.
+  discord_command_description_nettool_companies: Show companies.
+  discord_command_description_nettool_info_company: Show company information.
+  discord_command_description_nettool_blacklist: Show the blacklist.
+  discord_command_description_nettool_lock_company: Lock a company.
+  discord_command_description_nettool_unlock_company: Unlock a company.
+  discord_command_description_nettool_remove_company: Remove a company.
+  discord_command_description_nettool_kick_client: Disconnect a client.
+  discord_command_description_nettool_ban_client: Ban a client.
+  discord_command_description_nettool_ban_ip: Ban an IP address.
+  discord_command_description_nettool_unban_ip: Remove an IP ban.
+  discord_command_description_nettool_say: Send a server message.
+  discord_command_description_nettool_force_sync: Request a save and reload.
+  discord_command_description_nettool_shutdown: Shut down the server.
 
 

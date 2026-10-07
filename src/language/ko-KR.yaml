@@ -280,4 +280,57 @@ strings:
   help_discord_channel: "Discord bot가 기록할 채널 ID를 지정합니다."
   help_player_passwords: "회사 번호별 비밀번호를 입력합니다. 비어 있는 회사는 비밀번호를 설정하지 않습니다."
   help_ban_ips: "한 줄에 하나의 IP 주소 형식으로 입력합니다. 최대 63건입니다."
+  discord_command_users: Discord 명령 허용 사용자
+  config_discord_command_enabled: Discord에서 명령 입력 허용
+  config_discord_command_users: 명령을 허용할 Discord 사용자 ID
+  help_discord_command_enabled: 활성화하면 등록한 사용자 ID의 Discord 슬래시 명령을 모든 채널에서 받습니다.
+  help_discord_command_users: Discord 사용자 ID만 한 줄에 하나씩 입력합니다. 최대 63건이며 기존 번호=ID 형식(번호 0~62)도 지원합니다.
+  discord_command_users_notice: Discord 사용자 ID (한 줄에 하나, 최대 63건)
+  discord_command_user_line_invalid: '{line}번째 줄의 형식이 잘못되었습니다. 사용자 ID 또는 중복되지 않는 0~62 번호=ID를 입력하세요.'
+  discord_command_users_limit: Discord 명령 허용 사용자는 최대 63건입니다.
+  discord_user_id_required: Discord 사용자 ID는 17~20자리 숫자로 입력하세요.
+  discord_command_disabled: Discord 명령 입력이 비활성화되어 있습니다.
+  discord_command_not_allowed: 이 Discord 사용자는 명령을 실행할 권한이 없습니다.
+  discord_command_accepted: 명령을 접수했습니다.
+  discord_command_result_actor: 실행자
+  discord_command_result_invocation: 명령
+  discord_command_result_output: 실행 결과
+  log_discord_commands_synced: Discord 슬래시 명령을 동기화했습니다.
+  log_discord_command_sync_failed: 'Discord 슬래시 명령 동기화에 실패했습니다: {error}'
+  config_discord_command_result_enabled: 명령 결과를 전용 채널에 출력
+  config_discord_command_result_channel: 채널 ID
+  help_discord_command_result_enabled: 활성화하면 명령 결과를 지정한 전용 채널에 게시합니다.
+  help_discord_command_result_channel: 명령 결과를 게시할 Discord 채널 ID를 지정합니다.
+  log_discord_command_result_post_failed: 'Discord 명령 결과 게시에 실패했습니다: {error}'
+  rollback_datetime: 롤백 시각 (YYYY/MM/DD HH:MM, 날짜 생략 시 오늘)
+  rollback_by_time: 시각 지정
+  rollback_by_file: 파일 지정
+  rollback_file_read_failed: '롤백 대상 저장 데이터를 읽을 수 없습니다: {error}'
+  rollback_autosave_not_found: 지정한 시각 이전의 자동 저장 데이터를 찾을 수 없습니다.
+  discord_command_description_restart: 서버를 다시 시작합니다.
+  discord_command_description_manual_save: 서버를 중지하지 않고 저장합니다.
+  discord_command_description_maintenance: 서버를 일시 정지하거나 재개합니다.
+  discord_command_description_force_stop: 서버 프로세스를 강제 종료합니다.
+  discord_command_description_close_session: 서버를 중지하고 앱을 종료합니다.
+  discord_command_description_exit_app: 서버를 중지하지 않고 앱을 종료합니다.
+  discord_command_description_rollback: 지정 시각 직전 자동 저장으로 되돌립니다.
+  discord_command_description_cancel_scheduled_update: 예약된 업데이트를 취소합니다.
+  discord_command_description_schedule_update: 예약된 업데이트 시간을 변경합니다.
+  discord_command_description_update_now: 예약된 업데이트를 즉시 실행합니다.
+  discord_command_description_nettool: nettool 명령을 실행합니다.
+  discord_command_description_nettool_announce: 서버 정보를 공개합니다.
+  discord_command_description_nettool_clients: 연결된 클라이언트를 표시합니다.
+  discord_command_description_nettool_companies: 회사를 표시합니다.
+  discord_command_description_nettool_info_company: 회사 정보를 표시합니다.
+  discord_command_description_nettool_blacklist: 차단 목록을 표시합니다.
+  discord_command_description_nettool_lock_company: 회사를 잠급니다.
+  discord_command_description_nettool_unlock_company: 회사 잠금을 해제합니다.
+  discord_command_description_nettool_remove_company: 회사를 제거합니다.
+  discord_command_description_nettool_kick_client: 클라이언트 연결을 끊습니다.
+  discord_command_description_nettool_ban_client: 클라이언트를 차단합니다.
+  discord_command_description_nettool_ban_ip: IP 주소를 차단합니다.
+  discord_command_description_nettool_unban_ip: IP 차단을 해제합니다.
+  discord_command_description_nettool_say: 서버 메시지를 보냅니다.
+  discord_command_description_nettool_force_sync: 저장 및 다시 로드를 요청합니다.
+  discord_command_description_nettool_shutdown: 서버를 종료합니다.
 

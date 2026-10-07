@@ -280,4 +280,57 @@ strings:
   help_discord_channel: Geben Sie die Kanal-ID an, auf der der Discord-Bot Beiträge postet.
   help_player_passwords: Geben Sie für jedes Unternehmen ein Passwort ein; leere Unternehmen haben kein Passwort.
   help_ban_ips: Geben Sie pro Zeile eine IP-Adresse ein. Sie können bis zu 63 Adressen eingeben.
+  discord_command_users: Discord-Befehlsbenutzer
+  config_discord_command_enabled: Befehle von Discord akzeptieren
+  config_discord_command_users: Discord-Benutzer-IDs mit Befehlsberechtigung
+  help_discord_command_enabled: Akzeptiert Slash-Befehle von registrierten Benutzer-IDs in jedem Kanal.
+  help_discord_command_users: Geben Sie eine Discord-Benutzer-ID pro Zeile ein, maximal 63 Einträge. Nummer=ID (Nummern 0 bis 62) wird weiterhin unterstützt.
+  discord_command_users_notice: Discord-Benutzer-IDs (eine pro Zeile, maximal 63)
+  discord_command_user_line_invalid: 'Ungültiges Format in Zeile {line}. Geben Sie eine Benutzer-ID oder eine eindeutige Nummer=ID von 0 bis 62 ein.'
+  discord_command_users_limit: Maximal 63 Discord-Befehlsbenutzer können konfiguriert werden.
+  discord_user_id_required: Geben Sie eine Discord-Benutzer-ID mit 17 bis 20 Ziffern ein.
+  discord_command_disabled: Die Discord-Befehlseingabe ist deaktiviert.
+  discord_command_not_allowed: Dieser Discord-Benutzer darf keine Befehle ausführen.
+  discord_command_accepted: Befehl akzeptiert.
+  discord_command_result_actor: Ausgeführt von
+  discord_command_result_invocation: Befehl
+  discord_command_result_output: Ergebnis
+  log_discord_commands_synced: Discord-Slash-Befehle synchronisiert.
+  log_discord_command_sync_failed: 'Discord-Slash-Befehle konnten nicht synchronisiert werden: {error}'
+  config_discord_command_result_enabled: Befehlergebnisse in einem speziellen Kanal posten
+  config_discord_command_result_channel: Kanal-ID
+  help_discord_command_result_enabled: Postet Befehlergebnisse in den konfigurierten speziellen Kanal.
+  help_discord_command_result_channel: Geben Sie die Discord-Kanal-ID für Befehlergebnisse an.
+  log_discord_command_result_post_failed: 'Discord-Befehlergebnis konnte nicht gepostet werden: {error}'
+  rollback_datetime: Rollback-Zeit (YYYY/MM/DD HH:MM; ohne Datum heute)
+  rollback_by_time: Zeitpunkt angeben
+  rollback_by_file: Datei angeben
+  rollback_file_read_failed: 'Die Speicherdaten für das Rollback können nicht gelesen werden: {error}'
+  rollback_autosave_not_found: Es gibt keine Autosave-Daten vor dem angegebenen Zeitpunkt.
+  discord_command_description_restart: Server neu starten.
+  discord_command_description_manual_save: Server ohne Anhalten speichern.
+  discord_command_description_maintenance: Server anhalten oder fortsetzen.
+  discord_command_description_force_stop: Serverprozess zwangsweise beenden.
+  discord_command_description_close_session: Server stoppen und Anwendung schließen.
+  discord_command_description_exit_app: Anwendung ohne Serverstopp schließen.
+  discord_command_description_rollback: Zum Autosave vor einem Zeitpunkt zurückkehren.
+  discord_command_description_cancel_scheduled_update: Geplantes Update abbrechen.
+  discord_command_description_schedule_update: Zeit des geplanten Updates ändern.
+  discord_command_description_update_now: Geplantes Update sofort ausführen.
+  discord_command_description_nettool: Einen nettool-Befehl ausführen.
+  discord_command_description_nettool_announce: Serverinformationen veröffentlichen.
+  discord_command_description_nettool_clients: Verbundene Clients anzeigen.
+  discord_command_description_nettool_companies: Unternehmen anzeigen.
+  discord_command_description_nettool_info_company: Unternehmensinformationen anzeigen.
+  discord_command_description_nettool_blacklist: Sperrliste anzeigen.
+  discord_command_description_nettool_lock_company: Unternehmen sperren.
+  discord_command_description_nettool_unlock_company: Unternehmen entsperren.
+  discord_command_description_nettool_remove_company: Unternehmen entfernen.
+  discord_command_description_nettool_kick_client: Client trennen.
+  discord_command_description_nettool_ban_client: Client sperren.
+  discord_command_description_nettool_ban_ip: IP-Adresse sperren.
+  discord_command_description_nettool_unban_ip: IP-Sperre aufheben.
+  discord_command_description_nettool_say: Servernachricht senden.
+  discord_command_description_nettool_force_sync: Speichern und Neuladen anfordern.
+  discord_command_description_nettool_shutdown: Server beenden.
 

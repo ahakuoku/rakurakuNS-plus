@@ -280,4 +280,57 @@ strings:
   help_discord_channel: 指定 Discord 机器人发布的频道 ID。
   help_player_passwords: 输入每个公司的密码；空白公司没有密码。
   help_ban_ips: 每行输入一个 IP 地址。您最多可以输入 63 个地址。
+  discord_command_users: Discord 命令用户
+  config_discord_command_enabled: 接受来自 Discord 的命令
+  config_discord_command_users: 允许执行命令的 Discord 用户 ID
+  help_discord_command_enabled: 启用后，接受已注册用户 ID 在所有频道发出的 Discord 斜杠命令。
+  help_discord_command_users: 每行只输入一个 Discord 用户 ID，最多 63 条。也支持旧的编号=ID格式（编号为0至62）。
+  discord_command_users_notice: Discord 用户 ID（每行一个，最多63条）
+  discord_command_user_line_invalid: '第{line}行格式无效。请输入用户 ID，或不重复的0至62编号=ID。'
+  discord_command_users_limit: 最多可设置63个 Discord 命令用户。
+  discord_user_id_required: Discord 用户 ID 必须是 17 到 20 位数字。
+  discord_command_disabled: Discord 命令输入已禁用。
+  discord_command_not_allowed: 此 Discord 用户无权执行命令。
+  discord_command_accepted: 命令已接受。
+  discord_command_result_actor: 执行者
+  discord_command_result_invocation: 命令
+  discord_command_result_output: 执行结果
+  log_discord_commands_synced: 已同步 Discord 斜杠命令。
+  log_discord_command_sync_failed: '无法同步 Discord 斜杠命令: {error}'
+  config_discord_command_result_enabled: 将命令结果发布到专用频道
+  config_discord_command_result_channel: 频道 ID
+  help_discord_command_result_enabled: 启用后，将命令结果发布到指定的专用频道。
+  help_discord_command_result_channel: 指定用于发布命令结果的 Discord 频道 ID。
+  log_discord_command_result_post_failed: '发布 Discord 命令结果失败: {error}'
+  rollback_datetime: 回滚时间（YYYY/MM/DD HH:MM；省略日期时为今天）
+  rollback_by_time: 指定时间
+  rollback_by_file: 指定文件
+  rollback_file_read_failed: '无法读取回滚保存数据: {error}'
+  rollback_autosave_not_found: 未找到指定时间或之前的自动保存数据。
+  discord_command_description_restart: 重启服务器。
+  discord_command_description_manual_save: 不停止服务器即可保存。
+  discord_command_description_maintenance: 暂停或恢复服务器。
+  discord_command_description_force_stop: 强制停止服务器进程。
+  discord_command_description_close_session: 停止服务器并关闭应用程序。
+  discord_command_description_exit_app: 不停止服务器而关闭应用程序。
+  discord_command_description_rollback: 回滚到指定时间前的自动保存。
+  discord_command_description_cancel_scheduled_update: 取消计划更新。
+  discord_command_description_schedule_update: 更改计划更新的时间。
+  discord_command_description_update_now: 立即运行计划更新。
+  discord_command_description_nettool: 运行 nettool 命令。
+  discord_command_description_nettool_announce: 发布服务器信息。
+  discord_command_description_nettool_clients: 显示已连接的客户端。
+  discord_command_description_nettool_companies: 显示公司。
+  discord_command_description_nettool_info_company: 显示公司信息。
+  discord_command_description_nettool_blacklist: 显示黑名单。
+  discord_command_description_nettool_lock_company: 锁定公司。
+  discord_command_description_nettool_unlock_company: 解锁公司。
+  discord_command_description_nettool_remove_company: 删除公司。
+  discord_command_description_nettool_kick_client: 断开客户端。
+  discord_command_description_nettool_ban_client: 封禁客户端。
+  discord_command_description_nettool_ban_ip: 封禁 IP 地址。
+  discord_command_description_nettool_unban_ip: 解除 IP 封禁。
+  discord_command_description_nettool_say: 发送服务器消息。
+  discord_command_description_nettool_force_sync: 请求保存并重新加载。
+  discord_command_description_nettool_shutdown: 关闭服务器。
 

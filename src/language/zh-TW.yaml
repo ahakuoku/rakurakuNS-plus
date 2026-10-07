@@ -280,5 +280,58 @@ strings:
   help_discord_channel: 指定 Discord 機器人發布的頻道 ID。
   help_player_passwords: 輸入每家公司的密碼；空白公司沒有密碼。
   help_ban_ips: 每行輸入一個 IP 位址。您最多可以輸入 63 個位址。
+  discord_command_users: Discord 命令使用者
+  config_discord_command_enabled: 接受來自 Discord 的命令
+  config_discord_command_users: 允許執行命令的 Discord 使用者 ID
+  help_discord_command_enabled: 啟用後，接受已註冊使用者 ID 在所有頻道發出的 Discord 斜線命令。
+  help_discord_command_users: 每行只輸入一個 Discord 使用者 ID，最多63筆。也支援舊的編號=ID格式（編號為0至62）。
+  discord_command_users_notice: Discord 使用者 ID（每行一個，最多63筆）
+  discord_command_user_line_invalid: '第{line}行格式無效。請輸入使用者 ID，或不重複的0至62編號=ID。'
+  discord_command_users_limit: 最多可設定63個 Discord 命令使用者。
+  discord_user_id_required: Discord 使用者 ID 必須是 17 到 20 位數字。
+  discord_command_disabled: Discord 命令輸入已停用。
+  discord_command_not_allowed: 此 Discord 使用者無權執行命令。
+  discord_command_accepted: 命令已接受。
+  discord_command_result_actor: 執行者
+  discord_command_result_invocation: 命令
+  discord_command_result_output: 執行結果
+  log_discord_commands_synced: 已同步 Discord 斜線命令。
+  log_discord_command_sync_failed: '無法同步 Discord 斜線命令: {error}'
+  config_discord_command_result_enabled: 將命令結果發佈到專用頻道
+  config_discord_command_result_channel: 頻道 ID
+  help_discord_command_result_enabled: 啟用後，將命令結果發佈到指定的專用頻道。
+  help_discord_command_result_channel: 指定用於發佈命令結果的 Discord 頻道 ID。
+  log_discord_command_result_post_failed: '發佈 Discord 命令結果失敗: {error}'
+  rollback_datetime: 回復時間（YYYY/MM/DD HH:MM；省略日期時為今天）
+  rollback_by_time: 指定時間
+  rollback_by_file: 指定檔案
+  rollback_file_read_failed: '無法讀取回復儲存資料: {error}'
+  rollback_autosave_not_found: 找不到指定時間或之前的自動儲存資料。
+  discord_command_description_restart: 重新啟動伺服器。
+  discord_command_description_manual_save: 不停止伺服器即可儲存。
+  discord_command_description_maintenance: 暫停或恢復伺服器。
+  discord_command_description_force_stop: 強制停止伺服器程序。
+  discord_command_description_close_session: 停止伺服器並關閉應用程式。
+  discord_command_description_exit_app: 不停止伺服器而關閉應用程式。
+  discord_command_description_rollback: 回復到指定時間前的自動儲存。
+  discord_command_description_cancel_scheduled_update: 取消排定更新。
+  discord_command_description_schedule_update: 變更排定更新的時間。
+  discord_command_description_update_now: 立即執行排定更新。
+  discord_command_description_nettool: 執行 nettool 命令。
+  discord_command_description_nettool_announce: 發佈伺服器資訊。
+  discord_command_description_nettool_clients: 顯示已連線的用戶端。
+  discord_command_description_nettool_companies: 顯示公司。
+  discord_command_description_nettool_info_company: 顯示公司資訊。
+  discord_command_description_nettool_blacklist: 顯示封鎖清單。
+  discord_command_description_nettool_lock_company: 鎖定公司。
+  discord_command_description_nettool_unlock_company: 解除公司鎖定。
+  discord_command_description_nettool_remove_company: 刪除公司。
+  discord_command_description_nettool_kick_client: 中斷用戶端連線。
+  discord_command_description_nettool_ban_client: 封鎖用戶端。
+  discord_command_description_nettool_ban_ip: 封鎖 IP 位址。
+  discord_command_description_nettool_unban_ip: 解除 IP 封鎖。
+  discord_command_description_nettool_say: 傳送伺服器訊息。
+  discord_command_description_nettool_force_sync: 請求儲存並重新載入。
+  discord_command_description_nettool_shutdown: 關閉伺服器。
 
 

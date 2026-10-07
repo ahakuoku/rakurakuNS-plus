@@ -111,6 +111,7 @@ import time
 
 try:
     import discord
+    from discord import app_commands
 except ModuleNotFoundError:
     input(
         '必要なモジュールがインストールされていません。\n'
@@ -120,6 +121,7 @@ except ModuleNotFoundError:
     sys.exit()
 
 import re
+import json
 import datetime
 import platform
 import shutil
@@ -142,6 +144,40 @@ except ModuleNotFoundError:
 from tkinter import ttk, filedialog, messagebox
 import array
 import tempfile
+
+class DiscordYamlTranslator(app_commands.Translator):
+    """Use the existing language packs for Discord application-command text."""
+    def __init__(self):
+        self.language_packs = {}
+
+    async def load(self):
+        # sync() translates thousands of fields. Read each YAML once, outside the
+        # gateway event loop, so translation cannot block Discord heartbeats.
+        self.language_packs = await asyncio.to_thread(self._load_language_packs)
+
+    def _load_language_packs(self):
+        packs = {}
+        for filename in os.listdir(language_dir):
+            if not filename.endswith('.yaml'):
+                continue
+            try:
+                with open(os.path.join(language_dir, filename), 'r', encoding='utf-8') as language_file:
+                    document = yaml.safe_load(language_file) or {}
+                packs[os.path.splitext(filename)[0]] = document.get('strings', {})
+            except (OSError, yaml.YAMLError):
+                continue
+        return packs
+
+    async def translate(self, string, locale, context):
+        key = string.extras.get('translation_key')
+        if key is None:
+            return None
+        code = {'ja': 'ja-JP', 'ko': 'ko-KR', 'de': 'de-DE'}.get(locale.value, locale.value)
+        return self.language_packs.get(code, {}).get(key)
+
+def discord_locale(key):
+    """Provide a readable Discord default while retaining the language-pack key."""
+    return app_commands.locale_str(t(key), translation_key=key)
 
 # UI部品の文字列を一か所で言語パックへ接続する。既存画面の文言も
 # widget生成時に通過するため、新しい画面を追加する際の漏れを防ぐ。
@@ -178,6 +214,9 @@ for _filedialog_name in ('askopenfilename', 'askdirectory', 'asksaveasfilename')
 # 変数定義
 intents = discord.Intents.default()
 bot = discord.Client(intents=intents)
+discord_commands = app_commands.CommandTree(bot)
+discord_bot_run_lock = threading.Lock()
+discord_command_sync_lock = None
 pending_discord_notifications = []
 pending_discord_notifications_lock = threading.Lock()
 gui_log_queue = queue.Queue()
@@ -207,6 +246,10 @@ CONFIG_DISPLAY_NAMES = {
     'long_term_time': 'config_long_term_time',
     'enabled': 'config_discord_enabled', 'autosave_notice': 'config_autosave_notice',
     'token': 'config_discord_token', 'channel': 'config_discord_channel',
+    'command_enabled': 'config_discord_command_enabled',
+    'command_users': 'config_discord_command_users',
+    'command_result_enabled': 'config_discord_command_result_enabled',
+    'command_result_channel': 'config_discord_command_result_channel',
     'passwords': 'config_player_passwords', 'ban_ips': 'ban_ip',
 }
 
@@ -274,6 +317,22 @@ def load_config():
         config.discord_autosave_notice = int(discord_settings.get('autosave_notice', 0) or 0)
     except (TypeError, ValueError):
         config.discord_autosave_notice = 0
+    try:
+        config.discord_command_enabled = int(discord_settings.get('command_enabled', 0) or 0)
+    except (TypeError, ValueError):
+        config.discord_command_enabled = 0
+    command_users = discord_settings.get('command_users', {})
+    if not isinstance(command_users, dict):
+        command_users = {}
+    config.discord_command_users = {
+        str(user).strip() for user in command_users.values()
+        if str(user).strip().isdigit()
+    }
+    try:
+        config.discord_command_result_enabled = int(discord_settings.get('command_result_enabled', 1) or 0)
+    except (TypeError, ValueError):
+        config.discord_command_result_enabled = 1
+    config.discord_command_result_channel = discord_settings.get('command_result_channel', '')
 
 def default_config_data():
     return {
@@ -287,7 +346,11 @@ def default_config_data():
         'backup': {'long_term_keep_days': 0, 'long_term_time': 5},
         'players': {'passwords': {i: '' for i in range(63)}},
         'network': {'ban_ips': {i: '' for i in range(63)}},
-        'discord': {'enabled': 0, 'token': '', 'channel': '', 'autosave_notice': 0},
+        'discord': {
+            'enabled': 0, 'token': '', 'channel': '', 'autosave_notice': 0,
+            'command_enabled': 0, 'command_users': {i: '' for i in range(63)},
+            'command_result_enabled': 1, 'command_result_channel': '',
+        },
         # アプリケーション内部状態。設定画面には表示しない。
         'runtime': {
             'maintenance_mode': 0,
@@ -296,6 +359,37 @@ def default_config_data():
             'auto_restart_enabled': None,
         },
     }
+
+def parse_discord_command_users(text):
+    """Accept one user ID per line, including the legacy index=ID format."""
+    indexed = {}
+    unnumbered = []
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        line = line.strip()
+        if not line:
+            continue
+        if '=' in line:
+            index_text, user_id = (value.strip() for value in line.split('=', 1))
+            if not re.fullmatch(r'[0-9]+', index_text) or not 0 <= int(index_text) < 63:
+                raise ValueError(t('discord_command_user_line_invalid', line=line_number))
+            index = int(index_text)
+            if index in indexed:
+                raise ValueError(t('discord_command_user_line_invalid', line=line_number))
+        else:
+            index = None
+            user_id = line
+        if user_id and not re.fullmatch(r'[0-9]{17,20}', user_id):
+            raise ValueError(t('discord_user_id_required'))
+        if index is None:
+            unnumbered.append(user_id)
+        else:
+            indexed[index] = user_id
+    if len(indexed) + len(unnumbered) > 63:
+        raise ValueError(t('discord_command_users_limit'))
+    free_indices = (index for index in range(63) if index not in indexed)
+    for user_id in unnumbered:
+        indexed[next(free_indices)] = user_id
+    return {index: indexed.get(index, '') for index in range(63)}
 
 def persist_runtime_state():
     """設定画面では編集できない、再起動後も必要な内部状態を保存する。"""
@@ -399,7 +493,18 @@ class config_window:
             ['mode', 'backup_count', 'interval', 'long_term_keep_days', 'long_term_time'],
             save_data_values,
         )
-        self.add_tab(notebook, t('discord'), ['enabled', 'autosave_notice', 'token', 'channel'], data.get('discord', {}))
+        discord_values = dict(default_config_data()['discord'])
+        discord_values.update(data.get('discord', {}))
+        self.add_tab(
+            notebook, t('discord'),
+            ['enabled', 'autosave_notice', 'command_enabled', 'command_result_enabled',
+             'command_result_channel', 'token', 'channel'],
+            discord_values,
+        )
+        self.add_multiline_tab(
+            notebook, t('discord_command_users'), 'command_users',
+            data.get('discord', {}).get('command_users', {}),
+        )
         self.add_password_tab(notebook, data.get('players', {}).get('passwords', {}))
         self.add_multiline_tab(notebook, t('ban_ip'), 'ban_ips', data.get('network', {}).get('ban_ips', {}))
         button_frame = ttk.Frame(self.window)
@@ -414,17 +519,26 @@ class config_window:
     def apply_language(self, event=None):
         """Apply a language selection immediately by rebuilding the settings UI."""
         selected = self.language_var.get().split(' - ', 1)[0]
+        try:
+            command_users = parse_discord_command_users(self.fields['command_users'].get('1.0', 'end'))
+        except ValueError as error:
+            self.language_var.set(config_data.get('language', 'en-US'))
+            messagebox.showerror(t('input_error'), str(error), parent=self.window)
+            return
         # 言語変更時は設定画面を作り直すため、入力途中の値を先に保持する。
         # これを行わないと、初回起動時に既定値で上書きされ、サーバーの
         # パスや名前が空のまま保存されてしまう。
         config_data['language'] = selected
         for key in ('server', 'autosave', 'backup', 'discord'):
             for name in config_data.get(key, {}):
+                if name == 'command_users':
+                    continue
                 field = self.fields.get(name)
                 if field is not None:
                     config_data[key][name] = field.get()
         for i, entry in self.fields.get('passwords', {}).items():
             config_data.setdefault('players', {}).setdefault('passwords', {})[i] = entry.get()
+        config_data.setdefault('discord', {})['command_users'] = command_users
         ban_ips = config_data.setdefault('network', {}).setdefault('ban_ips', {})
         for line in self.fields.get('ban_ips').get('1.0', 'end').splitlines():
             if '=' in line:
@@ -483,6 +597,31 @@ class config_window:
                     frame, text=t('help'), command=lambda k=key: self.show_help(k)
                 ).grid(row=row, column=5, padx=3, pady=6)
                 continue
+            if is_discord_tab and key in ('command_result_enabled', 'command_result_channel'):
+                if key == 'command_result_channel':
+                    continue
+                ttk.Label(frame, text=t(CONFIG_DISPLAY_NAMES[key])).grid(
+                    row=row, column=0, sticky='w', padx=10, pady=8
+                )
+                pair_frame = ttk.Frame(frame)
+                pair_frame.grid(row=row, column=1, columnspan=3, sticky='ew', padx=10, pady=8)
+                pair_frame.grid_columnconfigure(2, weight=1)
+                variable = tk.IntVar(value=1 if int(values.get(key, 1) or 0) in (1, 2) else 0)
+                ttk.Checkbutton(
+                    pair_frame, text=t('enable'), style='Switch.TCheckbutton', variable=variable,
+                ).grid(row=0, column=0, sticky='w', padx=(0, 16))
+                self.fields[key] = variable
+                ttk.Label(pair_frame, text=t(CONFIG_DISPLAY_NAMES['command_result_channel'])).grid(
+                    row=0, column=1, sticky='w', padx=(0, 8)
+                )
+                entry = ttk.Entry(pair_frame, width=24)
+                entry.insert(0, str(values.get('command_result_channel', '')))
+                entry.grid(row=0, column=2, sticky='ew')
+                self.fields['command_result_channel'] = entry
+                ttk.Button(frame, text=t('help'), command=lambda k=key: self.show_help(k)).grid(
+                    row=row, column=4, sticky='e', padx=5, pady=8
+                )
+                continue
             ttk.Label(frame, text=t(CONFIG_DISPLAY_NAMES[key])).grid(row=row, column=0, sticky='w', padx=10, pady=8)
             if key == 'mode':
                 try:
@@ -527,10 +666,12 @@ class config_window:
                 self.long_term_keep_mode = mode
                 self.long_term_keep_days_entry = days_entry
                 self.fields[key] = mode
-            elif key in ('enabled', 'autosave_notice', 'press_space_after_start', 'response_monitor_enabled', 'restart_enabled'):
+            elif key in ('enabled', 'autosave_notice', 'command_enabled', 'command_result_enabled', 'press_space_after_start', 'response_monitor_enabled', 'restart_enabled'):
                 variable = tk.IntVar(value=1 if int(values.get(key, 0) or 0) in (1, 2) else 0)
                 text = t('use') if key in ('enabled', 'response_monitor_enabled', 'restart_enabled') else t('enable')
-                entry = ttk.Checkbutton(frame, text=text, style='Switch.TCheckbutton', variable=variable)
+                entry = ttk.Checkbutton(
+                    frame, text=text, style='Switch.TCheckbutton', variable=variable,
+                )
                 entry.grid(row=row, column=1, sticky='w', padx=10, pady=8)
                 self.fields[key] = variable
             else:
@@ -540,7 +681,7 @@ class config_window:
                     row=row, column=1,
                     columnspan=3 if is_server_tab and key == 'path' else
                     4 if is_server_tab else
-                    2 if is_discord_tab and key != 'token' else 1,
+                    (2 if key == 'token' else 3) if is_discord_tab else 1,
                     sticky='ew', padx=10, pady=8
                 )
                 self.fields[key] = entry
@@ -554,9 +695,11 @@ class config_window:
                         frame, text=t('show'), variable=self.secret_visibility['token'],
                         style='Switch.TCheckbutton',
                         command=lambda: self.toggle_secret('token')
-                    ).grid(row=row, column=2 if is_discord_tab else 3, padx=5, pady=8)
-            help_column = 5 if is_server_tab else 3 if is_discord_tab else 2
-            ttk.Button(frame, text=t('help'), command=lambda k=key: self.show_help(k)).grid(row=row, column=help_column, padx=5, pady=8)
+                    ).grid(row=row, column=3, padx=5, pady=8)
+            help_column = 5 if is_server_tab else 4 if is_discord_tab else 2
+            ttk.Button(frame, text=t('help'), command=lambda k=key: self.show_help(k)).grid(
+                row=row, column=help_column, sticky='e', padx=5, pady=8
+            )
 
     def select_server_executable(self):
         """ファイル選択ダイアログでサーバー実行ファイルを指定する。"""
@@ -584,14 +727,15 @@ class config_window:
     def add_multiline_tab(self, notebook, title, key, values):
         frame = ttk.Frame(notebook)
         notebook.add(frame, text=title)
-        ttk.Label(frame, text=t('numbered_value_per_line')).pack(anchor='w', padx=10, pady=8)
+        notice_key = 'discord_command_users_notice' if key == 'command_users' else 'numbered_value_per_line'
+        ttk.Label(frame, text=t(notice_key)).pack(anchor='w', padx=10, pady=8)
         ttk.Button(frame, text=t('help'), command=lambda k=key: self.show_help(k)).pack(anchor='e', padx=10)
         text = tk.Text(frame, width=65, height=25)
         text.pack(fill='both', expand=True, padx=10, pady=5)
         for i in range(63):
             value = values.get(i, values.get(str(i), ''))
             if value not in (None, ''):
-                text.insert('end', f'{i}={value}\n')
+                text.insert('end', f'{value}\n' if key == 'command_users' else f'{i}={value}\n')
         self.fields[key] = text
 
     def add_password_tab(self, notebook, values):
@@ -658,9 +802,12 @@ class config_window:
             'mode': 'help_autosave_mode', 'backup_count': 'help_backup_count',
             'interval': 'help_autosave_interval', 'long_term_keep_days': 'help_long_term_keep_days',
             'long_term_time': 'help_long_term_time', 'enabled': 'help_discord_enabled',
-            'autosave_notice': 'help_autosave_notice', 'token': 'help_discord_token',
+            'autosave_notice': 'help_autosave_notice', 'command_enabled': 'help_discord_command_enabled',
+            'command_result_enabled': 'help_discord_command_result_enabled',
+            'command_result_channel': 'help_discord_command_result_channel',
+            'token': 'help_discord_token',
             'channel': 'help_discord_channel', 'passwords': 'help_player_passwords',
-            'ban_ips': 'help_ban_ips',
+            'ban_ips': 'help_ban_ips', 'command_users': 'help_discord_command_users',
         }
         messagebox.showinfo(t('setting_help_title'), t(descriptions.get(key, 'no_description')), parent=self.window)
 
@@ -810,6 +957,13 @@ class config_window:
 
     def save(self):
         data = default_config_data()
+        try:
+            data['discord']['command_users'] = parse_discord_command_users(
+                self.fields['command_users'].get('1.0', 'end')
+            )
+        except ValueError as error:
+            messagebox.showerror(t('input_error'), str(error), parent=self.window)
+            return
         data['language'] = self.language_var.get().split(' - ', 1)[0]
         # 設定画面にない内部状態を保持する。
         data['runtime'] = config_data.get('runtime', data['runtime'])
@@ -822,6 +976,8 @@ class config_window:
         data['runtime']['auto_restart_enabled'] = self.fields['restart_enabled'].get()
         for key in ('server', 'autosave', 'backup', 'discord'):
             for name in data[key]:
+                if name == 'command_users':
+                    continue
                 if name == 'long_term_keep_days':
                     mode = self.long_term_keep_mode.get()
                     if mode == 'disabled':
@@ -850,6 +1006,7 @@ class config_window:
         if not self.first_run:
             check_config(initialize_runtime=False)
             app.server_name_label.config(text=t('managed_server') + config.server_name)
+            request_discord_command_sync()
         self.close()
 
     def validate_config_data(self, data):
@@ -872,6 +1029,8 @@ class config_window:
             ('backup.long_term_time', data['backup']['long_term_time'], 0, 24),
             ('discord.enabled', data['discord']['enabled'], 0, 2),
             ('discord.autosave_notice', data['discord']['autosave_notice'], 0, 1),
+            ('discord.command_enabled', data['discord']['command_enabled'], 0, 1),
+            ('discord.command_result_enabled', data['discord']['command_result_enabled'], 0, 1),
         )
         for name, value, minimum, maximum in integer_rules:
             display_name = t(CONFIG_DISPLAY_NAMES[name.split('.')[-1]])
@@ -888,6 +1047,15 @@ class config_window:
                 int(data['discord']['channel'])
             except (TypeError, ValueError):
                 return t('integer_required', field=t(CONFIG_DISPLAY_NAMES['channel']))
+        if int(data['discord']['command_enabled']) and int(data['discord']['command_result_enabled']):
+            try:
+                int(data['discord']['command_result_channel'])
+            except (TypeError, ValueError):
+                return t('integer_required', field=t(CONFIG_DISPLAY_NAMES['command_result_channel']))
+        for user_id in data['discord']['command_users'].values():
+            value = str(user_id).strip()
+            if value and (not value.isdigit() or not 17 <= len(value) <= 20):
+                return t('discord_user_id_required')
         return None
 
     def close(self):
@@ -1422,6 +1590,17 @@ class update_schedule_window(tk.Frame):
         self.body_path = tk.StringVar()
         self.pak_path = tk.StringVar()
         self.time_var = tk.StringVar(value=datetime.datetime.now().strftime('%Y/%m/%d %H:%M'))
+        with scheduled_updates_lock:
+            existing_schedule = dict(scheduled_updates) if scheduled_updates else None
+        if existing_schedule:
+            self.body_var.set(1 if existing_schedule.get('body') else 0)
+            self.pak_var.set(1 if existing_schedule.get('pak') else 0)
+            self.backup_var.set(existing_schedule.get('backup', 0))
+            self.discord_notice_var.set(existing_schedule.get('discord_notice', 0))
+            self.restart_server_var.set(existing_schedule.get('restart_server', 1))
+            self.body_path.set(existing_schedule.get('body') or '')
+            self.pak_path.set(existing_schedule.get('pak') or '')
+            self.time_var.set(existing_schedule['when'].strftime('%Y/%m/%d %H:%M'))
 
         ttk.Checkbutton(self.master, text=t('update_application'), style='Switch.TCheckbutton', variable=self.body_var).grid(row=0, column=0, padx=10, pady=8, sticky='w')
         ttk.Entry(self.master, textvariable=self.body_path, width=55).grid(row=1, column=0, padx=10, sticky='w')
@@ -1492,16 +1671,19 @@ class update_schedule_window(tk.Frame):
                 self.pak_path.get() if self.pak_var.get() else None)
 
     def update_now(self):
-        update_data = self.validate_update_inputs()
-        if update_data is None:
-            return
+        global scheduled_updates
+        with scheduled_updates_lock:
+            if scheduled_updates is None:
+                messagebox.showinfo(t('confirm'), t('no_update_schedule'), parent=self.master)
+                return
+            item = scheduled_updates
+            scheduled_updates = None
         if not messagebox.askyesno(t('confirm'), t('confirm_update_now'), parent=self.master):
+            with scheduled_updates_lock:
+                scheduled_updates = item
             return
-        body, pak = update_data
-        threading.Thread(target=execute_scheduled_update, args=({
-            'body': body, 'pak': pak, 'backup': self.backup_var.get(),
-            'restart_server': self.restart_server_var.get()
-        },), daemon=True).start()
+        persist_runtime_state()
+        threading.Thread(target=execute_scheduled_update, args=(item,), daemon=True).start()
         self.close_window()
 
     def cancel_schedule(self):
@@ -1787,28 +1969,44 @@ class manual_save_check(tk.Frame):
         self.close_window()
 
 class rollback_window(tk.Frame):
-    """ロールバック対象のセーブデータを選択する画面。"""
+    """時刻またはセーブファイルを指定してロールバックする画面。"""
     def __init__(self, master, app):
         super().__init__(master)
         self.master = master
         self.app = app
         self.master.title(t('rollback_data'))
         self.master.resizable(False, False)
-        self.master.geometry("610x150")
+        self.master.minsize(610, 0)
         self.master.protocol('WM_DELETE_WINDOW', self.close_window)
-        self.path_var = tk.StringVar()
+        self.mode_var = tk.StringVar(value='time')
+        self.time_var = tk.StringVar(value=datetime.datetime.now().strftime('%Y/%m/%d %H:%M'))
+        self.file_var = tk.StringVar(value='')
 
-        ttk.Label(self.master, text=t('rollback_save_file')).pack(
+        mode_frame = ttk.Frame(self.master)
+        mode_frame.pack(fill='x', padx=10, pady=(10, 0))
+        ttk.Radiobutton(
+            mode_frame, text=t('rollback_by_time'), variable=self.mode_var,
+            value='time', command=self.update_mode,
+        ).pack(side='left', padx=(0, 20))
+        ttk.Radiobutton(
+            mode_frame, text=t('rollback_by_file'), variable=self.mode_var,
+            value='file', command=self.update_mode,
+        ).pack(side='left')
+
+        ttk.Label(self.master, text=t('rollback_datetime')).pack(
             padx=10, pady=(10, 4), anchor="w"
         )
-        path_frame = ttk.Frame(self.master)
-        path_frame.pack(fill="x", padx=10)
-        ttk.Entry(path_frame, textvariable=self.path_var, width=60).pack(
-            side="left", fill="x", expand=True
+        self.time_entry = ttk.Entry(self.master, textvariable=self.time_var, width=28)
+        self.time_entry.pack(padx=10, anchor='w')
+        ttk.Label(self.master, text=t('rollback_save_file')).pack(
+            padx=10, pady=(10, 4), anchor='w'
         )
-        ttk.Button(path_frame, text=t('browse'), command=self.choose_file).pack(
-            side="right", padx=(5, 0)
-        )
+        file_frame = ttk.Frame(self.master)
+        file_frame.pack(fill='x', padx=10)
+        self.file_entry = ttk.Entry(file_frame, textvariable=self.file_var, width=55)
+        self.file_entry.pack(side='left', fill='x', expand=True)
+        self.browse_button = ttk.Button(file_frame, text=t('browse'), command=self.choose_file)
+        self.browse_button.pack(side='right', padx=(8, 0))
         button_frame = ttk.Frame(self.master)
         button_frame.pack(fill="x", padx=10, pady=12)
         ttk.Button(
@@ -1818,30 +2016,80 @@ class rollback_window(tk.Frame):
         ttk.Button(button_frame, text=t('cancel'), command=self.close_window).pack(
             side="right", expand=True, padx=5
         )
+        self.update_mode()
+
+    def update_mode(self):
+        by_time = self.mode_var.get() == 'time'
+        self.time_entry.configure(state='normal' if by_time else 'disabled')
+        self.file_entry.configure(state='disabled' if by_time else 'normal')
+        self.browse_button.configure(state='disabled' if by_time else 'normal')
 
     def choose_file(self):
+        autosave_root = os.path.join(server_folder_path, 'autosave')
         path = filedialog.askopenfilename(
-            title=t('select_rollback_save_file'),
-            filetypes=[(t('simutrans_save_data'), "*.sve"), (t('all_files'), "*.*")],
-            initialdir=server_folder_path,
-            parent=self.master,
+            parent=self.master, title=t('select_rollback_save_file'),
+            initialdir=autosave_root if os.path.isdir(autosave_root) else server_folder_path,
+            filetypes=[(t('simutrans_save_data'), '*.sve')],
         )
         if path:
-            self.path_var.set(path)
+            self.file_var.set(path)
 
     def confirm(self):
-        path = self.path_var.get().strip()
-        if not path or not os.path.isfile(path) or not path.lower().endswith('.sve'):
-            messagebox.showerror(t('input_confirmation'), t('sve_file_required'), parent=self.master)
+        if self.mode_var.get() == 'time':
+            target_time = parse_rollback_time(self.time_var.get())
+            if target_time is None:
+                messagebox.showerror(t('input_confirmation'), t('invalid_update_datetime'), parent=self.master)
+                return
+            path = find_autosave_before(target_time)
+            if path is None:
+                messagebox.showerror(t('input_confirmation'), t('rollback_autosave_not_found'), parent=self.master)
+                return
+        else:
+            path = self.file_var.get().strip()
+            if not path.lower().endswith('.sve') or not os.path.isfile(path):
+                messagebox.showerror(t('input_confirmation'), t('sve_file_required'), parent=self.master)
+                return
+            path = os.path.abspath(path)
+        try:
+            timestamp = datetime.datetime.fromtimestamp(os.path.getmtime(path)).strftime('%Y/%m/%d %H:%M:%S')
+        except OSError as error:
+            messagebox.showerror(t('input_confirmation'), t('rollback_file_read_failed', error=error), parent=self.master)
             return
-        timestamp = datetime.datetime.fromtimestamp(os.path.getctime(path)).strftime('%Y/%m/%d %H:%M:%S')
-        message = t('confirm_rollback', timestamp=timestamp)
+        message = f"{t('rollback_save_file')}\n{path}\n\n{t('confirm_rollback', timestamp=timestamp)}"
         if messagebox.askyesno(t('confirm'), message, parent=self.master):
             self.app.rollback_execute(path, timestamp)
             self.close_window()
 
     def close_window(self):
         self.master.destroy()
+
+def parse_rollback_time(value):
+    try:
+        raw = str(value).strip()
+        if re.fullmatch(r'\d{1,2}:\d{2}', raw):
+            raw = datetime.datetime.now().strftime('%Y/%m/%d ') + raw
+        return datetime.datetime.strptime(raw, '%Y/%m/%d %H:%M')
+    except ValueError:
+        return None
+
+def find_autosave_before(target_time):
+    """Find the newest .sve in autosave (including subfolders) at or before target_time."""
+    autosave_root = os.path.join(server_folder_path, 'autosave')
+    if not os.path.isdir(autosave_root):
+        return None
+    candidates = []
+    for root, _, filenames in os.walk(autosave_root):
+        for filename in filenames:
+            if not filename.lower().endswith('.sve'):
+                continue
+            path = os.path.join(root, filename)
+            try:
+                modified = datetime.datetime.fromtimestamp(os.path.getmtime(path))
+            except OSError:
+                continue
+            if modified <= target_time:
+                candidates.append((modified, path))
+    return max(candidates, default=(None, None), key=lambda item: item[0])[1]
 
 def rollback_server(save_path, timestamp):
     """通知、停止、現行データのバックアップ、置換、再起動を行う。"""
@@ -2065,6 +2313,8 @@ def run_discord_bot():
 
     if not discord_is_enabled():
         return
+    if not discord_bot_run_lock.acquire(blocking=False):
+        return
 
     try:
         bot.run(config.discord_token)
@@ -2080,11 +2330,43 @@ def run_discord_bot():
         print_gui_log(
             t('log_discord_bot_start_failed', error=e)
         )
+    finally:
+        discord_bot_run_lock.release()
+
+async def sync_discord_commands():
+    """Serialize startup and settings-save synchronization on the Bot's loop."""
+    global discord_command_sync_lock
+    if discord_command_sync_lock is None:
+        discord_command_sync_lock = asyncio.Lock()
+    async with discord_command_sync_lock:
+        try:
+            await discord_commands.set_translator(DiscordYamlTranslator())
+            set_discord_command_tree_enabled(discord_commands_enabled())
+            await discord_commands.sync()
+            print_gui_log(t('log_discord_commands_synced'))
+        except Exception as error:
+            print_gui_log(t('log_discord_command_sync_failed', error=error))
+
+def request_discord_command_sync():
+    """Submit saved settings to Discord without blocking the GUI thread."""
+    if bot.is_ready():
+        coroutine = sync_discord_commands()
+        try:
+            asyncio.run_coroutine_threadsafe(coroutine, bot.loop)
+        except RuntimeError as error:
+            coroutine.close()
+            print_gui_log(t('log_discord_command_sync_failed', error=error))
+    elif discord_is_enabled():
+        # 接続中ならon_readyで最新設定を同期する。未起動ならBotを開始する。
+        threading.Thread(target=run_discord_bot, daemon=True).start()
 
 @bot.event
 async def on_ready():
     if discord_is_enabled():
             print_with_date(t('log_discord_bot_started', user=bot.user))
+
+            # 初回設定の保存後・接続待ち中の保存は、接続完了時に同期する。
+            await sync_discord_commands()
 
             channel = bot.get_channel(
                 int(config.discord_channel)
@@ -2098,6 +2380,268 @@ async def on_ready():
                 pending_discord_notifications.clear()
             for title, description, color in pending:
                 await send_notification(title, description, color)
+
+def discord_commands_enabled():
+    try:
+        return discord_is_enabled() and int(getattr(config, 'discord_command_enabled', 0) or 0) == 1
+    except (TypeError, ValueError):
+        return False
+
+async def require_discord_command_permission(interaction):
+    """Allow registered users to invoke commands in any guild channel or DM."""
+    if not discord_commands_enabled():
+        await interaction.response.send_message(t('discord_command_disabled'), ephemeral=True)
+        return False
+    if str(interaction.user.id) not in getattr(config, 'discord_command_users', set()):
+        await interaction.response.send_message(t('discord_command_not_allowed'), ephemeral=True)
+        return False
+    return True
+
+async def discord_command_response(interaction, text, *, include_result=True):
+    if interaction.response.is_done():
+        await interaction.followup.send(str(text)[:1900], ephemeral=True)
+    else:
+        await interaction.response.send_message(str(text)[:1900], ephemeral=True)
+    await post_discord_command_result(interaction, text if include_result else None)
+
+def discord_command_invocation(interaction):
+    """Describe the submitted command, including subcommands and audit arguments."""
+    data = interaction.data or {}
+    command_names = [data.get('name') or interaction.command.qualified_name]
+    arguments = []
+
+    def collect_options(options):
+        for option in options:
+            name = option['name']
+            if option.get('type') in (1, 2):  # Subcommand or subcommand group.
+                command_names.append(name)
+                collect_options(option.get('options', []))
+            else:
+                value = '***' if name == 'token' else option.get('value')
+                arguments.append(f'{name}={json.dumps(value, ensure_ascii=False)}')
+
+    collect_options(data.get('options', []))
+    return '/' + ' '.join(command_names + arguments)
+
+async def post_discord_command_result(interaction, text=None):
+    """Post the actor and invocation, with actual output but never an acceptance notice."""
+    if not int(getattr(config, 'discord_command_result_enabled', 1) or 0):
+        return
+    try:
+        channel_id = int(getattr(config, 'discord_command_result_channel', '') or 0)
+        channel = bot.get_channel(channel_id)
+        if channel is None:
+            channel = await bot.fetch_channel(channel_id)
+        actor = discord.utils.escape_markdown(str(interaction.user))
+        command = discord.utils.escape_markdown(discord_command_invocation(interaction))
+        message = (
+            f"{t('discord_command_result_actor')}: {actor} (ID: {interaction.user.id})\n"
+            f"{t('discord_command_result_invocation')}: {command}"
+        )
+        if text is not None:
+            message += f"\n{t('discord_command_result_output')}:\n{text}"
+        # Keep all output, even when adding the audit header exceeds Discord's limit.
+        for offset in range(0, len(message), 1900):
+            await channel.send(message[offset:offset + 1900], allowed_mentions=discord.AllowedMentions.none())
+    except Exception as error:
+        print_gui_log(t('log_discord_command_result_post_failed', error=error))
+
+async def discord_run_nettool(command, value='', password='', apply_ban_setting=False):
+    """Run the same nettool operation as the GUI and return its textual result."""
+    def run():
+        if command in ('lock-company', 'unlock-company', 'remove-company'):
+            check = subprocess.run(
+                [run_nettool(), '-p', str(nettool_pw), '-s', server_ip + str(config.port_number),
+                 'info-company', value], capture_output=True, text=True, encoding='utf-8', errors='replace'
+            )
+            if check.stdout == 'Nothing received.\n':
+                return t('nettool_company_missing')
+        args = [run_nettool(), '-p', str(nettool_pw), '-s', server_ip + str(config.port_number), command]
+        if value:
+            args.append(value)
+        if password:
+            args.append(password)
+        result = subprocess.run(args, capture_output=True, text=True, encoding='utf-8', errors='replace')
+        output = (result.stdout or result.stderr).strip()
+        if result.returncode != 0:
+            return t('nettool_command_failed', command=command, code=result.returncode, output=output)
+        if apply_ban_setting and command in ('ban-ip', 'unban-ip'):
+            update_discord_ban_setting(value, command == 'ban-ip')
+        return output or t('nettool_sent', command=command)
+    return await asyncio.to_thread(run)
+
+def update_discord_ban_setting(ip, enabled):
+    values = [getattr(config, f'banip_{i}', '') for i in range(63)]
+    if enabled and ip not in values:
+        try:
+            values[values.index('')] = ip
+        except ValueError:
+            return
+    elif not enabled:
+        values = ['' if item == ip else item for item in values]
+    config_data.setdefault('network', {}).setdefault('ban_ips', {}).update({i: values[i] for i in range(63)})
+    with open(config_path, 'w', encoding='utf-8') as config_file:
+        yaml.safe_dump(config_data, config_file, allow_unicode=True, sort_keys=False)
+    load_config()
+
+@discord_commands.command(name='restart', description=discord_locale('discord_command_description_restart'))
+async def discord_restart(interaction):
+    if not await require_discord_command_permission(interaction): return
+    restart_server_threaded(2)
+    await discord_command_response(interaction, t('discord_command_accepted'), include_result=False)
+
+@discord_commands.command(name='manual-save', description=discord_locale('discord_command_description_manual_save'))
+async def discord_manual_save(interaction):
+    if not await require_discord_command_permission(interaction): return
+    threading.Thread(target=manual_save, daemon=True).start()
+    await discord_command_response(interaction, t('discord_command_accepted'), include_result=False)
+
+@discord_commands.command(name='maintenance', description=discord_locale('discord_command_description_maintenance'))
+@app_commands.describe(backup='Create a long-term backup when pausing.')
+async def discord_maintenance(interaction, backup: bool = False):
+    global start_code
+    if not await require_discord_command_permission(interaction): return
+    mode = app.maintenance_mode
+    if mode == 0:
+        threading.Thread(target=server_stop, args=(3, int(backup)), daemon=True).start()
+        app.maintenance_mode = 1
+    elif mode == 1:
+        start_code = 2
+        app.maintenance_mode = 0
+    else:
+        start_code = 7
+        app.maintenance_mode = 0
+    app.after(0, app.update_maintenance_button)
+    persist_runtime_state()
+    await discord_command_response(interaction, t('discord_command_accepted'), include_result=False)
+
+@discord_commands.command(name='force-stop', description=discord_locale('discord_command_description_force_stop'))
+async def discord_force_stop(interaction):
+    if not await require_discord_command_permission(interaction): return
+    threading.Thread(target=force_stop_server, daemon=True).start()
+    await discord_command_response(interaction, t('discord_command_accepted'), include_result=False)
+
+@discord_commands.command(name='close-session', description=discord_locale('discord_command_description_close_session'))
+async def discord_close_session(interaction):
+    if not await require_discord_command_permission(interaction): return
+    def close_session():
+        server_stop(5, 0)
+        app.after(0, app.master.destroy)
+    threading.Thread(target=close_session, daemon=True).start()
+    await discord_command_response(interaction, t('discord_command_accepted'), include_result=False)
+
+@discord_commands.command(name='exit-app', description=discord_locale('discord_command_description_exit_app'))
+async def discord_exit_app(interaction):
+    if not await require_discord_command_permission(interaction): return
+    await discord_command_response(interaction, t('discord_command_accepted'), include_result=False)
+    app.after(0, app.master.destroy)
+
+@discord_commands.command(name='rollback', description=discord_locale('discord_command_description_rollback'))
+@app_commands.describe(when='YYYY/MM/DD HH:MM or HH:MM')
+async def discord_rollback(interaction, when: str):
+    if not await require_discord_command_permission(interaction): return
+    target_time = parse_rollback_time(when)
+    if target_time is None:
+        await discord_command_response(interaction, t('invalid_update_datetime'))
+        return
+    save_path = find_autosave_before(target_time)
+    if save_path is None:
+        await discord_command_response(interaction, t('rollback_autosave_not_found'))
+        return
+    timestamp = datetime.datetime.fromtimestamp(os.path.getmtime(save_path)).strftime('%Y/%m/%d %H:%M:%S')
+    threading.Thread(target=rollback_server, args=(save_path, timestamp), daemon=True).start()
+    await discord_command_response(interaction, t('discord_command_accepted'), include_result=False)
+
+@discord_commands.command(name='cancel-scheduled-update', description=discord_locale('discord_command_description_cancel_scheduled_update'))
+async def discord_cancel_scheduled_update(interaction):
+    if not await require_discord_command_permission(interaction): return
+    await discord_command_response(interaction, t('cancellation_complete') if cancel_scheduled_update() else t('no_update_schedule'))
+
+@discord_commands.command(name='schedule-update', description=discord_locale('discord_command_description_schedule_update'))
+@app_commands.describe(when='YYYY/MM/DD HH:MM or HH:MM')
+async def discord_schedule_update(interaction, when: str):
+    if not await require_discord_command_permission(interaction): return
+    try:
+        raw = when.strip()
+        if re.fullmatch(r'\d{1,2}:\d{2}', raw): raw = datetime.datetime.now().strftime('%Y/%m/%d ') + raw
+        scheduled_time = datetime.datetime.strptime(raw, '%Y/%m/%d %H:%M')
+        if scheduled_time <= datetime.datetime.now(): raise ValueError
+    except ValueError:
+        await discord_command_response(interaction, t('invalid_update_datetime'))
+        return
+    with scheduled_updates_lock:
+        if scheduled_updates is None:
+            has_schedule = False
+        else:
+            scheduled_updates['when'] = scheduled_time
+            has_schedule = True
+    if not has_schedule:
+        await discord_command_response(interaction, t('no_update_schedule'))
+        return
+    persist_runtime_state()
+    await discord_command_response(interaction, t('discord_command_accepted'), include_result=False)
+
+@discord_commands.command(name='update-now', description=discord_locale('discord_command_description_update_now'))
+async def discord_update_now(interaction):
+    if not await require_discord_command_permission(interaction): return
+    global scheduled_updates
+    with scheduled_updates_lock:
+        if scheduled_updates is None:
+            item = None
+        else:
+            item = scheduled_updates
+            scheduled_updates = None
+    if item is None:
+        await discord_command_response(interaction, t('no_update_schedule'))
+        return
+    persist_runtime_state()
+    threading.Thread(target=execute_scheduled_update, args=(item,), daemon=True).start()
+    await discord_command_response(interaction, t('discord_command_accepted'), include_result=False)
+
+nettool_discord_group = app_commands.Group(name='nettool', description=discord_locale('discord_command_description_nettool'))
+discord_commands.add_command(nettool_discord_group)
+
+def register_nettool_discord_command(name, argument_name=None, needs_password=False):
+    async def callback(interaction, value: str = '', password: str = '', apply_ban_setting: bool = False):
+        if not await require_discord_command_permission(interaction): return
+        if argument_name and not value.strip():
+            await discord_command_response(interaction, t('nettool_argument_required'))
+            return
+        if needs_password and not password.strip():
+            await discord_command_response(interaction, t('nettool_argument_required'))
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        result = await discord_run_nettool(name, value.strip(), password.strip(), apply_ban_setting)
+        await discord_command_response(interaction, result)
+    callback.__name__ = 'nettool_' + name.replace('-', '_')
+    callback.__doc__ = 'Run nettool ' + name
+    callback = app_commands.describe(
+        value='Command argument.', password='New company password.',
+        apply_ban_setting='Also update the BAN IP settings.',
+    )(callback)
+    nettool_discord_group.command(
+        name=name, description=discord_locale(f'discord_command_description_nettool_{name.replace("-", "_")}')
+    )(callback)
+
+for _name, _argument, _password in (
+    ('announce', None, False), ('clients', None, False), ('companies', None, False),
+    ('info-company', 'company_number', False), ('blacklist', None, False),
+    ('lock-company', 'company_number', True), ('unlock-company', 'company_number', False),
+    ('remove-company', 'company_number', False), ('kick-client', 'client_number', False),
+    ('ban-client', 'client_number', False), ('ban-ip', 'ip_address', False),
+    ('unban-ip', 'ip_address', False), ('say', 'message', False),
+    ('force-sync', None, False), ('shutdown', None, False),
+):
+    register_nettool_discord_command(_name, _argument, _password)
+
+discord_command_registry = tuple(discord_commands.get_commands())
+
+def set_discord_command_tree_enabled(enabled):
+    """Synchronize either every supported command or an explicitly empty command set."""
+    discord_commands.clear_commands(guild=None)
+    if enabled:
+        for command in discord_command_registry:
+            discord_commands.add_command(command)
 
 # 関数定義（一般）
 

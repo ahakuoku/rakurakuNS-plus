@@ -1209,22 +1209,24 @@ class window_main(tk.Frame):
         self.newWindow.grab_set()
         rollback_window(self.newWindow, self)
 
-    def rollback_execute(self, save_path, timestamp):
+    def rollback_execute(self, save_path, timestamp, cached_save_path=None):
         self.rollback_button.config(state="disabled")
         try:
             threading.Thread(
                 target=self.rollback_threaded,
-                args=(save_path, timestamp),
+                args=(save_path, timestamp, cached_save_path),
                 daemon=True,
             ).start()
         except Exception:
             self.rollback_button.config(state="normal")
+            remove_rollback_cache(cached_save_path)
             raise
 
-    def rollback_threaded(self, save_path, timestamp):
+    def rollback_threaded(self, save_path, timestamp, cached_save_path=None):
         try:
             rollback_server(save_path, timestamp)
         finally:
+            remove_rollback_cache(cached_save_path)
             # Tk widgets must be updated on the GUI thread, even after a failure.
             try:
                 self.after(0, lambda: self.rollback_button.config(state="normal"))
@@ -2066,14 +2068,16 @@ class rollback_window(tk.Frame):
                 return
             path = os.path.abspath(path)
         try:
-            timestamp, _ = get_rollback_save_state(path)
+            cached_path, timestamp = cache_rollback_save(path)
         except OSError as error:
             messagebox.showerror(t('input_confirmation'), t('rollback_file_read_failed', error=error), parent=self.master)
             return
         message = f"{t('rollback_save_file')}\n{path}\n\n{t('confirm_rollback', timestamp=timestamp)}"
         if messagebox.askyesno(t('confirm'), message, parent=self.master):
-            self.app.rollback_execute(path, timestamp)
+            self.app.rollback_execute(cached_path, timestamp, cached_path)
             self.close_window()
+        else:
+            remove_rollback_cache(cached_path)
 
     def close_window(self):
         self.master.destroy()
@@ -2107,10 +2111,32 @@ def find_autosave_before(target_time):
     return max(candidates, default=(None, None), key=lambda item: item[0])[1]
 
 def get_rollback_save_state(save_path):
-    """Use the same save timestamp in GUI and Discord, and detect changes while confirming."""
+    """Return the save timestamp for rollback messages, at minute precision."""
     file_stat = os.stat(save_path)
-    timestamp = datetime.datetime.fromtimestamp(file_stat.st_mtime).strftime('%Y/%m/%d %H:%M:%S')
+    timestamp = datetime.datetime.fromtimestamp(file_stat.st_mtime).strftime('%Y/%m/%d %H:%M')
     return timestamp, (file_stat.st_mtime_ns, file_stat.st_size)
+
+def cache_rollback_save(save_path):
+    """Copy the selected save before rollback maintenance can rotate autosaves."""
+    file_descriptor, cached_path = tempfile.mkstemp(prefix='rakuraku-rollback-', suffix='.sve')
+    os.close(file_descriptor)
+    try:
+        shutil.copy2(save_path, cached_path)
+        timestamp, _ = get_rollback_save_state(cached_path)
+        return cached_path, timestamp
+    except Exception:
+        remove_rollback_cache(cached_path)
+        raise
+
+def remove_rollback_cache(cached_path):
+    if not cached_path:
+        return
+    try:
+        os.remove(cached_path)
+    except FileNotFoundError:
+        pass
+    except OSError:
+        pass
 
 def rollback_server(save_path, timestamp):
     """通知、停止、現行データのバックアップ、置換、再起動を行う。"""
@@ -2121,7 +2147,7 @@ def rollback_server(save_path, timestamp):
         nettool_say('Maintenance soon.')
         discord_post(
             t('discord_rollback_title'),
-            t('discord_rollback_description', timestamp=timestamp.rsplit(' ', 1)[-1]),
+            t('discord_rollback_description', timestamp=timestamp),
             0xff0000,
         )
         time.sleep(30)
@@ -2562,13 +2588,13 @@ async def discord_exit_app(interaction):
 
 class DiscordRollbackConfirmation(discord.ui.View):
     """A private, single-use rollback approval tied to the command's original user."""
-    def __init__(self, interaction, save_path, timestamp, save_state):
+    def __init__(self, interaction, cached_save_path, timestamp):
         super().__init__(timeout=120)
         self.command_interaction = interaction
         self.owner_id = interaction.user.id
-        self.save_path = save_path
+        self.cached_save_path = cached_save_path
         self.timestamp = timestamp
-        self.save_state = save_state
+        self.cache_owned = True
         self.finished = False
         approve = discord.ui.Button(label=t('yes'), style=discord.ButtonStyle.danger)
         approve.callback = self.approve
@@ -2591,24 +2617,21 @@ class DiscordRollbackConfirmation(discord.ui.View):
         await post_discord_command_result(self.command_interaction, text if audit_text is None else audit_text)
 
     async def approve(self, interaction):
-        if not await self.interaction_check(interaction):
-            return
-        # Claim the request before awaiting anything, so double clicks cannot execute twice.
+        # interaction_check is called automatically by discord.py before this callback.
+        # Claim and acknowledge the request before starting any other work.
         self.finished = True
-        self.stop()
         await interaction.response.defer()
-        try:
-            _, current_state = await asyncio.to_thread(get_rollback_save_state, self.save_path)
-        except OSError:
-            await self.finish(t('discord_rollback_save_changed'))
-            return
-        if current_state != self.save_state:
-            await self.finish(t('discord_rollback_save_changed'))
-            return
+        self.stop()
         try:
             # Run the GUI's entry point on Tk's thread, not on Discord's gateway loop.
-            await asyncio.to_thread(app.after, 0, app.rollback_execute, self.save_path, self.timestamp)
+            await asyncio.to_thread(
+                app.after, 0, app.rollback_execute,
+                self.cached_save_path, self.timestamp, self.cached_save_path,
+            )
+            self.cache_owned = False
         except Exception as error:
+            remove_rollback_cache(self.cached_save_path)
+            self.cache_owned = False
             await self.finish(t('discord_rollback_start_failed', error=error))
             return
         await self.finish(
@@ -2617,23 +2640,41 @@ class DiscordRollbackConfirmation(discord.ui.View):
         )
 
     async def cancel(self, interaction):
-        if not await self.interaction_check(interaction):
-            return
         self.finished = True
-        self.stop()
         await interaction.response.defer()
+        self.stop()
+        remove_rollback_cache(self.cached_save_path)
+        self.cache_owned = False
         await self.finish(t('cancellation_complete'))
 
     async def on_timeout(self):
         if self.finished:
             return
         self.finished = True
+        remove_rollback_cache(self.cached_save_path)
+        self.cache_owned = False
         text = t('discord_rollback_confirmation_expired')
         try:
             await self.command_interaction.edit_original_response(content=text, view=None)
         except discord.HTTPException as error:
             print_gui_log(t('log_discord_command_result_post_failed', error=error))
         await post_discord_command_result(self.command_interaction, text)
+
+    async def on_error(self, interaction, error, item):
+        if self.cache_owned:
+            remove_rollback_cache(self.cached_save_path)
+            self.cache_owned = False
+        self.finished = True
+        self.stop()
+        text = t('discord_rollback_start_failed', error=error)
+        print_gui_log(text)
+        try:
+            if interaction.response.is_done():
+                await interaction.followup.send(text, ephemeral=True)
+            else:
+                await interaction.response.send_message(text, ephemeral=True)
+        except discord.HTTPException as response_error:
+            print_gui_log(t('log_discord_command_result_post_failed', error=response_error))
 
 
 @discord_commands.command(name='rollback', description=discord_locale('discord_command_description_rollback'))
@@ -2650,15 +2691,13 @@ async def discord_rollback(interaction, when: str):
         await discord_command_response(interaction, t('rollback_autosave_not_found'))
         return
     try:
-        timestamp, save_state = await asyncio.to_thread(get_rollback_save_state, save_path)
+        cached_path, timestamp = await asyncio.to_thread(cache_rollback_save, save_path)
     except OSError as error:
         await discord_command_response(interaction, t('rollback_file_read_failed', error=error))
         return
-    saved_at = datetime.datetime.strptime(timestamp, '%Y/%m/%d %H:%M:%S')
-    display_time = f'{saved_at.year}/{saved_at.month}/{saved_at.day} {saved_at:%H:%M}'
-    view = DiscordRollbackConfirmation(interaction, save_path, timestamp, save_state)
+    view = DiscordRollbackConfirmation(interaction, cached_path, timestamp)
     await interaction.edit_original_response(
-        content=t('discord_rollback_confirmation', timestamp=display_time), view=view,
+        content=t('discord_rollback_confirmation', timestamp=timestamp), view=view,
     )
 
 @discord_commands.command(name='cancel-scheduled-update', description=discord_locale('discord_command_description_cancel_scheduled_update'))
@@ -3950,7 +3989,7 @@ def monitoring():
                     set_company_pw()
                     set_ban_user()
                     print_gui_log(t('log_server_resumed'))
-                    discord_post(t('discord_server_resumed_title'), t('discord_server_resumed_description'), 0x00ff00)
+                    discord_post(t('discord_maintenance_completed_title'), t('discord_thanks_description'), 0x00ff00)
                     start_code = 1
                 elif start_code == 5:
                     app_start()

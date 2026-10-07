@@ -290,7 +290,7 @@ strings:
   discord_command_users_limit: Discordコマンド許可ユーザーは最大63件です。
   discord_user_id_required: DiscordユーザーIDは17～20桁の数字で入力してください。
   discord_command_disabled: Discordコマンド入力は無効です。
-  discord_command_not_allowed: このDiscordユーザーにはコマンド実行権限がありません。
+  discord_command_not_allowed: このコマンドを実行する権限がありません。
   discord_command_accepted: コマンドを受け付けました。
   discord_command_result_actor: 実行者
   discord_command_result_invocation: コマンド

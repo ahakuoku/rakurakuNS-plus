@@ -290,7 +290,7 @@ strings:
   discord_command_users_limit: At most 63 Discord command users can be configured.
   discord_user_id_required: Enter a Discord user ID as a 17 to 20 digit number.
   discord_command_disabled: Discord command input is disabled.
-  discord_command_not_allowed: This Discord user is not allowed to run commands.
+  discord_command_not_allowed: You do not have permission to run this command.
   discord_command_accepted: Command accepted.
   discord_command_result_actor: Executed by
   discord_command_result_invocation: Command

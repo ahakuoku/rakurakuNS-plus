@@ -290,7 +290,7 @@ strings:
   discord_command_users_limit: Discord 명령 허용 사용자는 최대 63건입니다.
   discord_user_id_required: Discord 사용자 ID는 17~20자리 숫자로 입력하세요.
   discord_command_disabled: Discord 명령 입력이 비활성화되어 있습니다.
-  discord_command_not_allowed: 이 Discord 사용자는 명령을 실행할 권한이 없습니다.
+  discord_command_not_allowed: 이 명령을 실행할 권한이 없습니다.
   discord_command_accepted: 명령을 접수했습니다.
   discord_command_result_actor: 실행자
   discord_command_result_invocation: 명령

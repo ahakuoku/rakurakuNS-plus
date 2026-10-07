@@ -290,7 +290,7 @@ strings:
   discord_command_users_limit: Maximal 63 Discord-Befehlsbenutzer können konfiguriert werden.
   discord_user_id_required: Geben Sie eine Discord-Benutzer-ID mit 17 bis 20 Ziffern ein.
   discord_command_disabled: Die Discord-Befehlseingabe ist deaktiviert.
-  discord_command_not_allowed: Dieser Discord-Benutzer darf keine Befehle ausführen.
+  discord_command_not_allowed: Sie haben keine Berechtigung, diesen Befehl auszuführen.
   discord_command_accepted: Befehl akzeptiert.
   discord_command_result_actor: Ausgeführt von
   discord_command_result_invocation: Befehl

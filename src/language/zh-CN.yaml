@@ -290,7 +290,7 @@ strings:
   discord_command_users_limit: 最多可设置63个 Discord 命令用户。
   discord_user_id_required: Discord 用户 ID 必须是 17 到 20 位数字。
   discord_command_disabled: Discord 命令输入已禁用。
-  discord_command_not_allowed: 此 Discord 用户无权执行命令。
+  discord_command_not_allowed: 您没有执行此命令的权限。
   discord_command_accepted: 命令已接受。
   discord_command_result_actor: 执行者
   discord_command_result_invocation: 命令

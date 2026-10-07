@@ -315,6 +315,16 @@ strings:
   discord_rollback_start_failed: 'ロールバックの開始に失敗しました: {error}'
   discord_command_admin_only: 管理者のみ実行できます。
   discord_command_description_admin: 管理コマンドを実行します。
+  discord_command_argument_backup: メンテナンス開始時に長期バックアップを作成するか指定します。
+  discord_command_argument_rollback_when: ロールバック先の時刻をYYYY/MM/DD HH:MMまたはHH:MMで指定します。
+  discord_command_argument_schedule_when: 変更後の更新時刻をYYYY/MM/DD HH:MMまたはHH:MMで指定します。
+  discord_command_argument_unused: このコマンドでは使用しません。
+  discord_command_argument_nettool_company_number: 会社番号を指定します。
+  discord_command_argument_nettool_client_number: クライアント番号を指定します。
+  discord_command_argument_nettool_ip_address: IPアドレスを指定します。
+  discord_command_argument_nettool_message: サーバー内へ送信するメッセージを指定します。
+  discord_command_argument_nettool_password: 新しい会社パスワードを指定します。
+  discord_command_argument_nettool_apply_ban_setting: BAN IP設定にも反映するか指定します。
   discord_command_description_restart: サーバーを再起動します。
   discord_command_description_manual_save: サーバーを停止せず手動セーブします。
   discord_command_description_maintenance: サーバーを一時停止または再開します。

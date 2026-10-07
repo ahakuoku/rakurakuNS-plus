@@ -315,6 +315,16 @@ strings:
   discord_rollback_start_failed: 'Could not start rollback: {error}'
   discord_command_admin_only: Only administrators can run this command.
   discord_command_description_admin: Run an administrative command.
+  discord_command_argument_backup: Whether to create a long-term backup when maintenance starts.
+  discord_command_argument_rollback_when: Rollback time in YYYY/MM/DD HH:MM or HH:MM format.
+  discord_command_argument_schedule_when: New update time in YYYY/MM/DD HH:MM or HH:MM format.
+  discord_command_argument_unused: Not used by this command.
+  discord_command_argument_nettool_company_number: Company number.
+  discord_command_argument_nettool_client_number: Client number.
+  discord_command_argument_nettool_ip_address: IP address.
+  discord_command_argument_nettool_message: Message to send in the server.
+  discord_command_argument_nettool_password: New company password.
+  discord_command_argument_nettool_apply_ban_setting: Whether to also update the BAN IP settings.
   discord_command_description_restart: Restart the server.
   discord_command_description_manual_save: Save the server without stopping it.
   discord_command_description_maintenance: Pause or resume the server.

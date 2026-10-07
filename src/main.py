@@ -175,15 +175,20 @@ class DiscordYamlTranslator(app_commands.Translator):
         code = {'ja': 'ja-JP', 'ko': 'ko-KR', 'de': 'de-DE'}.get(locale.value, locale.value)
         language_pack = self.language_packs.get(code, {})
         translated = language_pack.get(key)
-        admin_only = language_pack.get('discord_command_admin_only')
         if translated is None:
             return None
-        return f'{translated} {admin_only}' if admin_only else translated
+        if string.extras.get('append_admin_only'):
+            admin_only = language_pack.get('discord_command_admin_only')
+            return f'{translated} {admin_only}' if admin_only else translated
+        return translated
 
-def discord_locale(key):
+def discord_locale(key, *, append_admin_only=True):
     """Provide a readable Discord default while retaining the language-pack key."""
+    value = t(key)
+    if append_admin_only:
+        value = f"{value} {t('discord_command_admin_only')}"
     return app_commands.locale_str(
-        f"{t(key)} {t('discord_command_admin_only')}", translation_key=key,
+        value, translation_key=key, append_admin_only=append_admin_only,
     )
 
 # UI部品の文字列を一か所で言語パックへ接続する。既存画面の文言も
@@ -2558,7 +2563,9 @@ async def discord_manual_save(interaction):
     await discord_command_response(interaction, t('discord_command_accepted'), include_result=False)
 
 @admin_discord_group.command(name='maintenance', description=discord_locale('discord_command_description_maintenance'))
-@app_commands.describe(backup='Create a long-term backup when pausing.')
+@app_commands.describe(
+    backup=discord_locale('discord_command_argument_backup', append_admin_only=False),
+)
 async def discord_maintenance(interaction, backup: bool = False):
     global start_code
     if not await require_discord_command_permission(interaction): return
@@ -2689,7 +2696,9 @@ class DiscordRollbackConfirmation(discord.ui.View):
 
 
 @admin_discord_group.command(name='rollback', description=discord_locale('discord_command_description_rollback'))
-@app_commands.describe(when='YYYY/MM/DD HH:MM or HH:MM')
+@app_commands.describe(
+    when=discord_locale('discord_command_argument_rollback_when', append_admin_only=False),
+)
 async def discord_rollback(interaction, when: str):
     if not await require_discord_command_permission(interaction): return
     target_time = parse_rollback_time(when)
@@ -2717,7 +2726,9 @@ async def discord_cancel_scheduled_update(interaction):
     await discord_command_response(interaction, t('cancellation_complete') if cancel_scheduled_update() else t('no_update_schedule'))
 
 @admin_discord_group.command(name='schedule-update', description=discord_locale('discord_command_description_schedule_update'))
-@app_commands.describe(when='YYYY/MM/DD HH:MM or HH:MM')
+@app_commands.describe(
+    when=discord_locale('discord_command_argument_schedule_when', append_admin_only=False),
+)
 async def discord_schedule_update(interaction, when: str):
     if not await require_discord_command_permission(interaction): return
     try:
@@ -2774,9 +2785,22 @@ def register_nettool_discord_command(name, argument_name=None, needs_password=Fa
         await discord_command_response(interaction, result)
     callback.__name__ = 'nettool_' + name.replace('-', '_')
     callback.__doc__ = 'Run nettool ' + name
+    value_description_key = (
+        f'discord_command_argument_nettool_{argument_name}'
+        if argument_name else 'discord_command_argument_unused'
+    )
+    password_description_key = (
+        'discord_command_argument_nettool_password'
+        if needs_password else 'discord_command_argument_unused'
+    )
+    ban_setting_description_key = (
+        'discord_command_argument_nettool_apply_ban_setting'
+        if name in ('ban-ip', 'unban-ip') else 'discord_command_argument_unused'
+    )
     callback = app_commands.describe(
-        value='Command argument.', password='New company password.',
-        apply_ban_setting='Also update the BAN IP settings.',
+        value=discord_locale(value_description_key, append_admin_only=False),
+        password=discord_locale(password_description_key, append_admin_only=False),
+        apply_ban_setting=discord_locale(ban_setting_description_key, append_admin_only=False),
     )(callback)
     nettool_discord_group.command(
         name=name, description=discord_locale(f'discord_command_description_nettool_{name.replace("-", "_")}')

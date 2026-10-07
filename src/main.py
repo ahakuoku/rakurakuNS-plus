@@ -3923,6 +3923,10 @@ def server_stop(set_code, long_backup_code):
         print_gui_log(t('log_restart_notice_sent'))
         discord_post(t('discord_restart_soon_title'), t('discord_no_login_description'), 0xffbf00)
     elif set_code == 3:
+        # Stop monitoring before the planned-maintenance notices and shutdown.
+        # Otherwise monitoring() can observe the process exit in the small gap
+        # before the code below was assigned, and report a false server-down.
+        start_code = 3
         nettool_say('Maintenance soon.')
         print_gui_log(t('log_maintenance_notice_sent'))
         discord_post(t('discord_maintenance_soon_title'), t('discord_no_login_description'), 0xffbf00)

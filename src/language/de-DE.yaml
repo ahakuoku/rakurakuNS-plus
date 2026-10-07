@@ -307,6 +307,12 @@ strings:
   rollback_by_file: Datei angeben
   rollback_file_read_failed: 'Die Speicherdaten für das Rollback können nicht gelesen werden: {error}'
   rollback_autosave_not_found: Es gibt keine Autosave-Daten vor dem angegebenen Zeitpunkt.
+  discord_rollback_confirmation: 'Der Spielstand wird auf {timestamp} zurückgesetzt. Fortfahren?'
+  discord_rollback_confirmation_owner_only: Nur der Benutzer, der den Befehl eingegeben hat, kann diese Anfrage bestätigen.
+  discord_rollback_confirmation_expired: Diese Anfrage ist abgelaufen. Führen Sie den Rollback-Befehl erneut aus.
+  discord_rollback_save_changed: Der ausgewählte Spielstand wurde während der Bestätigung geändert oder gelöscht. Führen Sie den Rollback-Befehl erneut aus.
+  discord_rollback_started: 'Rollback auf {timestamp} wurde gestartet.'
+  discord_rollback_start_failed: 'Rollback konnte nicht gestartet werden: {error}'
   discord_command_description_restart: Server neu starten.
   discord_command_description_manual_save: Server ohne Anhalten speichern.
   discord_command_description_maintenance: Server anhalten oder fortsetzen.

@@ -307,6 +307,12 @@ strings:
   rollback_by_file: 指定文件
   rollback_file_read_failed: '无法读取回滚保存数据: {error}'
   rollback_autosave_not_found: 未找到指定时间或之前的自动保存数据。
+  discord_rollback_confirmation: '将回滚到 {timestamp} 的数据。是否继续？'
+  discord_rollback_confirmation_owner_only: 只有输入命令的用户可以操作此确认。
+  discord_rollback_confirmation_expired: 确认已过期。请重新执行回滚命令。
+  discord_rollback_save_changed: 等待确认时，所选保存数据已被修改或删除。请重新执行回滚命令。
+  discord_rollback_started: '已开始回滚到 {timestamp}。'
+  discord_rollback_start_failed: '无法开始回滚: {error}'
   discord_command_description_restart: 重启服务器。
   discord_command_description_manual_save: 不停止服务器即可保存。
   discord_command_description_maintenance: 暂停或恢复服务器。

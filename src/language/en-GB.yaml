@@ -307,6 +307,12 @@ strings:
   rollback_by_file: Specify file
   rollback_file_read_failed: 'Cannot read the rollback save data: {error}'
   rollback_autosave_not_found: No autosave data exists at or before the specified time.
+  discord_rollback_confirmation: 'The save will be rolled back to {timestamp}. Proceed?'
+  discord_rollback_confirmation_owner_only: Only the user who entered the command can respond to this confirmation.
+  discord_rollback_confirmation_expired: This confirmation has expired. Run the rollback command again.
+  discord_rollback_save_changed: The selected save was changed or deleted while awaiting confirmation. Run the rollback command again.
+  discord_rollback_started: 'Rollback to {timestamp} has started.'
+  discord_rollback_start_failed: 'Could not start rollback: {error}'
   discord_command_description_restart: Restart the server.
   discord_command_description_manual_save: Save the server without stopping it.
   discord_command_description_maintenance: Pause or resume the server.

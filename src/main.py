@@ -1211,11 +1211,26 @@ class window_main(tk.Frame):
 
     def rollback_execute(self, save_path, timestamp):
         self.rollback_button.config(state="disabled")
-        threading.Thread(
-            target=rollback_server,
-            args=(save_path, timestamp),
-            daemon=True,
-        ).start()
+        try:
+            threading.Thread(
+                target=self.rollback_threaded,
+                args=(save_path, timestamp),
+                daemon=True,
+            ).start()
+        except Exception:
+            self.rollback_button.config(state="normal")
+            raise
+
+    def rollback_threaded(self, save_path, timestamp):
+        try:
+            rollback_server(save_path, timestamp)
+        finally:
+            # Tk widgets must be updated on the GUI thread, even after a failure.
+            try:
+                self.after(0, lambda: self.rollback_button.config(state="normal"))
+            except (RuntimeError, tk.TclError):
+                # The application may have been closed during the operation.
+                pass
 
     def server_restart_check_start(self):
         # 確認ダイアログを開く

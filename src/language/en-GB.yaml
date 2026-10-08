@@ -331,6 +331,7 @@ strings:
   discord_command_argument_nettool_message: Message to send in the server.
   discord_command_argument_nettool_password: New company password.
   discord_command_argument_nettool_apply_ban_setting: Whether to also update the BAN IP settings.
+  discord_command_argument_nettool_apply_password_setting: Whether to also update the company password settings.
   discord_command_description_restart: Restart the server.
   discord_command_description_manual_save: Save the server without stopping it.
   discord_command_description_maintenance: Pause or resume the server.

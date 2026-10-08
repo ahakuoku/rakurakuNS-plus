@@ -2656,7 +2656,7 @@ async def post_discord_command_result(interaction, text=None):
     except Exception as error:
         print_gui_log(t('log_discord_command_result_post_failed', error=error))
 
-async def discord_run_nettool(command, value='', password='', apply_ban_setting=False):
+async def discord_run_nettool(command, value='', password='', apply_ban_setting=False, apply_password_setting=False):
     """Run the same nettool operation as the GUI and return its textual result."""
     def run():
         if command in ('lock-company', 'unlock-company', 'remove-company'):
@@ -2677,6 +2677,8 @@ async def discord_run_nettool(command, value='', password='', apply_ban_setting=
             return t('nettool_command_failed', command=command, code=result.returncode, output=output)
         if apply_ban_setting and command in ('ban-ip', 'unban-ip'):
             update_discord_ban_setting(value, command == 'ban-ip')
+        if apply_password_setting and command in ('lock-company', 'unlock-company'):
+            update_discord_company_password_setting(value, password if command == 'lock-company' else '')
         return output or t('nettool_sent', command=command)
     return await asyncio.to_thread(run)
 
@@ -2690,6 +2692,18 @@ def update_discord_ban_setting(ip, enabled):
     elif not enabled:
         values = ['' if item == ip else item for item in values]
     config_data.setdefault('network', {}).setdefault('ban_ips', {}).update({i: values[i] for i in range(63)})
+    with open(config_path, 'w', encoding='utf-8') as config_file:
+        yaml.safe_dump(config_data, config_file, allow_unicode=True, sort_keys=False)
+    load_config()
+
+def update_discord_company_password_setting(company_number, password):
+    try:
+        company_index = int(company_number)
+    except (TypeError, ValueError):
+        return
+    if not 0 <= company_index < 63:
+        return
+    config_data.setdefault('players', {}).setdefault('passwords', {})[company_index] = password
     with open(config_path, 'w', encoding='utf-8') as config_file:
         yaml.safe_dump(config_data, config_file, allow_unicode=True, sort_keys=False)
     load_config()
@@ -2918,7 +2932,7 @@ nettool_discord_group = app_commands.Group(name='nettool', description=discord_l
 admin_discord_group.add_command(nettool_discord_group)
 
 def register_nettool_discord_command(name, argument_name=None, needs_password=False):
-    async def execute(interaction, value='', password='', apply_ban_setting=False):
+    async def execute(interaction, value='', password='', apply_ban_setting=False, apply_password_setting=False):
         if not await require_discord_command_permission(interaction): return
         if argument_name and not value.strip():
             await discord_command_response(interaction, t('nettool_argument_required'))
@@ -2927,7 +2941,9 @@ def register_nettool_discord_command(name, argument_name=None, needs_password=Fa
             await discord_command_response(interaction, t('nettool_argument_required'))
             return
         await interaction.response.defer(ephemeral=True, thinking=True)
-        result = await discord_run_nettool(name, value.strip(), password.strip(), apply_ban_setting)
+        result = await discord_run_nettool(
+            name, value.strip(), password.strip(), apply_ban_setting, apply_password_setting,
+        )
         await discord_command_response(interaction, result)
 
     descriptions = {}
@@ -2935,14 +2951,19 @@ def register_nettool_discord_command(name, argument_name=None, needs_password=Fa
         async def callback(interaction):
             await execute(interaction)
     elif needs_password:
-        async def callback(interaction, value: str, password: str):
-            await execute(interaction, value=value, password=password)
+        async def callback(interaction, value: str, password: str, apply_password_setting: bool = False):
+            await execute(
+                interaction, value=value, password=password, apply_password_setting=apply_password_setting,
+            )
         descriptions.update(
             value=discord_locale(
                 f'discord_command_argument_nettool_{argument_name}', append_admin_only=False,
             ),
             password=discord_locale(
                 'discord_command_argument_nettool_password', append_admin_only=False,
+            ),
+            apply_password_setting=discord_locale(
+                'discord_command_argument_nettool_apply_password_setting', append_admin_only=False,
             ),
         )
     elif name in ('ban-ip', 'unban-ip'):
@@ -2954,6 +2975,17 @@ def register_nettool_discord_command(name, argument_name=None, needs_password=Fa
             ),
             apply_ban_setting=discord_locale(
                 'discord_command_argument_nettool_apply_ban_setting', append_admin_only=False,
+            ),
+        )
+    elif name == 'unlock-company':
+        async def callback(interaction, value: str, apply_password_setting: bool = False):
+            await execute(interaction, value=value, apply_password_setting=apply_password_setting)
+        descriptions.update(
+            value=discord_locale(
+                f'discord_command_argument_nettool_{argument_name}', append_admin_only=False,
+            ),
+            apply_password_setting=discord_locale(
+                'discord_command_argument_nettool_apply_password_setting', append_admin_only=False,
             ),
         )
     else:

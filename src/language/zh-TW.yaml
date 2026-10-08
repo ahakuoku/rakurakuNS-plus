@@ -331,6 +331,7 @@ strings:
   discord_command_argument_nettool_message: 指定要傳送到伺服器內的訊息。
   discord_command_argument_nettool_password: 指定新的公司密碼。
   discord_command_argument_nettool_apply_ban_setting: 指定是否同時更新BAN IP設定。
+  discord_command_argument_nettool_apply_password_setting: 指定是否也更新公司密碼設定。
   discord_command_description_restart: 重新啟動伺服器。
   discord_command_description_manual_save: 不停止伺服器即可儲存。
   discord_command_description_maintenance: 暫停或恢復伺服器。

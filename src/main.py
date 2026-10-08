@@ -1491,9 +1491,9 @@ class window_main(tk.Frame):
 class nettool_window(tk.Frame):
     """nettoolの全管理コマンドを送信する画面。"""
     COMMAND_GROUPS = (
-        ('nettool_group_information', ('announce', 'clients', 'companies', 'info-company', 'blacklist')),
+        ('nettool_group_information', ('announce', 'clients', 'companies', 'info-company')),
         ('nettool_group_company', ('lock-company', 'unlock-company', 'remove-company')),
-        ('nettool_group_connection', ('kick-client', 'ban-client', 'ban-ip', 'unban-ip', 'say')),
+        ('nettool_group_connection', ('kick-client', 'ban-client', 'ban-ip', 'unban-ip', 'say', 'blacklist')),
         ('nettool_group_server', ('force-sync', 'shutdown')),
     )
     ARGUMENT_LABELS = {

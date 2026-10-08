@@ -1507,7 +1507,7 @@ class nettool_window(tk.Frame):
         super().__init__(master)
         self.master = master
         self.master.title(t('nettool_commands'))
-        self.master.geometry('1050x720')
+        self.master.geometry('1200x720')
         self.master.minsize(900, 620)
         self.master.protocol('WM_DELETE_WINDOW', self.close_window)
         self.grid(row=0, column=0, sticky='nsew', padx=12, pady=12)
@@ -1519,6 +1519,7 @@ class nettool_window(tk.Frame):
         self.command_results = queue.Queue()
         self.apply_ban_var = tk.BooleanVar(value=False)
         self.apply_password_var = tk.BooleanVar(value=False)
+        self.lock_company_password_visible = tk.BooleanVar(value=False)
         ttk.Label(self, text=t('nettool_description'), wraplength=1000).grid(row=0, column=0, sticky='w', pady=(0, 8))
         commands_area = ttk.Frame(self)
         commands_area.grid(row=1, column=0, sticky='nsew')
@@ -1602,19 +1603,30 @@ class nettool_window(tk.Frame):
             password_label.grid(row=row, column=2, sticky='e', padx=(0, 4))
             password = ttk.Entry(parent, width=16, show='*')
             password.grid(row=row, column=3, sticky='ew', padx=(0, 6))
+            password_visibility = ttk.Checkbutton(
+                parent, text=t('show_password'), variable=self.lock_company_password_visible,
+                style='Switch.TCheckbutton', command=self._toggle_lock_company_password,
+            )
+            password_visibility.grid(row=row, column=4, sticky='w', padx=(0, 6))
             self._bind_command_scroll(password_label)
             self._bind_command_scroll(password)
+            self._bind_command_scroll(password_visibility)
             self.inputs['lock-company_password'] = password
         else:
             spacer = ttk.Label(parent, text='')
             spacer.grid(row=row, column=2, sticky='ew')
             self._bind_command_scroll(spacer)
         send_button = ttk.Button(parent, text=t('send'), command=lambda c=command: self.send(c))
-        send_button.grid(row=row, column=4, padx=2)
+        send_button.grid(row=row, column=5, padx=2)
         help_button = ttk.Button(parent, text=t('help'), command=lambda c=command: self.show_command_help(c))
-        help_button.grid(row=row, column=5, padx=2)
+        help_button.grid(row=row, column=6, padx=2)
         self._bind_command_scroll(send_button)
         self._bind_command_scroll(help_button)
+
+    def _toggle_lock_company_password(self):
+        self.inputs['lock-company_password'].configure(
+            show='' if self.lock_company_password_visible.get() else '*'
+        )
 
     def _bind_command_scroll(self, widget):
         widget.bind('<MouseWheel>', self._scroll_commands, add='+')

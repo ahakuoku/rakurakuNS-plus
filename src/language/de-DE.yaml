@@ -24,7 +24,7 @@ strings:
   browse: Durchsuchen...
   show: Zeigen
   help: Helfen
-  numbered_value_per_line: Zahl=Wert (ein Eintrag pro Zeile)
+  ip_address_per_line: IP-Adresse (eine pro Zeile)
   company_passwords_notice: Firmenpasswörter (Firma 15 und höher erfordern OTRP v59_0_2 oder höher)
   show_password: Passwörter anzeigen
   company_number: Firma {i}

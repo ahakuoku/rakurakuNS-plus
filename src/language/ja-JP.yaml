@@ -24,7 +24,7 @@ strings:
   browse: 参照…
   show: 表示
   help: 説明
-  numbered_value_per_line: 番号=値（1行に1件）
+  ip_address_per_line: IPアドレス（1行に1件）
   company_passwords_notice: 会社ごとのパスワード（15番以降はOTRP v59_0_2以降専用）
   show_password: パスワードを表示
   company_number: 会社 {i}

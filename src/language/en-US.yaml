@@ -24,7 +24,7 @@ strings:
   browse: Browse...
   show: Show
   help: Help
-  numbered_value_per_line: number=value (one entry per line)
+  ip_address_per_line: IP address (one per line)
   company_passwords_notice: Company passwords (company 15 and later require OTRP v59_0_2 or later)
   show_password: Show passwords
   company_number: Company {i}

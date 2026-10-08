@@ -24,7 +24,7 @@ strings:
   browse: 瀏覽...
   show: 展示
   help: 幫助
-  numbered_value_per_line: 數字=值（每行一個條目）
+  ip_address_per_line: IP 位址（每行一個）
   company_passwords_notice: 公司密碼（公司 15 及更高版本需要 OTRP v59_0_2 或更高版本）
   show_password: 顯示密碼
   company_number: 公司 {i}

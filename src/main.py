@@ -626,11 +626,10 @@ class config_window:
             config_data.setdefault('players', {}).setdefault('passwords', {})[i] = entry.get()
         config_data.setdefault('discord', {})['command_users'] = command_users
         ban_ips = config_data.setdefault('network', {}).setdefault('ban_ips', {})
-        for line in self.fields.get('ban_ips').get('1.0', 'end').splitlines():
-            if '=' in line:
-                index, value = line.split('=', 1)
-                if index.strip().isdigit() and 0 <= int(index) < 63:
-                    ban_ips[int(index)] = value
+        ban_ips.update({i: '' for i in range(63)})
+        ban_values = [line.strip() for line in self.fields.get('ban_ips').get('1.0', 'end').splitlines() if line.strip()]
+        for index, value in enumerate(ban_values[:63]):
+            ban_ips[index] = value
         # 初回起動中は、言語変更だけで設定ファイルを作成しない。
         # ファイルが先に作られると、保存前でもメイン処理が初期設定済みと
         # 判断し、空の server.path を check_config() で検証してしまう。
@@ -816,7 +815,7 @@ class config_window:
     def add_multiline_tab(self, notebook, title, key, values):
         frame = ttk.Frame(notebook)
         notebook.add(frame, text=title)
-        notice_key = 'discord_command_users_notice' if key == 'command_users' else 'numbered_value_per_line'
+        notice_key = 'discord_command_users_notice' if key == 'command_users' else 'ip_address_per_line'
         ttk.Label(frame, text=t(notice_key)).pack(anchor='w', padx=10, pady=8)
         ttk.Button(frame, text=t('help'), command=lambda k=key: self.show_help(k)).pack(anchor='e', padx=10)
         text = tk.Text(frame, width=65, height=25)
@@ -824,7 +823,7 @@ class config_window:
         for i in range(63):
             value = values.get(i, values.get(str(i), ''))
             if value not in (None, ''):
-                text.insert('end', f'{value}\n' if key == 'command_users' else f'{i}={value}\n')
+                text.insert('end', f'{value}\n')
         self.fields[key] = text
 
     def add_password_tab(self, notebook, values):
@@ -997,7 +996,7 @@ class config_window:
             for i in range(63):
                 value = getattr(legacy, f'banip_{i}', '')
                 if value not in ('', None):
-                    text.insert('end', f'{i}={value}\n')
+                    text.insert('end', f'{value}\n')
             messagebox.showinfo(t('import_complete'), t('legacy_import_complete'), parent=self.window)
         except Exception as error:
             messagebox.showerror(t('import_failed'), t('legacy_import_failed', error=error), parent=self.window)
@@ -1061,7 +1060,7 @@ class config_window:
             for i in range(1, 64):
                 address = settings.get(f'ban_address_{i}', '')
                 if address:
-                    ban_text.insert('end', f'{i - 1}={address}\n')
+                    ban_text.insert('end', f'{address}\n')
             messagebox.showinfo(t('import_complete'), t('bat_import_complete'), parent=self.window)
         except Exception as error:
             messagebox.showerror(t('import_failed'), t('bat_import_failed', error=error), parent=self.window)
@@ -1102,11 +1101,9 @@ class config_window:
                     data[key][name] = self.fields[name].get()
         for i, entry in self.fields['passwords'].items():
             data['players']['passwords'][i] = entry.get()
-        for line in self.fields['ban_ips'].get('1.0', 'end').splitlines():
-            if '=' in line:
-                index, value = line.split('=', 1)
-                if index.strip().isdigit() and 0 <= int(index) < 63:
-                    data['network']['ban_ips'][int(index)] = value
+        ban_values = [line.strip() for line in self.fields['ban_ips'].get('1.0', 'end').splitlines() if line.strip()]
+        for index, value in enumerate(ban_values[:63]):
+            data['network']['ban_ips'][index] = value
         error = self.validate_config_data(data)
         if error:
             messagebox.showerror(t('input_error'), error, parent=self.window)

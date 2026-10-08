@@ -24,7 +24,7 @@ strings:
   browse: "참조…"
   show: "표시"
   help: "설명"
-  numbered_value_per_line: "번호=값(1행에 1건)"
+  ip_address_per_line: IP 주소(한 줄에 하나)
   company_passwords_notice: "회사별 비밀번호(15번 이후는 OTRP v59_0_2 이후 전용)"
   show_password: "비밀번호 표시"
   company_number: "회사 {i}"

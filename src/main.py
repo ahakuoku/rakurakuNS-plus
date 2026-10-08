@@ -1119,9 +1119,9 @@ class config_window:
             check_config(initialize_runtime=False)
             app.server_name_label.config(text=t('managed_server') + config.server_name)
             request_discord_command_sync()
-            # 設定GUIで変更した会社パスワードを、保存直後にサーバーへ反映する。
+            # 設定GUIで変更した会社パスワードとBAN IPを、保存直後にサーバーへ反映する。
             # nettool 呼び出しでGUI操作が停止しないよう、バックグラウンドで実行する。
-            threading.Thread(target=set_company_pw, daemon=True).start()
+            threading.Thread(target=apply_server_access_settings, daemon=True).start()
         self.close()
 
     def validate_config_data(self, data):
@@ -3994,6 +3994,11 @@ def set_ban_user():
         banip = getattr(config, f'banip_{i}', '')
         nettool_banip(banip)
     print_gui_log(t('log_ban_users_set'))
+
+def apply_server_access_settings():
+    """Apply configured company passwords and BAN IPs to the running server."""
+    set_company_pw()
+    set_ban_user()
 
 def delete_old_long_backup_files():
     # 指定日数を超えたファイルを削除する

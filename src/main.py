@@ -1119,6 +1119,9 @@ class config_window:
             check_config(initialize_runtime=False)
             app.server_name_label.config(text=t('managed_server') + config.server_name)
             request_discord_command_sync()
+            # 設定GUIで変更した会社パスワードを、保存直後にサーバーへ反映する。
+            # nettool 呼び出しでGUI操作が停止しないよう、バックグラウンドで実行する。
+            threading.Thread(target=set_company_pw, daemon=True).start()
         self.close()
 
     def validate_config_data(self, data):

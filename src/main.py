@@ -46,9 +46,16 @@ except Exception:
 language_code = 'en-US'
 translations = {}
 translation_aliases = {}
+locale_date_format = 'YYYY/MM/DD'
+
+DATE_FORMATS = {
+    'YYYY/MM/DD': '%Y/%m/%d',
+    'MM/DD/YYYY': '%m/%d/%Y',
+    'DD/MM/YYYY': '%d/%m/%Y',
+}
 
 def load_language(code='en-US'):
-    global language_code, translations, translation_aliases
+    global language_code, translations, translation_aliases, locale_date_format
     requested = str(code or 'ja-JP')
     path = os.path.join(language_dir, f'{requested}.yaml')
     fallback = os.path.join(language_dir, 'ja-JP.yaml')
@@ -58,11 +65,32 @@ def load_language(code='en-US'):
         language_code = document.get('locale', requested)
         translations = document.get('strings', {})
         translation_aliases = document.get('aliases', {})
+        configured_locale_format = document.get('date_format', 'YYYY/MM/DD')
+        locale_date_format = configured_locale_format if configured_locale_format in DATE_FORMATS else 'YYYY/MM/DD'
     except (OSError, yaml.YAMLError):
-        language_code, translations, translation_aliases = 'en-US', {}, {}
+        language_code, translations, translation_aliases, locale_date_format = 'en-US', {}, {}, 'YYYY/MM/DD'
+
+def selected_date_format():
+    """Return the configured date order, falling back to the current language."""
+    configured = config_data.get('date_format')
+    return configured if configured in DATE_FORMATS else locale_date_format
+
+def format_datetime(value, *, seconds=False):
+    """Format a datetime for UI and Discord text using the selected date order."""
+    time_format = '%H:%M:%S' if seconds else '%H:%M'
+    return value.strftime(f"{DATE_FORMATS[selected_date_format()]} {time_format}")
+
+def parse_datetime(value):
+    """Parse a date/time entry, allowing a time-only entry for today."""
+    raw = str(value).strip()
+    if re.fullmatch(r'\d{1,2}:\d{2}', raw):
+        raw = f"{datetime.datetime.now().strftime(DATE_FORMATS[selected_date_format()])} {raw}"
+    return datetime.datetime.strptime(raw, f"{DATE_FORMATS[selected_date_format()]} %H:%M")
 
 def t(key, **values):
     value = translations.get(translation_aliases.get(key, key), key)
+    if '{date_format}' in value:
+        values.setdefault('date_format', selected_date_format())
     return value.format(**values) if values else value
 
 def available_languages():
@@ -163,7 +191,14 @@ class DiscordYamlTranslator(app_commands.Translator):
             try:
                 with open(os.path.join(language_dir, filename), 'r', encoding='utf-8') as language_file:
                     document = yaml.safe_load(language_file) or {}
-                packs[os.path.splitext(filename)[0]] = document.get('strings', {})
+                pack = document.get('strings', {})
+                # Discord translations must describe the same input format as the
+                # running application, rather than the translator's own locale.
+                packs[os.path.splitext(filename)[0]] = {
+                    key: value.replace('{date_format}', selected_date_format())
+                    if isinstance(value, str) else value
+                    for key, value in pack.items()
+                }
             except (OSError, yaml.YAMLError):
                 continue
         return packs
@@ -349,6 +384,7 @@ def load_config():
 def default_config_data():
     return {
         'language': 'en-US',
+        'date_format': 'MM/DD/YYYY',
         'server': {
             'path': '', 'port': '13353', 'restart_time': -1,
             'response_monitor_enabled': 0, 'response_timeout': 0,
@@ -463,7 +499,7 @@ class config_window:
         notebook = ttk.Notebook(self.window)
         notebook.pack(fill='both', expand=True, padx=8, pady=8)
         language_frame = ttk.Frame(notebook)
-        notebook.add(language_frame, text=t('language_tab'))
+        notebook.add(language_frame, text=t('language_locale'))
         ttk.Label(language_frame, text=t('language_tab')).grid(row=0, column=0, sticky='w', padx=10, pady=12)
         # 言語名は選択中の言語で翻訳せず、各YAMLの固定表記を使う。
         languages = available_languages()
@@ -476,7 +512,15 @@ class config_window:
         language_box.set(next((f'{code} - {name}' for code, name in languages if code == self.language_var.get()), ''))
         language_box.grid(row=0, column=1, sticky='w', padx=10, pady=12)
         language_box.bind('<<ComboboxSelected>>', self.apply_language)
-        ttk.Label(language_frame, text=t('translation_accuracy_notice')).grid(row=1, column=0, columnspan=2, sticky='w', padx=10, pady=8)
+        ttk.Label(language_frame, text=t('date_format')).grid(row=1, column=0, sticky='w', padx=10, pady=12)
+        self.date_format_var = tk.StringVar(value=data.get('date_format', selected_date_format()))
+        if self.date_format_var.get() not in DATE_FORMATS:
+            self.date_format_var.set(selected_date_format())
+        ttk.Combobox(
+            language_frame, textvariable=self.date_format_var,
+            values=list(DATE_FORMATS), state='readonly', width=28,
+        ).grid(row=1, column=1, sticky='w', padx=10, pady=12)
+        ttk.Label(language_frame, text=t('translation_accuracy_notice')).grid(row=2, column=0, columnspan=2, sticky='w', padx=10, pady=8)
         server_values = data.get('server', {})
         if 'path' not in server_values:
             folder = server_values.get('folder_path', '')
@@ -560,10 +604,13 @@ class config_window:
         # 初回起動中は、言語変更だけで設定ファイルを作成しない。
         # ファイルが先に作られると、保存前でもメイン処理が初期設定済みと
         # 判断し、空の server.path を check_config() で検証してしまう。
+        load_language(selected)
+        # A language change uses the locale's documented date order. Users can
+        # still choose another order in the Locale field before saving.
+        config_data['date_format'] = locale_date_format
         if not self.first_run:
             with open(config_path, 'w', encoding='utf-8') as config_file:
                 yaml.safe_dump(config_data, config_file, allow_unicode=True, sort_keys=False)
-        load_language(selected)
         if 'app' in globals() and app is not None:
             app.apply_language()
         self.window.grab_release()
@@ -977,6 +1024,7 @@ class config_window:
             messagebox.showerror(t('input_error'), str(error), parent=self.window)
             return
         data['language'] = self.language_var.get().split(' - ', 1)[0]
+        data['date_format'] = self.date_format_var.get()
         # 設定画面にない内部状態を保持する。
         data['runtime'] = config_data.get('runtime', data['runtime'])
         try:
@@ -1618,7 +1666,7 @@ class update_schedule_window(tk.Frame):
         self.restart_server_var = tk.IntVar(value=1)
         self.body_path = tk.StringVar()
         self.pak_path = tk.StringVar()
-        self.time_var = tk.StringVar(value=datetime.datetime.now().strftime('%Y/%m/%d %H:%M'))
+        self.time_var = tk.StringVar(value=format_datetime(datetime.datetime.now()))
         with scheduled_updates_lock:
             existing_schedule = dict(scheduled_updates) if scheduled_updates else None
         if existing_schedule:
@@ -1629,7 +1677,7 @@ class update_schedule_window(tk.Frame):
             self.restart_server_var.set(existing_schedule.get('restart_server', 1))
             self.body_path.set(existing_schedule.get('body') or '')
             self.pak_path.set(existing_schedule.get('pak') or '')
-            self.time_var.set(existing_schedule['when'].strftime('%Y/%m/%d %H:%M'))
+            self.time_var.set(format_datetime(existing_schedule['when']))
 
         ttk.Checkbutton(self.master, text=t('update_application'), style='Switch.TCheckbutton', variable=self.body_var).grid(row=0, column=0, padx=10, pady=8, sticky='w')
         ttk.Entry(self.master, textvariable=self.body_path, width=55).grid(row=1, column=0, padx=10, sticky='w')
@@ -1673,10 +1721,7 @@ class update_schedule_window(tk.Frame):
         if update_data is None:
             return
         try:
-            raw = self.time_var.get().strip()
-            if re.fullmatch(r'\d{1,2}:\d{2}', raw):
-                raw = datetime.datetime.now().strftime('%Y/%m/%d ') + raw
-            when = datetime.datetime.strptime(raw, '%Y/%m/%d %H:%M')
+            when = parse_datetime(self.time_var.get())
         except ValueError:
             messagebox.showerror(t('input_confirmation'), t('invalid_update_datetime'), parent=self.master)
             return
@@ -1685,7 +1730,7 @@ class update_schedule_window(tk.Frame):
             return
         body, pak = update_data
         schedule_update(when, body, pak, self.backup_var.get(), self.discord_notice_var.get(), self.restart_server_var.get())
-        messagebox.showinfo(t('registration_complete'), t('update_registered', when=when.strftime('%Y/%m/%d %H:%M')), parent=self.master)
+        messagebox.showinfo(t('registration_complete'), t('update_registered', when=format_datetime(when)), parent=self.master)
         self.close_window()
 
     def validate_update_inputs(self):
@@ -2010,7 +2055,7 @@ class rollback_window(tk.Frame):
         self.master.minsize(610, 0)
         self.master.protocol('WM_DELETE_WINDOW', self.close_window)
         self.mode_var = tk.StringVar(value='time')
-        self.time_var = tk.StringVar(value=datetime.datetime.now().strftime('%Y/%m/%d %H:%M'))
+        self.time_var = tk.StringVar(value=format_datetime(datetime.datetime.now()))
         self.file_var = tk.StringVar(value='')
 
         mode_frame = ttk.Frame(self.master)
@@ -2098,10 +2143,7 @@ class rollback_window(tk.Frame):
 
 def parse_rollback_time(value):
     try:
-        raw = str(value).strip()
-        if re.fullmatch(r'\d{1,2}:\d{2}', raw):
-            raw = datetime.datetime.now().strftime('%Y/%m/%d ') + raw
-        return datetime.datetime.strptime(raw, '%Y/%m/%d %H:%M')
+        return parse_datetime(value)
     except ValueError:
         return None
 
@@ -2127,7 +2169,7 @@ def find_autosave_before(target_time):
 def get_rollback_save_state(save_path):
     """Return the save timestamp for rollback messages, at minute precision."""
     file_stat = os.stat(save_path)
-    timestamp = datetime.datetime.fromtimestamp(file_stat.st_mtime).strftime('%Y/%m/%d %H:%M')
+    timestamp = format_datetime(datetime.datetime.fromtimestamp(file_stat.st_mtime))
     return timestamp, (file_stat.st_mtime_ns, file_stat.st_size)
 
 def cache_rollback_save(save_path):
@@ -2265,7 +2307,7 @@ def print_gui_log(content):
     # GUIのログに追記
     date_time = datetime.datetime.now()
     # WindowsのstrftimeへUnicode本文を渡さず、日時と本文を分けて連結する。
-    content = date_time.strftime('[%Y/%m/%d %H:%M:%S] ') + content
+    content = f'[{format_datetime(date_time, seconds=True)}] ' + content
     app.log_text_insert(content)
     return None
 
@@ -2734,9 +2776,7 @@ async def discord_cancel_scheduled_update(interaction):
 async def discord_schedule_update(interaction, when: str):
     if not await require_discord_command_permission(interaction): return
     try:
-        raw = when.strip()
-        if re.fullmatch(r'\d{1,2}:\d{2}', raw): raw = datetime.datetime.now().strftime('%Y/%m/%d ') + raw
-        scheduled_time = datetime.datetime.strptime(raw, '%Y/%m/%d %H:%M')
+        scheduled_time = parse_datetime(when)
         if scheduled_time <= datetime.datetime.now(): raise ValueError
     except ValueError:
         await discord_command_response(interaction, t('invalid_update_datetime'))
@@ -2881,7 +2921,7 @@ def schedule_update(when, body_source, pak_source, long_backup_code, discord_not
             update_kind = t('update_kind_application')
         else:
             update_kind = t('update_kind_pak')
-        time_text = when.strftime('%H:%M') if when.date() == datetime.datetime.now().date() else when.strftime('%Y/%m/%d %H:%M')
+        time_text = when.strftime('%H:%M') if when.date() == datetime.datetime.now().date() else format_datetime(when)
         discord_post(t('discord_maintenance_schedule_title'), t('discord_maintenance_schedule_description', kind=update_kind, time=time_text), 0xffbf00)
     print_gui_log(t('log_update_scheduled'))
 
@@ -3581,7 +3621,7 @@ def print_with_date(content):
     date_time = datetime.datetime.now()
     # 本文をstrftimeの書式文字列に含めると、Windowsでは本文のUnicode文字を
     # ロケール依存のエンコーディングへ変換しようとして失敗することがある。
-    message = date_time.strftime('[%Y/%m/%d %H:%M:%S] ') + content
+    message = f'[{format_datetime(date_time, seconds=True)}] ' + content
     try:
         # Windowsの既定コードページでは、中国語などの翻訳ログを出力できない
         # 場合があるため、標準出力をUTF-8へ切り替える。

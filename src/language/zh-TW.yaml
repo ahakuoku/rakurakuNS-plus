@@ -1,8 +1,11 @@
 # Rakuraku NS+ Traditional Chinese UI language pack
 locale: zh-TW
 language_name: 繁體中文（台灣）
+date_format: YYYY/MM/DD
 strings:
   language_tab: Language
+  language_locale: Language / 地區設定
+  date_format: 日期格式
   translation_accuracy_notice: "翻譯可能不正確。\n某些錯誤訊息可能會以日文顯示。"
   settings: 設定
   server: 伺服器
@@ -94,7 +97,7 @@ strings:
   select_application: 選擇 Simutrans 應用程式
   update_pakset: 更新包集
   select_pakset: 選擇包集資料夾
-  update_datetime: 更新時間（YYYY/MM/DD HH:MM；省略今天的日期）
+  update_datetime: 更新時間（{date_format} HH:MM；省略今天的日期）
   backup_before_update: 更新前建立長期備份
   post_discord_notice: 向 Discord 發布通知
   update_after_action: 更新後的操作
@@ -136,7 +139,7 @@ strings:
   update_kind_pak: 帕克
   pakset_validation_title: 資料包驗證
   pakset_validation_message: 這不是一個包。檢查ground.Outside.pak是否存在且命名正確。檔案名稱區分大小寫。
-  invalid_update_datetime: 輸入更新時間，格式為 YYYY/MM/DD HH:MM 或 HH:MM。
+  invalid_update_datetime: 輸入更新時間，格式為 {date_format} HH:MM 或 HH:MM。
   future_datetime_required: 指定未來的日期和時間。
   update_registered: 更新計劃為 {when}。
   update_target_required: 選擇要更新的 Simutrans 應用程式或 Pakset。
@@ -302,7 +305,7 @@ strings:
   help_discord_command_result_enabled: 啟用後，將命令結果發佈到指定的專用頻道。
   help_discord_command_result_channel: 指定用於發佈命令結果的 Discord 頻道 ID。
   log_discord_command_result_post_failed: '發佈 Discord 命令結果失敗: {error}'
-  rollback_datetime: 回復時間（YYYY/MM/DD HH:MM；省略日期時為今天）
+  rollback_datetime: 回復時間（{date_format} HH:MM；省略日期時為今天）
   rollback_by_time: 指定時間
   rollback_by_file: 指定檔案
   rollback_file_read_failed: '無法讀取回復儲存資料: {error}'
@@ -316,8 +319,8 @@ strings:
   discord_command_admin_only: 僅限管理員執行此命令。
   discord_command_description_admin: 執行管理命令。
   discord_command_argument_backup: 指定維護開始時是否建立長期備份。
-  discord_command_argument_rollback_when: 以YYYY/MM/DD HH:MM或HH:MM格式指定回復時間。
-  discord_command_argument_schedule_when: 以YYYY/MM/DD HH:MM或HH:MM格式指定新的更新時間。
+  discord_command_argument_rollback_when: 以{date_format} HH:MM或HH:MM格式指定回復時間。
+  discord_command_argument_schedule_when: 以{date_format} HH:MM或HH:MM格式指定新的更新時間。
   discord_command_argument_nettool_company_number: 指定公司編號。
   discord_command_argument_nettool_client_number: 指定客戶端編號。
   discord_command_argument_nettool_ip_address: 指定IP位址。

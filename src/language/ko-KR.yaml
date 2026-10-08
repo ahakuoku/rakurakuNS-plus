@@ -1,8 +1,11 @@
 # Rakuraku NS+ Korean UI language pack
 locale: ko-KR
 language_name: 한국어 (대한민국)
+date_format: YYYY/MM/DD
 strings:
   language_tab: "Language"
+  language_locale: "Language / 로캘"
+  date_format: 날짜 형식
   translation_accuracy_notice: "번역이 잘못되었을 수 있습니다.\n일부 오류 메시지는 일본어를 표시할 수 있습니다."
   settings: "설정"
   server: "서버"
@@ -94,7 +97,7 @@ strings:
   select_application: "본체 파일 선택"
   update_pakset: "Pakset 업데이트"
   select_pakset: "Pakset 폴더 선택"
-  update_datetime: "갱신일시(YYYY/MM/DD HH:MM, 일자 생략시는 당일)"
+  update_datetime: "갱신일시({date_format} HH:MM, 일자 생략시는 당일)"
   backup_before_update: "업데이트 직전의 저장 데이터를 장기 백업"
   post_discord_notice: "Discord에 예고 게시"
   update_after_action: "업데이트 후 동작"
@@ -131,7 +134,7 @@ strings:
   select_update_pakset: "업데이트할 Pakset 폴더 선택"
   pakset_validation_title: "Pakset 확인"
   pakset_validation_message: "이것은 Pakset이 아닙니다. ground.Outside.pak이 있는지, 이름이 올바른지 확인하십시오. (파일 이름은 대소문자를 구분합니다.)"
-  invalid_update_datetime: "업데이트 날짜와 시간은 YYYY/MM/DD HH:MM 또는 HH:MM으로 입력하십시오."
+  invalid_update_datetime: "업데이트 날짜와 시간은 {date_format} HH:MM 또는 HH:MM으로 입력하십시오."
   future_datetime_required: "미래의 날짜와 시간을 지정하십시오."
   update_registered: "'{when}로 업데이트합니다. '"
   update_target_required: "본체 또는 Pakset을 업데이트하도록 설정하십시오."
@@ -302,7 +305,7 @@ strings:
   help_discord_command_result_enabled: 활성화하면 명령 결과를 지정한 전용 채널에 게시합니다.
   help_discord_command_result_channel: 명령 결과를 게시할 Discord 채널 ID를 지정합니다.
   log_discord_command_result_post_failed: 'Discord 명령 결과 게시에 실패했습니다: {error}'
-  rollback_datetime: 롤백 시각 (YYYY/MM/DD HH:MM, 날짜 생략 시 오늘)
+  rollback_datetime: 롤백 시각 ({date_format} HH:MM, 날짜 생략 시 오늘)
   rollback_by_time: 시각 지정
   rollback_by_file: 파일 지정
   rollback_file_read_failed: '롤백 대상 저장 데이터를 읽을 수 없습니다: {error}'
@@ -316,8 +319,8 @@ strings:
   discord_command_admin_only: 관리자만 실행할 수 있습니다.
   discord_command_description_admin: 관리 명령을 실행합니다.
   discord_command_argument_backup: 점검 시작 시 장기 백업을 생성할지 지정합니다.
-  discord_command_argument_rollback_when: 롤백 시각을 YYYY/MM/DD HH:MM 또는 HH:MM 형식으로 지정합니다.
-  discord_command_argument_schedule_when: 변경할 업데이트 시각을 YYYY/MM/DD HH:MM 또는 HH:MM 형식으로 지정합니다.
+  discord_command_argument_rollback_when: 롤백 시각을 {date_format} HH:MM 또는 HH:MM 형식으로 지정합니다.
+  discord_command_argument_schedule_when: 변경할 업데이트 시각을 {date_format} HH:MM 또는 HH:MM 형식으로 지정합니다.
   discord_command_argument_nettool_company_number: 회사 번호를 지정합니다.
   discord_command_argument_nettool_client_number: 클라이언트 번호를 지정합니다.
   discord_command_argument_nettool_ip_address: IP 주소를 지정합니다.

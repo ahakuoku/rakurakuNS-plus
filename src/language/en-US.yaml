@@ -1,8 +1,11 @@
 # Rakuraku NS+ English UI language pack
 locale: en-US
 language_name: English (US)
+date_format: MM/DD/YYYY
 strings:
   language_tab: Language
+  language_locale: Language / Locale
+  date_format: Date format
   translation_accuracy_notice: "The translation may be incorrect.\nSome error messages may appear in Japanese."
   settings: Settings
   server: Server
@@ -94,7 +97,7 @@ strings:
   select_application: Select the Simutrans application
   update_pakset: Update the Pakset
   select_pakset: Select the Pakset folder
-  update_datetime: Update time (YYYY/MM/DD HH:MM; omit the date for today)
+  update_datetime: Update time ({date_format} HH:MM; omit the date for today)
   backup_before_update: Create a long-term backup before updating
   post_discord_notice: Post a notice to Discord
   update_after_action: Action after update
@@ -136,7 +139,7 @@ strings:
   update_kind_pak: Pak
   pakset_validation_title: Pakset validation
   pakset_validation_message: This is not a Pakset. Check whether ground.Outside.pak exists and is correctly named. File names are case-sensitive.
-  invalid_update_datetime: Enter the update time as YYYY/MM/DD HH:MM or HH:MM.
+  invalid_update_datetime: Enter the update time as {date_format} HH:MM or HH:MM.
   future_datetime_required: Specify a future date and time.
   update_registered: Update scheduled for {when}.
   update_target_required: Select either the Simutrans application or Pakset to update.
@@ -302,7 +305,7 @@ strings:
   help_discord_command_result_enabled: When enabled, post command results to the configured dedicated channel.
   help_discord_command_result_channel: Specify the Discord channel ID for command results.
   log_discord_command_result_post_failed: 'Failed to post Discord command result: {error}'
-  rollback_datetime: Rollback time (YYYY/MM/DD HH:MM; today if date is omitted)
+  rollback_datetime: Rollback time ({date_format} HH:MM; today if date is omitted)
   rollback_by_time: Specify time
   rollback_by_file: Specify file
   rollback_file_read_failed: 'Cannot read the rollback save data: {error}'
@@ -316,8 +319,8 @@ strings:
   discord_command_admin_only: Only administrators can run this command.
   discord_command_description_admin: Run an administrative command.
   discord_command_argument_backup: Whether to create a long-term backup when maintenance starts.
-  discord_command_argument_rollback_when: Rollback time in YYYY/MM/DD HH:MM or HH:MM format.
-  discord_command_argument_schedule_when: New update time in YYYY/MM/DD HH:MM or HH:MM format.
+  discord_command_argument_rollback_when: Rollback time in {date_format} HH:MM or HH:MM format.
+  discord_command_argument_schedule_when: New update time in {date_format} HH:MM or HH:MM format.
   discord_command_argument_nettool_company_number: Company number.
   discord_command_argument_nettool_client_number: Client number.
   discord_command_argument_nettool_ip_address: IP address.

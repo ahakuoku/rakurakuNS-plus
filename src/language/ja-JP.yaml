@@ -1,8 +1,11 @@
 # らくらくNS+ Japanese UI language pack
 locale: ja-JP
 language_name: 日本語
+date_format: YYYY/MM/DD
 strings:
   language_tab: Language
+  language_locale: Language / ロケール
+  date_format: 日付形式
   translation_accuracy_notice: "翻訳は間違っている場合があります。\n一部のエラーメッセージでは日本語が表示されることがあります。"
   settings: 設定
   server: サーバー
@@ -94,7 +97,7 @@ strings:
   select_application: 本体ファイルを選択
   update_pakset: Paksetを更新する
   select_pakset: Paksetフォルダを選択
-  update_datetime: 更新日時（YYYY/MM/DD HH:MM、日付省略時は当日）
+  update_datetime: 更新日時（{date_format} HH:MM、日付省略時は当日）
   backup_before_update: 更新直前のセーブデータを長期バックアップする
   post_discord_notice: Discordに予告を投稿
   update_after_action: 更新後の動作
@@ -131,7 +134,7 @@ strings:
   select_update_pakset: 更新するPaksetフォルダを選択
   pakset_validation_title: Pakset確認
   pakset_validation_message: これはPaksetではありません。ground.Outside.pakがあるかどうか、名前は正しいかどうかをご確認ください。（ファイル名は大文字と小文字を区別します。）
-  invalid_update_datetime: 更新日時は YYYY/MM/DD HH:MM または HH:MM で入力してください。
+  invalid_update_datetime: 更新日時は {date_format} HH:MM または HH:MM で入力してください。
   future_datetime_required: 未来の日時を指定してください。
   update_registered: '{when} に更新します。'
   update_target_required: 本体またはPaksetのどちらかを更新する設定にしてください。
@@ -302,7 +305,7 @@ strings:
   help_discord_command_result_enabled: 有効にすると、コマンド結果を指定した専用チャンネルへ投稿します。
   help_discord_command_result_channel: コマンド結果を投稿するDiscordチャンネルIDを指定します。
   log_discord_command_result_post_failed: 'Discordコマンド結果の投稿に失敗しました: {error}'
-  rollback_datetime: ロールバック先時刻（YYYY/MM/DD HH:MM、日付省略時は当日）
+  rollback_datetime: ロールバック先時刻（{date_format} HH:MM、日付省略時は当日）
   rollback_by_time: 時刻指定
   rollback_by_file: ファイル指定
   rollback_file_read_failed: 'ロールバック先のセーブデータを読み取れません: {error}'
@@ -316,8 +319,8 @@ strings:
   discord_command_admin_only: 管理者のみ実行できます。
   discord_command_description_admin: 管理コマンドを実行します。
   discord_command_argument_backup: メンテナンス開始時に長期バックアップを作成するか指定します。
-  discord_command_argument_rollback_when: ロールバック先の時刻をYYYY/MM/DD HH:MMまたはHH:MMで指定します。
-  discord_command_argument_schedule_when: 変更後の更新時刻をYYYY/MM/DD HH:MMまたはHH:MMで指定します。
+  discord_command_argument_rollback_when: ロールバック先の時刻を{date_format} HH:MMまたはHH:MMで指定します。
+  discord_command_argument_schedule_when: 変更後の更新時刻を{date_format} HH:MMまたはHH:MMで指定します。
   discord_command_argument_nettool_company_number: 会社番号を指定します。
   discord_command_argument_nettool_client_number: クライアント番号を指定します。
   discord_command_argument_nettool_ip_address: IPアドレスを指定します。

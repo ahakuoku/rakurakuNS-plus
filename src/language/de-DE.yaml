@@ -1,8 +1,11 @@
 # Rakuraku NS+ German UI language pack
 locale: de-DE
 language_name: Deutsch (Deutschland)
+date_format: DD/MM/YYYY
 strings:
   language_tab: Language
+  language_locale: Language / Gebietsschema
+  date_format: Datumsformat
   translation_accuracy_notice: "Die Übersetzung ist möglicherweise falsch.\nEinige Fehlermeldungen werden möglicherweise auf Japanisch angezeigt."
   settings: Einstellungen
   server: Server
@@ -94,7 +97,7 @@ strings:
   select_application: Wählen Sie die Simutrans-Anwendung aus
   update_pakset: Aktualisieren Sie das Paket
   select_pakset: Wählen Sie den Pakset-Ordner aus
-  update_datetime: Aktualisierungszeit (JJJJ/MM/TT HH:MM; das Datum für heute weglassen)
+  update_datetime: Aktualisierungszeit ({date_format} HH:MM; das Datum für heute weglassen)
   backup_before_update: Erstellen Sie vor dem Update ein Langzeit-Backup
   post_discord_notice: Veröffentlichen Sie eine Mitteilung auf Discord
   update_after_action: Aktion nach dem Update
@@ -136,7 +139,7 @@ strings:
   update_kind_pak: Pak
   pakset_validation_title: Paketvalidierung
   pakset_validation_message: Dies ist kein Paket. Überprüfen Sie, ob Ground.Outside.pak existiert und den korrekten Namen hat. Bei Dateinamen muss die Groß-/Kleinschreibung beachtet werden.
-  invalid_update_datetime: Geben Sie die Aktualisierungszeit als JJJJ/MM/TT HH:MM oder HH:MM ein.
+  invalid_update_datetime: Geben Sie die Aktualisierungszeit als {date_format} HH:MM oder HH:MM ein.
   future_datetime_required: Geben Sie ein zukünftiges Datum und eine zukünftige Uhrzeit an.
   update_registered: Update für {when} geplant.
   update_target_required: Wählen Sie entweder die Simutrans-Anwendung oder das Pakset zum Aktualisieren aus.
@@ -302,7 +305,7 @@ strings:
   help_discord_command_result_enabled: Postet Befehlergebnisse in den konfigurierten speziellen Kanal.
   help_discord_command_result_channel: Geben Sie die Discord-Kanal-ID für Befehlergebnisse an.
   log_discord_command_result_post_failed: 'Discord-Befehlergebnis konnte nicht gepostet werden: {error}'
-  rollback_datetime: Rollback-Zeit (YYYY/MM/DD HH:MM; ohne Datum heute)
+  rollback_datetime: Rollback-Zeit ({date_format} HH:MM; ohne Datum heute)
   rollback_by_time: Zeitpunkt angeben
   rollback_by_file: Datei angeben
   rollback_file_read_failed: 'Die Speicherdaten für das Rollback können nicht gelesen werden: {error}'
@@ -316,8 +319,8 @@ strings:
   discord_command_admin_only: Nur Administratoren können diesen Befehl ausführen.
   discord_command_description_admin: Einen Verwaltungsbefehl ausführen.
   discord_command_argument_backup: Gibt an, ob beim Wartungsbeginn ein Langzeit-Backup erstellt wird.
-  discord_command_argument_rollback_when: Rollback-Zeit im Format YYYY/MM/DD HH:MM oder HH:MM.
-  discord_command_argument_schedule_when: Neue Update-Zeit im Format YYYY/MM/DD HH:MM oder HH:MM.
+  discord_command_argument_rollback_when: Rollback-Zeit im Format {date_format} HH:MM oder HH:MM.
+  discord_command_argument_schedule_when: Neue Update-Zeit im Format {date_format} HH:MM oder HH:MM.
   discord_command_argument_nettool_company_number: Unternehmensnummer.
   discord_command_argument_nettool_client_number: Clientnummer.
   discord_command_argument_nettool_ip_address: IP-Adresse.

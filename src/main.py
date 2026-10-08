@@ -493,6 +493,24 @@ def parse_company_names(output):
     return companies
 
 
+def normalize_ipv4_address(ip):
+    """Return an IPv4 address as a tuple, ignoring zero padding in each octet."""
+    parts = str(ip).strip().split('.')
+    if len(parts) != 4 or not all(re.fullmatch(r'[0-9]+', part) for part in parts):
+        return None
+    octets = tuple(int(part) for part in parts)
+    return octets if all(0 <= octet <= 255 for octet in octets) else None
+
+
+def is_ip_banned(blacklist_output, ip):
+    """Return whether an IP address appears in `nettool blacklist` output."""
+    target_ip = normalize_ipv4_address(ip)
+    if target_ip is None:
+        return False
+    banned_ips = re.findall(r'^\s*\[\s*\d+\]\s+\.\.\s+(\S+)\s*$', blacklist_output, re.MULTILINE)
+    return any(normalize_ipv4_address(banned_ip) == target_ip for banned_ip in banned_ips)
+
+
 def get_company_names():
     """Return (companies, status) for the currently configured server."""
     try:
@@ -1175,6 +1193,10 @@ class config_window:
             value = str(user_id).strip()
             if value and (not value.isdigit() or not 17 <= len(value) <= 20):
                 return t('discord_user_id_required')
+        for ip in data['network']['ban_ips'].values():
+            value = str(ip).strip()
+            if value and normalize_ipv4_address(value) is None:
+                return t('invalid_ip_address', ip=value)
         return None
 
     def close(self):
@@ -1676,6 +1698,9 @@ class nettool_window(tk.Frame):
         if command in self.ARGUMENT_LABELS and not value:
             messagebox.showerror(t('input_error'), t('nettool_argument_required'), parent=self.master)
             return
+        if command in ('ban-ip', 'unban-ip') and normalize_ipv4_address(value) is None:
+            messagebox.showerror(t('input_error'), t('invalid_ip_address', ip=value), parent=self.master)
+            return
         if command == 'lock-company' and not self.inputs['lock-company_password'].get().strip():
             messagebox.showerror(t('input_error'), t('nettool_argument_required'), parent=self.master)
             return
@@ -1724,6 +1749,22 @@ class nettool_window(tk.Frame):
 
     def _send_command(self, command, value, extra=None, apply=False, apply_password=False):
         try:
+            if command == 'ban-ip':
+                check = subprocess.run(
+                    [run_nettool(), '-p', str(nettool_pw), '-s', server_ip + str(config.port_number), 'blacklist'],
+                    capture_output=True, text=True, encoding='utf-8', errors='replace',
+                )
+                check_output = check.stdout or check.stderr
+                if check.returncode != 0:
+                    self._write_output(t(
+                        'nettool_command_failed', command='blacklist', code=check.returncode, output=check_output,
+                    ))
+                    return
+                if is_ip_banned(check.stdout, value):
+                    if apply:
+                        self._update_ban_setting(value, True)
+                    self._write_output(t('nettool_ip_already_banned', ip=value))
+                    return
             args = [run_nettool(), '-p', str(nettool_pw), '-s', server_ip + str(config.port_number), command]
             if value:
                 args.append(value)
@@ -2689,6 +2730,20 @@ async def post_discord_command_result(interaction, text=None):
 async def discord_run_nettool(command, value='', password='', apply_ban_setting=False, apply_password_setting=False):
     """Run the same nettool operation as the GUI and return its textual result."""
     def run():
+        if command in ('ban-ip', 'unban-ip') and normalize_ipv4_address(value) is None:
+            return t('invalid_ip_address', ip=value)
+        if command == 'ban-ip':
+            check = subprocess.run(
+                [run_nettool(), '-p', str(nettool_pw), '-s', server_ip + str(config.port_number), 'blacklist'],
+                capture_output=True, text=True, encoding='utf-8', errors='replace',
+            )
+            output = (check.stdout or check.stderr).strip()
+            if check.returncode != 0:
+                return t('nettool_command_failed', command='blacklist', code=check.returncode, output=output)
+            if is_ip_banned(check.stdout, value):
+                if apply_ban_setting:
+                    update_discord_ban_setting(value, True)
+                return t('nettool_ip_already_banned', ip=value)
         if command in ('lock-company', 'unlock-company', 'remove-company'):
             check = subprocess.run(
                 [run_nettool(), '-p', str(nettool_pw), '-s', server_ip + str(config.port_number),
@@ -4001,12 +4056,17 @@ def nettool_forcesync():
 def nettool_banip(banip):
     # IPBANユーザーを設定する
     global nettool_pw
-    if banip != '':
-        subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'ban-ip', banip])
+    if banip != '' and normalize_ipv4_address(banip) is not None:
+        check = subprocess.run(
+            [run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'blacklist'],
+            capture_output=True, text=True, encoding='utf-8', errors='replace',
+        )
+        if check.returncode == 0 and not is_ip_banned(check.stdout, banip):
+            subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'ban-ip', banip])
 
 def nettool_unbanip(banip):
     global nettool_pw
-    if banip != '':
+    if banip != '' and normalize_ipv4_address(banip) is not None:
         subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'unban-ip', banip])
 
 def set_ban_user(previous_ban_ips=None):
@@ -4016,7 +4076,15 @@ def set_ban_user(previous_ban_ips=None):
         for i in range(63)
     }
     current_ban_ips.discard('')
+    invalid_ban_ips = {banip for banip in current_ban_ips if normalize_ipv4_address(banip) is None}
+    for banip in invalid_ban_ips:
+        print_gui_log(t('invalid_ip_address', ip=banip))
+    current_ban_ips -= invalid_ban_ips
     if previous_ban_ips is not None:
+        previous_ban_ips = {
+            banip for banip in previous_ban_ips
+            if normalize_ipv4_address(banip) is not None
+        }
         for banip in previous_ban_ips - current_ban_ips:
             nettool_unbanip(banip)
     for banip in current_ban_ips:

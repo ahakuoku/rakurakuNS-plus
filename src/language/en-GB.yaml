@@ -88,6 +88,8 @@ strings:
   nettool_ip_address: IP address
   nettool_message: Message
   nettool_new_password: New password
+  nettool_ip_already_banned: '{ip} is already banned.'
+  invalid_ip_address: '{ip} is not a valid IPv4 address.'
   nettool_close: Close
   nettool_no_output: There was no output.
   nettool_command_failed: '{command} failed (exit code: {code}). {output}'

@@ -77,6 +77,8 @@ strings:
   nettool_ip_address: IP 주소
   nettool_message: 메시지
   nettool_new_password: 새 비밀번호
+  nettool_ip_already_banned: '{ip}은(는) 이미 BAN되었습니다.'
+  invalid_ip_address: '{ip}은(는) 유효한 IPv4 주소가 아닙니다.'
   nettool_close: 닫기
   nettool_no_output: 출력이 없습니다.
   nettool_command_failed: '{command} 전송 실패(종료 코드: {code}). {output}'

@@ -77,6 +77,8 @@ strings:
   nettool_ip_address: IP-Adresse
   nettool_message: Nachricht
   nettool_new_password: Neues Passwort
+  nettool_ip_already_banned: '{ip} ist bereits gesperrt.'
+  invalid_ip_address: '{ip} ist keine gültige IPv4-Adresse.'
   nettool_close: Schließen
   nettool_no_output: Keine Ausgabe.
   nettool_command_failed: '{command} fehlgeschlagen (Exit-Code: {code}). {output}'

@@ -88,6 +88,8 @@ strings:
   nettool_ip_address: IPアドレス
   nettool_message: メッセージ
   nettool_new_password: 新しいパスワード
+  nettool_ip_already_banned: '{ip} はすでにBANされています。'
+  invalid_ip_address: '{ip} は有効なIPv4アドレスではありません。'
   nettool_close: 閉じる
   nettool_no_output: 出力はありません。
   nettool_command_failed: '{command} の送信に失敗しました（終了コード: {code}）。{output}'

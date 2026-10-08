@@ -1067,6 +1067,11 @@ class config_window:
 
     def save(self):
         data = default_config_data()
+        previous_ban_ips = {
+            str(value).strip()
+            for value in config_data.get('network', {}).get('ban_ips', {}).values()
+            if str(value).strip()
+        }
         try:
             data['discord']['command_users'] = parse_discord_command_users(
                 self.fields['command_users'].get('1.0', 'end')
@@ -1118,7 +1123,9 @@ class config_window:
             request_discord_command_sync()
             # 設定GUIで変更した会社パスワードとBAN IPを、保存直後にサーバーへ反映する。
             # nettool 呼び出しでGUI操作が停止しないよう、バックグラウンドで実行する。
-            threading.Thread(target=apply_server_access_settings, daemon=True).start()
+            threading.Thread(
+                target=apply_server_access_settings, args=(previous_ban_ips,), daemon=True,
+            ).start()
         self.close()
 
     def validate_config_data(self, data):
@@ -3985,17 +3992,29 @@ def nettool_banip(banip):
     if banip != '':
         subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'ban-ip', banip])
 
-def set_ban_user():
+def nettool_unbanip(banip):
+    global nettool_pw
+    if banip != '':
+        subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'unban-ip', banip])
+
+def set_ban_user(previous_ban_ips=None):
     # IPBANユーザーを設定する
-    for i in range(63):
-        banip = getattr(config, f'banip_{i}', '')
+    current_ban_ips = {
+        str(getattr(config, f'banip_{i}', '')).strip()
+        for i in range(63)
+    }
+    current_ban_ips.discard('')
+    if previous_ban_ips is not None:
+        for banip in previous_ban_ips - current_ban_ips:
+            nettool_unbanip(banip)
+    for banip in current_ban_ips:
         nettool_banip(banip)
     print_gui_log(t('log_ban_users_set'))
 
-def apply_server_access_settings():
+def apply_server_access_settings(previous_ban_ips=None):
     """Apply configured company passwords and BAN IPs to the running server."""
     set_company_pw()
-    set_ban_user()
+    set_ban_user(previous_ban_ips)
 
 def delete_old_long_backup_files():
     # 指定日数を超えたファイルを削除する

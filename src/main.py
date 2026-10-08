@@ -1513,6 +1513,8 @@ class nettool_window(tk.Frame):
         self.inputs = {}
         self.company_inputs = {}
         self.command_results = queue.Queue()
+        self.apply_ban_var = tk.BooleanVar(value=False)
+        self.apply_password_var = tk.BooleanVar(value=False)
         ttk.Label(self, text=t('nettool_description'), wraplength=1000).grid(row=0, column=0, sticky='w', pady=(0, 8))
         commands_area = ttk.Frame(self)
         commands_area.grid(row=1, column=0, sticky='nsew')
@@ -1535,16 +1537,28 @@ class nettool_window(tk.Frame):
             group.grid(row=row, column=0, sticky='ew', pady=4)
             group.grid_columnconfigure(1, weight=1)
             self._bind_command_scroll(group)
-            for command_row, command in enumerate(commands):
+            if group_key == 'nettool_group_company':
+                setting_toggle = ttk.Checkbutton(
+                    group, text=t('nettool_apply_password_setting'), variable=self.apply_password_var,
+                    style='Switch.TCheckbutton',
+                )
+                setting_toggle.grid(row=0, column=1, columnspan=5, sticky='w', pady=(0, 6))
+                self._bind_command_scroll(setting_toggle)
+                command_row_offset = 1
+            elif group_key == 'nettool_group_connection':
+                setting_toggle = ttk.Checkbutton(
+                    group, text=t('nettool_apply_ban_setting'), variable=self.apply_ban_var,
+                    style='Switch.TCheckbutton',
+                )
+                setting_toggle.grid(row=0, column=1, columnspan=5, sticky='w', pady=(0, 6))
+                self._bind_command_scroll(setting_toggle)
+                command_row_offset = 1
+            else:
+                command_row_offset = 0
+            for command_row, command in enumerate(commands, start=command_row_offset):
                 self._add_command_row(group, command_row, command)
-        self.apply_ban_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(self, text=t('nettool_apply_ban_setting'), variable=self.apply_ban_var,
-                        style='Switch.TCheckbutton').grid(row=2, column=0, sticky='w', pady=(8, 4))
-        self.apply_password_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(self, text=t('nettool_apply_password_setting'), variable=self.apply_password_var,
-                        style='Switch.TCheckbutton').grid(row=3, column=0, sticky='w', pady=4)
         output_frame = ttk.LabelFrame(self, text=t('nettool_result'), padding=6)
-        output_frame.grid(row=4, column=0, sticky='nsew', pady=(4, 0))
+        output_frame.grid(row=2, column=0, sticky='nsew', pady=(4, 0))
         output_frame.grid_columnconfigure(0, weight=1)
         output_frame.grid_rowconfigure(0, weight=1)
         self.output = tk.Text(output_frame, height=10, wrap='word', state='disabled')
@@ -1554,7 +1568,7 @@ class nettool_window(tk.Frame):
         self.output.configure(yscrollcommand=scrollbar.set)
         self.grid_rowconfigure(1, weight=1)
         button_frame = ttk.Frame(self)
-        button_frame.grid(row=5, column=0, sticky='e', pady=(8, 0))
+        button_frame.grid(row=3, column=0, sticky='e', pady=(8, 0))
         ttk.Button(button_frame, text=t('nettool_close'), command=self.close_window).pack()
         threading.Thread(target=self._load_company_names, daemon=True).start()
         self.after(GUI_LOG_FLUSH_INTERVAL_MS, self._flush_command_results)

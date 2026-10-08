@@ -482,6 +482,31 @@ def restore_runtime_state():
         except (KeyError, TypeError, ValueError):
             scheduled_updates = None
 
+
+def parse_company_names(output):
+    """Extract company IDs and names from the `nettool companies` response."""
+    companies = {}
+    for line in output.splitlines():
+        match = re.match(r'^Company #(\d+):\s*(.*)$', line)
+        if match:
+            companies[int(match.group(1))] = match.group(2)
+    return companies
+
+
+def get_company_names():
+    """Return (companies, status) for the currently configured server."""
+    try:
+        result = subprocess.run(
+            [run_nettool(), '-p', str(nettool_pw), '-s', server_ip + str(config.port_number), 'companies'],
+            capture_output=True, text=True, encoding='utf-8', errors='replace',
+        )
+    except Exception:
+        return {}, 'failed'
+    if result.returncode != 0:
+        return {}, 'failed'
+    companies = parse_company_names(result.stdout)
+    return companies, 'ok' if companies else 'empty'
+
 class config_window:
     def __init__(self, master, first_run=False):
         self.master = master
@@ -495,6 +520,7 @@ class config_window:
         self.long_term_keep_days_entry = None
         self.secret_entries = {'token': [], 'passwords': []}
         self.secret_visibility = {'token': tk.IntVar(value=0), 'passwords': tk.IntVar(value=0)}
+        self.company_name_labels = {}
         data = config_data if config_data else default_config_data()
         notebook = ttk.Notebook(self.window)
         notebook.pack(fill='both', expand=True, padx=8, pady=8)
@@ -569,6 +595,10 @@ class config_window:
         ttk.Button(button_frame, text=t('import_bat_settings'), command=self.import_setting_bat).pack(side='left', padx=(8, 0))
         ttk.Button(button_frame, text=t('save'), style='Accent.TButton', command=self.save).pack(side='right', padx=(8, 0))
         ttk.Button(button_frame, text=t('cancel'), command=self.close).pack(side='right')
+        if self.first_run:
+            self._set_company_names({}, 'initial')
+        else:
+            threading.Thread(target=self._load_company_names, daemon=True).start()
         self.window.transient(master)
         self.window.grab_set()
 
@@ -832,20 +862,42 @@ class config_window:
         contents.bind('<Button-5>', lambda event: canvas.yview_scroll(1, 'units'))
         password_fields = {}
         for i in range(63):
-            column = (i // 21) * 2
-            row = (i % 21) + 1
-            ttk.Label(contents, text=t('company_number', i=i)).grid(row=row, column=column, sticky='w', padx=(10, 4), pady=3)
+            row = i
+            ttk.Label(contents, text=t('company_number', i=i)).grid(row=row, column=0, sticky='w', padx=(10, 4), pady=3)
+            company_name = ttk.Label(contents, foreground='gray')
+            company_name.grid(row=row, column=1, sticky='w', padx=(0, 12), pady=3)
             entry = ttk.Entry(contents, width=22, show='*')
             value = values.get(i, values.get(str(i), ''))
             entry.insert(0, str(value or ''))
-            entry.grid(row=row, column=column + 1, sticky='w', padx=(0, 18), pady=3)
+            entry.grid(row=row, column=2, sticky='w', padx=(0, 18), pady=3)
             entry.bind('<MouseWheel>', lambda event: canvas.yview_scroll(-int(event.delta / 120), 'units'))
             entry.bind('<Button-4>', lambda event: canvas.yview_scroll(-1, 'units'))
             entry.bind('<Button-5>', lambda event: canvas.yview_scroll(1, 'units'))
             password_fields[i] = entry
+            self.company_name_labels[i] = company_name
             self.secret_entries['passwords'].append(entry)
         ttk.Button(frame, text=t('help'), command=lambda: self.show_help('passwords')).grid(row=2, column=0, padx=10, pady=8, sticky='w')
         self.fields['passwords'] = password_fields
+
+    def _load_company_names(self):
+        companies, status = get_company_names()
+        try:
+            self.window.after(0, self._set_company_names, companies, status)
+        except (RuntimeError, tk.TclError):
+            pass
+
+    def _set_company_names(self, companies, status):
+        status_key = {
+            'initial': 'company_info_initial_setup',
+            'failed': 'company_info_fetch_failed',
+            'empty': 'company_not_found',
+        }.get(status, 'company_not_found')
+        for number, label in self.company_name_labels.items():
+            name = companies.get(number)
+            label.config(
+                text=name if name is not None else t(status_key),
+                foreground='black' if name is not None else 'gray',
+            )
 
     def toggle_secret(self, key):
         show = '' if self.secret_visibility[key].get() else '*'
@@ -1448,16 +1500,17 @@ class nettool_window(tk.Frame):
         super().__init__(master)
         self.master = master
         self.master.title(t('nettool_commands'))
-        self.master.geometry('800x720')
-        self.master.minsize(720, 620)
+        self.master.geometry('1050x720')
+        self.master.minsize(900, 620)
         self.master.protocol('WM_DELETE_WINDOW', self.close_window)
         self.grid(row=0, column=0, sticky='nsew', padx=12, pady=12)
         self.master.grid_rowconfigure(0, weight=1)
         self.master.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
         self.inputs = {}
+        self.company_inputs = {}
         self.command_results = queue.Queue()
-        ttk.Label(self, text=t('nettool_description'), wraplength=760).grid(row=0, column=0, sticky='w', pady=(0, 8))
+        ttk.Label(self, text=t('nettool_description'), wraplength=1000).grid(row=0, column=0, sticky='w', pady=(0, 8))
         commands_area = ttk.Frame(self)
         commands_area.grid(row=1, column=0, sticky='nsew')
         commands_area.grid_columnconfigure(0, weight=1)
@@ -1497,6 +1550,7 @@ class nettool_window(tk.Frame):
         button_frame = ttk.Frame(self)
         button_frame.grid(row=4, column=0, sticky='e', pady=(8, 0))
         ttk.Button(button_frame, text=t('nettool_close'), command=self.close_window).pack()
+        threading.Thread(target=self._load_company_names, daemon=True).start()
         self.after(GUI_LOG_FLUSH_INTERVAL_MS, self._flush_command_results)
 
     def _add_command_row(self, parent, row, command):
@@ -1504,10 +1558,15 @@ class nettool_window(tk.Frame):
         label.grid(row=row, column=0, sticky='w', pady=3)
         self._bind_command_scroll(label)
         if command in self.ARGUMENT_LABELS:
-            entry = ttk.Entry(parent)
+            if self.ARGUMENT_LABELS[command] == 'nettool_company_number':
+                entry = ttk.Combobox(parent, state='disabled', width=52)
+                entry.set(t('company_info_fetch_failed'))
+                self.company_inputs[command] = entry
+            else:
+                entry = ttk.Entry(parent)
+                entry.insert(0, t(self.ARGUMENT_LABELS[command]))
+                entry.bind('<FocusIn>', lambda event, e=entry, key=self.ARGUMENT_LABELS[command]: self._clear_hint(e, t(key)))
             entry.grid(row=row, column=1, sticky='ew', padx=(4, 6))
-            entry.insert(0, t(self.ARGUMENT_LABELS[command]))
-            entry.bind('<FocusIn>', lambda event, e=entry, key=self.ARGUMENT_LABELS[command]: self._clear_hint(e, t(key)))
             self._bind_command_scroll(entry)
             self.inputs[command] = entry
         else:
@@ -1569,6 +1628,9 @@ class nettool_window(tk.Frame):
     def send(self, command):
         argument = self.inputs.get(command)
         value = argument.get().strip() if argument else ''
+        if command in self.company_inputs:
+            match = re.match(r'^(\d+):', value)
+            value = match.group(1) if match else ''
         if argument and value == t(self.ARGUMENT_LABELS[command]):
             value = ''
         if command == 'announce' and not messagebox.askyesno(t('confirm'), t('nettool_announce_warning'), parent=self.master):
@@ -1585,6 +1647,24 @@ class nettool_window(tk.Frame):
         apply_ban_setting = self.apply_ban_var.get()
         sender = getattr(self, f'send_{command.replace("-", "_")}')
         threading.Thread(target=sender, args=(value, password, apply_ban_setting), daemon=True).start()
+
+    def _load_company_names(self):
+        companies, status = get_company_names()
+        try:
+            self.after(0, self._set_company_names, companies, status)
+        except (RuntimeError, tk.TclError):
+            pass
+
+    def _set_company_names(self, companies, status):
+        values = [f'{number}: {name}' for number, name in sorted(companies.items())]
+        placeholder = t({
+            'failed': 'company_info_fetch_failed',
+            'empty': 'company_not_found',
+        }.get(status, 'company_not_found'))
+        for entry in self.company_inputs.values():
+            entry.configure(state='normal', values=values)
+            entry.set(t('nettool_company_number') if values else placeholder)
+            entry.configure(state='readonly' if values else 'disabled')
 
     def send_announce(self, value, password, apply): self._send_command('announce', value, apply=apply)
     def send_clients(self, value, password, apply): self._send_command('clients', value, apply=apply)

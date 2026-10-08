@@ -28,6 +28,9 @@ strings:
   company_passwords_notice: Company passwords (company 15 and later require OTRP v59_0_2 or later)
   show_password: Show passwords
   company_number: Company {i}
+  company_info_initial_setup: Company information cannot be displayed during initial setup.
+  company_info_fetch_failed: Failed to retrieve company information.
+  company_not_found: No companies exist.
   save: Save
   cancel: Cancel
   import_legacy_config: Import a pre-v0.2.0 Rakuraku NS+ configuration

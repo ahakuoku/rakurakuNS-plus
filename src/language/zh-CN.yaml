@@ -28,6 +28,9 @@ strings:
   company_passwords_notice: 公司密码（公司 15 及更高版本需要 OTRP v59_0_2 或更高版本）
   show_password: 显示密码
   company_number: 公司 {i}
+  company_info_initial_setup: 初始设置期间无法显示公司信息。
+  company_info_fetch_failed: 获取公司信息失败。
+  company_not_found: 不存在公司。
   save: 节省
   cancel: 取消
   import_legacy_config: 导入 v0.2.0 之前的 Rakuraku NS+ 配置

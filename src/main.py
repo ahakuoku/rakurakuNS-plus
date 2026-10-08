@@ -1540,8 +1540,11 @@ class nettool_window(tk.Frame):
         self.apply_ban_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(self, text=t('nettool_apply_ban_setting'), variable=self.apply_ban_var,
                         style='Switch.TCheckbutton').grid(row=2, column=0, sticky='w', pady=(8, 4))
+        self.apply_password_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(self, text=t('nettool_apply_password_setting'), variable=self.apply_password_var,
+                        style='Switch.TCheckbutton').grid(row=3, column=0, sticky='w', pady=4)
         output_frame = ttk.LabelFrame(self, text=t('nettool_result'), padding=6)
-        output_frame.grid(row=3, column=0, sticky='nsew', pady=(4, 0))
+        output_frame.grid(row=4, column=0, sticky='nsew', pady=(4, 0))
         output_frame.grid_columnconfigure(0, weight=1)
         output_frame.grid_rowconfigure(0, weight=1)
         self.output = tk.Text(output_frame, height=10, wrap='word', state='disabled')
@@ -1551,7 +1554,7 @@ class nettool_window(tk.Frame):
         self.output.configure(yscrollcommand=scrollbar.set)
         self.grid_rowconfigure(1, weight=1)
         button_frame = ttk.Frame(self)
-        button_frame.grid(row=4, column=0, sticky='e', pady=(8, 0))
+        button_frame.grid(row=5, column=0, sticky='e', pady=(8, 0))
         ttk.Button(button_frame, text=t('nettool_close'), command=self.close_window).pack()
         threading.Thread(target=self._load_company_names, daemon=True).start()
         self.after(GUI_LOG_FLUSH_INTERVAL_MS, self._flush_command_results)
@@ -1648,8 +1651,12 @@ class nettool_window(tk.Frame):
             return
         password = self.inputs['lock-company_password'].get().strip() if command == 'lock-company' else None
         apply_ban_setting = self.apply_ban_var.get()
-        sender = getattr(self, f'send_{command.replace("-", "_")}')
-        threading.Thread(target=sender, args=(value, password, apply_ban_setting), daemon=True).start()
+        apply_password_setting = self.apply_password_var.get()
+        threading.Thread(
+            target=self._send_command,
+            args=(command, value, password, apply_ban_setting, apply_password_setting),
+            daemon=True,
+        ).start()
 
     def _load_company_names(self):
         companies, status = get_company_names()
@@ -1685,7 +1692,7 @@ class nettool_window(tk.Frame):
     def send_force_sync(self, value, password, apply): self._send_command('force-sync', value, apply=apply)
     def send_shutdown(self, value, password, apply): self._send_command('shutdown', value, apply=apply)
 
-    def _send_command(self, command, value, extra=None, apply=False):
+    def _send_command(self, command, value, extra=None, apply=False, apply_password=False):
         try:
             args = [run_nettool(), '-p', str(nettool_pw), '-s', server_ip + str(config.port_number), command]
             if value:
@@ -1707,6 +1714,8 @@ class nettool_window(tk.Frame):
                 self._write_output(response or t('nettool_sent', command=command))
             if result.returncode == 0 and command in ('ban-ip', 'unban-ip') and apply:
                 self._update_ban_setting(value, command == 'ban-ip')
+            if result.returncode == 0 and command in ('lock-company', 'unlock-company') and apply_password:
+                self._update_company_password_setting(value, extra if command == 'lock-company' else '')
         except Exception as error:
             self._write_output(t('nettool_failed', error=error))
 
@@ -1724,6 +1733,18 @@ class nettool_window(tk.Frame):
         elif not enabled:
             values = ['' if item == ip else item for item in values]
         config_data.setdefault('network', {}).setdefault('ban_ips', {}).update({i: values[i] for i in range(63)})
+        with open(config_path, 'w', encoding='utf-8') as config_file:
+            yaml.safe_dump(config_data, config_file, allow_unicode=True, sort_keys=False)
+        load_config()
+
+    def _update_company_password_setting(self, company_number, password):
+        try:
+            company_index = int(company_number)
+        except (TypeError, ValueError):
+            return
+        if not 0 <= company_index < 63:
+            return
+        config_data.setdefault('players', {}).setdefault('passwords', {})[company_index] = password
         with open(config_path, 'w', encoding='utf-8') as config_file:
             yaml.safe_dump(config_data, config_file, allow_unicode=True, sort_keys=False)
         load_config()

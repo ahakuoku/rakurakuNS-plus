@@ -59,6 +59,7 @@ strings:
   nettool_commands: nettool 命令
   send: 发送
   nettool_apply_ban_setting: 应用到 BAN IP 设置并重新加载
+  nettool_apply_password_setting: 应用到公司密码设置
   nettool_announce_warning: 将公开地图缩略图和连接信息。确定发送吗？
   nettool_argument_required: 请输入参数。
   nettool_company_missing: 指定的公司不存在。

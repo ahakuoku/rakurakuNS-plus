@@ -59,6 +59,7 @@ strings:
   nettool_commands: nettoolコマンド
   send: 送信
   nettool_apply_ban_setting: BAN IP設定に反映して再読み込み
+  nettool_apply_password_setting: 会社パスワード設定に反映
   nettool_announce_warning: "このコマンドを送信すると、マップのサムネイルや接続先情報などが公開されます。本当に送信しますか？"
   nettool_argument_required: 引数を入力してください。
   nettool_company_missing: 指定された会社は存在しません。

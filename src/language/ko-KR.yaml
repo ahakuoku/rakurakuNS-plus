@@ -59,6 +59,7 @@ strings:
   nettool_commands: nettool 명령
   send: 전송
   nettool_apply_ban_setting: BAN IP 설정에 반영하고 다시 불러오기
+  nettool_apply_password_setting: 회사 비밀번호 설정에 반영
   nettool_announce_warning: "지도 썸네일과 접속 정보가 공개됩니다. 이 명령을 전송하시겠습니까?"
   nettool_argument_required: 인수를 입력하십시오.
   nettool_company_missing: 지정한 회사가 없습니다.

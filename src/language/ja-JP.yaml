@@ -136,7 +136,7 @@ strings:
   config_discord_enabled: Discord botの使用設定
   config_autosave_notice: Discordでオートセーブを告知する
   config_discord_token: Discord botトークン
-  config_discord_channel: DiscordチャンネルID
+  config_discord_channel: Discord通知チャンネルID
   config_player_passwords: プレイヤーパスワード
   select_update_application: 更新する本体ファイルを選択
   select_update_pakset: 更新するPaksetフォルダを選択

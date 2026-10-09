@@ -136,7 +136,7 @@ strings:
   config_discord_enabled: 使用 Discord 机器人
   config_autosave_notice: 在 Discord 上宣布自动保存
   config_discord_token: Discord 机器人令牌
-  config_discord_channel: 不和谐频道 ID
+  config_discord_channel: Discord 通知频道 ID
   config_player_passwords: 玩家密码
   select_update_application: 选择要更新的 Simutrans 应用程序
   select_update_pakset: 选择要更新的 Pakset 文件夹

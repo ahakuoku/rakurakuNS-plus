@@ -136,7 +136,7 @@ strings:
   config_discord_enabled: Verwenden Sie den Discord-Bot
   config_autosave_notice: Kündigen Sie Autosaves auf Discord an
   config_discord_token: Discord-Bot-Token
-  config_discord_channel: Discord-Kanal-ID
+  config_discord_channel: Discord-Benachrichtigungskanal-ID
   config_player_passwords: Spielerpasswörter
   select_update_application: Wählen Sie die zu aktualisierende Simutrans-Anwendung aus
   select_update_pakset: Wählen Sie den Pakset-Ordner aus, den Sie aktualisieren möchten

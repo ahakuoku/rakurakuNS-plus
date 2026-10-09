@@ -136,7 +136,7 @@ strings:
   config_discord_enabled: Use Discord bot
   config_autosave_notice: Announce autosaves on Discord
   config_discord_token: Discord bot token
-  config_discord_channel: Discord channel ID
+  config_discord_channel: Discord notification channel ID
   config_player_passwords: Player passwords
   select_update_application: Select the Simutrans application to update
   select_update_pakset: Select the Pakset folder to update

@@ -136,7 +136,7 @@ strings:
   config_discord_enabled: "Discord bot 사용 설정"
   config_autosave_notice: "Discord로 자동 저장을 알리기"
   config_discord_token: "Discord bot 토큰"
-  config_discord_channel: "Discord 채널 ID"
+  config_discord_channel: "Discord 알림 채널 ID"
   config_player_passwords: "플레이어 비밀번호"
   select_update_application: "업데이트할 본체 파일 선택"
   select_update_pakset: "업데이트할 Pakset 폴더 선택"

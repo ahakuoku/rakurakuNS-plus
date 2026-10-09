@@ -1,8 +1,11 @@
 # Rakuraku NS+ Traditional Chinese UI language pack
 locale: zh-TW
 language_name: 繁體中文（台灣）
+date_format: YYYY/MM/DD
 strings:
   language_tab: Language
+  language_locale: Language / 地區設定
+  date_format: 日期格式
   translation_accuracy_notice: "翻譯可能不正確。\n某些錯誤訊息可能會以日文顯示。"
   settings: 設定
   server: 伺服器
@@ -21,10 +24,13 @@ strings:
   browse: 瀏覽...
   show: 展示
   help: 幫助
-  numbered_value_per_line: 數字=值（每行一個條目）
+  ip_address_per_line: IP 位址（每行一個）
   company_passwords_notice: 公司密碼（公司 15 及更高版本需要 OTRP v59_0_2 或更高版本）
   show_password: 顯示密碼
   company_number: 公司 {i}
+  company_info_initial_setup: 初始設定期間無法顯示公司資訊。
+  company_info_fetch_failed: 無法取得公司資訊。
+  company_not_found: 沒有公司。
   save: 節省
   cancel: 取消
   import_legacy_config: 導入 v0.2.0 之前的 Rakuraku NS+ 配置
@@ -52,7 +58,8 @@ strings:
   schedule_update: 安排 Simutrans 應用程式/Pak 更新
   nettool_commands: nettool 指令
   send: 傳送
-  nettool_apply_ban_setting: 套用至 BAN IP 設定並重新載入
+  nettool_apply_ban_setting: 套用至 BAN IP 設定
+  nettool_apply_password_setting: 套用至公司密碼設定
   nettool_announce_warning: 將公開地圖縮圖及連線資訊。確定要傳送嗎？
   nettool_argument_required: 請輸入引數。
   nettool_company_missing: 指定的公司不存在。
@@ -70,6 +77,8 @@ strings:
   nettool_ip_address: IP 位址
   nettool_message: 訊息
   nettool_new_password: 新密碼
+  nettool_ip_already_banned: '{ip} 已被封鎖。'
+  invalid_ip_address: '{ip} 不是有效的 IPv4 位址。'
   nettool_close: 關閉
   nettool_no_output: 沒有輸出。
   nettool_command_failed: '{command} 傳送失敗（結束代碼：{code}）。{output}'
@@ -94,7 +103,7 @@ strings:
   select_application: 選擇 Simutrans 應用程式
   update_pakset: 更新包集
   select_pakset: 選擇包集資料夾
-  update_datetime: 更新時間（YYYY/MM/DD HH:MM；省略今天的日期）
+  update_datetime: 更新時間（{date_format} HH:MM；省略今天的日期）
   backup_before_update: 更新前建立長期備份
   post_discord_notice: 向 Discord 發布通知
   update_after_action: 更新後的操作
@@ -136,7 +145,7 @@ strings:
   update_kind_pak: 帕克
   pakset_validation_title: 資料包驗證
   pakset_validation_message: 這不是一個包。檢查ground.Outside.pak是否存在且命名正確。檔案名稱區分大小寫。
-  invalid_update_datetime: 輸入更新時間，格式為 YYYY/MM/DD HH:MM 或 HH:MM。
+  invalid_update_datetime: 輸入更新時間，格式為 {date_format} HH:MM 或 HH:MM。
   future_datetime_required: 指定未來的日期和時間。
   update_registered: 更新計劃為 {when}。
   update_target_required: 選擇要更新的 Simutrans 應用程式或 Pakset。
@@ -280,5 +289,76 @@ strings:
   help_discord_channel: 指定 Discord 機器人發布的頻道 ID。
   help_player_passwords: 輸入每家公司的密碼；空白公司沒有密碼。
   help_ban_ips: 每行輸入一個 IP 位址。您最多可以輸入 63 個位址。
+  discord_command_users: Discord 命令使用者
+  config_discord_command_enabled: 接受來自 Discord 的命令
+  config_discord_command_users: 允許執行命令的 Discord 使用者 ID
+  help_discord_command_enabled: 啟用後，接受已註冊使用者 ID 在所有頻道發出的 Discord 斜線命令。
+  help_discord_command_users: 每行只輸入一個 Discord 使用者 ID，最多63筆。也支援舊的編號=ID格式（編號為0至62）。
+  discord_command_users_notice: Discord 使用者 ID（每行一個，最多63筆）
+  discord_command_user_line_invalid: '第{line}行格式無效。請輸入使用者 ID，或不重複的0至62編號=ID。'
+  discord_command_users_limit: 最多可設定63個 Discord 命令使用者。
+  discord_user_id_required: Discord 使用者 ID 必須是 17 到 20 位數字。
+  discord_command_disabled: Discord 命令輸入已停用。
+  discord_command_not_allowed: 您沒有執行此命令的權限。
+  discord_command_accepted: 命令已接受。
+  discord_command_result_actor: 執行者
+  discord_command_result_invocation: 命令
+  discord_command_result_output: 執行結果
+  log_discord_commands_synced: 已同步 Discord 斜線命令。
+  log_discord_command_sync_failed: '無法同步 Discord 斜線命令: {error}'
+  config_discord_command_result_enabled: 將命令結果發佈到專用頻道
+  config_discord_command_result_channel: 頻道 ID
+  help_discord_command_result_enabled: 啟用後，將命令結果發佈到指定的專用頻道。
+  help_discord_command_result_channel: 指定用於發佈命令結果的 Discord 頻道 ID。
+  log_discord_command_result_post_failed: '發佈 Discord 命令結果失敗: {error}'
+  rollback_datetime: 回復時間（{date_format} HH:MM；省略日期時為今天）
+  rollback_by_time: 指定時間
+  rollback_by_file: 指定檔案
+  rollback_file_read_failed: '無法讀取回復儲存資料: {error}'
+  rollback_autosave_not_found: 找不到指定時間或之前的自動儲存資料。
+  discord_rollback_confirmation: '將回復到 {timestamp} 的資料。是否繼續？'
+  discord_rollback_confirmation_owner_only: 只有輸入命令的使用者可以操作此確認。
+  discord_rollback_confirmation_expired: 確認已過期。請重新執行回復命令。
+  discord_rollback_save_changed: 等待確認時，所選儲存資料已被修改或刪除。請重新執行回復命令。
+  discord_rollback_started: '已開始回復到 {timestamp}。'
+  discord_rollback_start_failed: '無法開始回復: {error}'
+  discord_command_admin_only: 僅限管理員執行此命令。
+  discord_command_description_admin: 執行管理命令。
+  discord_command_argument_backup: 指定維護開始時是否建立長期備份。
+  discord_command_argument_rollback_when: 以{date_format} HH:MM或HH:MM格式指定回復時間。
+  discord_command_argument_schedule_when: 以{date_format} HH:MM或HH:MM格式指定新的更新時間。
+  discord_command_argument_nettool_company_number: 指定公司編號。
+  discord_command_argument_nettool_client_number: 指定客戶端編號。
+  discord_command_argument_nettool_ip_address: 指定IP位址。
+  discord_command_argument_nettool_message: 指定要傳送到伺服器內的訊息。
+  discord_command_argument_nettool_password: 指定新的公司密碼。
+  discord_command_argument_nettool_apply_ban_setting: 指定是否同時更新BAN IP設定。
+  discord_command_argument_nettool_apply_password_setting: 指定是否也更新公司密碼設定。
+  discord_command_description_restart: 重新啟動伺服器。
+  discord_command_description_manual_save: 不停止伺服器即可儲存。
+  discord_command_description_maintenance: 暫停或恢復伺服器。
+  discord_command_description_force_stop: 強制停止伺服器程序。
+  discord_command_description_close_session: 停止伺服器並關閉應用程式。
+  discord_command_description_exit_app: 不停止伺服器而關閉應用程式。
+  discord_command_description_rollback: 回復到指定時間前的自動儲存。
+  discord_command_description_cancel_scheduled_update: 取消排定更新。
+  discord_command_description_schedule_update: 變更排定更新的時間。
+  discord_command_description_update_now: 立即執行排定更新。
+  discord_command_description_nettool: 執行 nettool 命令。
+  discord_command_description_nettool_announce: 發佈伺服器資訊。
+  discord_command_description_nettool_clients: 顯示已連線的用戶端。
+  discord_command_description_nettool_companies: 顯示公司。
+  discord_command_description_nettool_info_company: 顯示公司資訊。
+  discord_command_description_nettool_blacklist: 顯示封鎖清單。
+  discord_command_description_nettool_lock_company: 鎖定公司。
+  discord_command_description_nettool_unlock_company: 解除公司鎖定。
+  discord_command_description_nettool_remove_company: 刪除公司。
+  discord_command_description_nettool_kick_client: 中斷用戶端連線。
+  discord_command_description_nettool_ban_client: 封鎖用戶端。
+  discord_command_description_nettool_ban_ip: 封鎖 IP 位址。
+  discord_command_description_nettool_unban_ip: 解除 IP 封鎖。
+  discord_command_description_nettool_say: 傳送伺服器訊息。
+  discord_command_description_nettool_force_sync: 請求儲存並重新載入。
+  discord_command_description_nettool_shutdown: 關閉伺服器。
 
 

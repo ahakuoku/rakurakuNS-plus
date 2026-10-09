@@ -46,9 +46,16 @@ except Exception:
 language_code = 'en-US'
 translations = {}
 translation_aliases = {}
+locale_date_format = 'YYYY/MM/DD'
+
+DATE_FORMATS = {
+    'YYYY/MM/DD': '%Y/%m/%d',
+    'MM/DD/YYYY': '%m/%d/%Y',
+    'DD/MM/YYYY': '%d/%m/%Y',
+}
 
 def load_language(code='en-US'):
-    global language_code, translations, translation_aliases
+    global language_code, translations, translation_aliases, locale_date_format
     requested = str(code or 'ja-JP')
     path = os.path.join(language_dir, f'{requested}.yaml')
     fallback = os.path.join(language_dir, 'ja-JP.yaml')
@@ -58,11 +65,32 @@ def load_language(code='en-US'):
         language_code = document.get('locale', requested)
         translations = document.get('strings', {})
         translation_aliases = document.get('aliases', {})
+        configured_locale_format = document.get('date_format', 'YYYY/MM/DD')
+        locale_date_format = configured_locale_format if configured_locale_format in DATE_FORMATS else 'YYYY/MM/DD'
     except (OSError, yaml.YAMLError):
-        language_code, translations, translation_aliases = 'en-US', {}, {}
+        language_code, translations, translation_aliases, locale_date_format = 'en-US', {}, {}, 'YYYY/MM/DD'
+
+def selected_date_format():
+    """Return the configured date order, falling back to the current language."""
+    configured = config_data.get('date_format')
+    return configured if configured in DATE_FORMATS else locale_date_format
+
+def format_datetime(value, *, seconds=False):
+    """Format a datetime for UI and Discord text using the selected date order."""
+    time_format = '%H:%M:%S' if seconds else '%H:%M'
+    return value.strftime(f"{DATE_FORMATS[selected_date_format()]} {time_format}")
+
+def parse_datetime(value):
+    """Parse a date/time entry, allowing a time-only entry for today."""
+    raw = str(value).strip()
+    if re.fullmatch(r'\d{1,2}:\d{2}', raw):
+        raw = f"{datetime.datetime.now().strftime(DATE_FORMATS[selected_date_format()])} {raw}"
+    return datetime.datetime.strptime(raw, f"{DATE_FORMATS[selected_date_format()]} %H:%M")
 
 def t(key, **values):
     value = translations.get(translation_aliases.get(key, key), key)
+    if '{date_format}' in value:
+        values.setdefault('date_format', selected_date_format())
     return value.format(**values) if values else value
 
 def available_languages():
@@ -111,6 +139,7 @@ import time
 
 try:
     import discord
+    from discord import app_commands
 except ModuleNotFoundError:
     input(
         '必要なモジュールがインストールされていません。\n'
@@ -120,6 +149,7 @@ except ModuleNotFoundError:
     sys.exit()
 
 import re
+import json
 import datetime
 import platform
 import shutil
@@ -142,6 +172,59 @@ except ModuleNotFoundError:
 from tkinter import ttk, filedialog, messagebox
 import array
 import tempfile
+
+class DiscordYamlTranslator(app_commands.Translator):
+    """Use the existing language packs for Discord application-command text."""
+    def __init__(self):
+        self.language_packs = {}
+
+    async def load(self):
+        # sync() translates thousands of fields. Read each YAML once, outside the
+        # gateway event loop, so translation cannot block Discord heartbeats.
+        self.language_packs = await asyncio.to_thread(self._load_language_packs)
+
+    def _load_language_packs(self):
+        packs = {}
+        for filename in os.listdir(language_dir):
+            if not filename.endswith('.yaml'):
+                continue
+            try:
+                with open(os.path.join(language_dir, filename), 'r', encoding='utf-8') as language_file:
+                    document = yaml.safe_load(language_file) or {}
+                pack = document.get('strings', {})
+                # Discord translations must describe the same input format as the
+                # running application, rather than the translator's own locale.
+                packs[os.path.splitext(filename)[0]] = {
+                    key: value.replace('{date_format}', selected_date_format())
+                    if isinstance(value, str) else value
+                    for key, value in pack.items()
+                }
+            except (OSError, yaml.YAMLError):
+                continue
+        return packs
+
+    async def translate(self, string, locale, context):
+        key = string.extras.get('translation_key')
+        if key is None:
+            return None
+        code = {'ja': 'ja-JP', 'ko': 'ko-KR', 'de': 'de-DE'}.get(locale.value, locale.value)
+        language_pack = self.language_packs.get(code, {})
+        translated = language_pack.get(key)
+        if translated is None:
+            return None
+        if string.extras.get('append_admin_only'):
+            admin_only = language_pack.get('discord_command_admin_only')
+            return f'{translated} {admin_only}' if admin_only else translated
+        return translated
+
+def discord_locale(key, *, append_admin_only=True):
+    """Provide a readable Discord default while retaining the language-pack key."""
+    value = t(key)
+    if append_admin_only:
+        value = f"{value} {t('discord_command_admin_only')}"
+    return app_commands.locale_str(
+        value, translation_key=key, append_admin_only=append_admin_only,
+    )
 
 # UI部品の文字列を一か所で言語パックへ接続する。既存画面の文言も
 # widget生成時に通過するため、新しい画面を追加する際の漏れを防ぐ。
@@ -178,6 +261,9 @@ for _filedialog_name in ('askopenfilename', 'askdirectory', 'asksaveasfilename')
 # 変数定義
 intents = discord.Intents.default()
 bot = discord.Client(intents=intents)
+discord_commands = app_commands.CommandTree(bot)
+discord_bot_run_lock = threading.Lock()
+discord_command_sync_lock = None
 pending_discord_notifications = []
 pending_discord_notifications_lock = threading.Lock()
 gui_log_queue = queue.Queue()
@@ -207,6 +293,10 @@ CONFIG_DISPLAY_NAMES = {
     'long_term_time': 'config_long_term_time',
     'enabled': 'config_discord_enabled', 'autosave_notice': 'config_autosave_notice',
     'token': 'config_discord_token', 'channel': 'config_discord_channel',
+    'command_enabled': 'config_discord_command_enabled',
+    'command_users': 'config_discord_command_users',
+    'command_result_enabled': 'config_discord_command_result_enabled',
+    'command_result_channel': 'config_discord_command_result_channel',
     'passwords': 'config_player_passwords', 'ban_ips': 'ban_ip',
 }
 
@@ -274,10 +364,27 @@ def load_config():
         config.discord_autosave_notice = int(discord_settings.get('autosave_notice', 0) or 0)
     except (TypeError, ValueError):
         config.discord_autosave_notice = 0
+    try:
+        config.discord_command_enabled = int(discord_settings.get('command_enabled', 0) or 0)
+    except (TypeError, ValueError):
+        config.discord_command_enabled = 0
+    command_users = discord_settings.get('command_users', {})
+    if not isinstance(command_users, dict):
+        command_users = {}
+    config.discord_command_users = {
+        str(user).strip() for user in command_users.values()
+        if str(user).strip().isdigit()
+    }
+    try:
+        config.discord_command_result_enabled = int(discord_settings.get('command_result_enabled', 1) or 0)
+    except (TypeError, ValueError):
+        config.discord_command_result_enabled = 1
+    config.discord_command_result_channel = discord_settings.get('command_result_channel', '')
 
 def default_config_data():
     return {
         'language': 'en-US',
+        'date_format': 'MM/DD/YYYY',
         'server': {
             'path': '', 'port': '13353', 'restart_time': -1,
             'response_monitor_enabled': 0, 'response_timeout': 0,
@@ -287,7 +394,11 @@ def default_config_data():
         'backup': {'long_term_keep_days': 0, 'long_term_time': 5},
         'players': {'passwords': {i: '' for i in range(63)}},
         'network': {'ban_ips': {i: '' for i in range(63)}},
-        'discord': {'enabled': 0, 'token': '', 'channel': '', 'autosave_notice': 0},
+        'discord': {
+            'enabled': 0, 'token': '', 'channel': '', 'autosave_notice': 0,
+            'command_enabled': 0, 'command_users': {i: '' for i in range(63)},
+            'command_result_enabled': 1, 'command_result_channel': '',
+        },
         # アプリケーション内部状態。設定画面には表示しない。
         'runtime': {
             'maintenance_mode': 0,
@@ -296,6 +407,37 @@ def default_config_data():
             'auto_restart_enabled': None,
         },
     }
+
+def parse_discord_command_users(text):
+    """Accept one user ID per line, including the legacy index=ID format."""
+    indexed = {}
+    unnumbered = []
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        line = line.strip()
+        if not line:
+            continue
+        if '=' in line:
+            index_text, user_id = (value.strip() for value in line.split('=', 1))
+            if not re.fullmatch(r'[0-9]+', index_text) or not 0 <= int(index_text) < 63:
+                raise ValueError(t('discord_command_user_line_invalid', line=line_number))
+            index = int(index_text)
+            if index in indexed:
+                raise ValueError(t('discord_command_user_line_invalid', line=line_number))
+        else:
+            index = None
+            user_id = line
+        if user_id and not re.fullmatch(r'[0-9]{17,20}', user_id):
+            raise ValueError(t('discord_user_id_required'))
+        if index is None:
+            unnumbered.append(user_id)
+        else:
+            indexed[index] = user_id
+    if len(indexed) + len(unnumbered) > 63:
+        raise ValueError(t('discord_command_users_limit'))
+    free_indices = (index for index in range(63) if index not in indexed)
+    for user_id in unnumbered:
+        indexed[next(free_indices)] = user_id
+    return {index: indexed.get(index, '') for index in range(63)}
 
 def persist_runtime_state():
     """設定画面では編集できない、再起動後も必要な内部状態を保存する。"""
@@ -340,6 +482,49 @@ def restore_runtime_state():
         except (KeyError, TypeError, ValueError):
             scheduled_updates = None
 
+
+def parse_company_names(output):
+    """Extract company IDs and names from the `nettool companies` response."""
+    companies = {}
+    for line in output.splitlines():
+        match = re.match(r'^Company #(\d+):\s*(.*)$', line)
+        if match:
+            companies[int(match.group(1))] = match.group(2)
+    return companies
+
+
+def normalize_ipv4_address(ip):
+    """Return an IPv4 address as a tuple, ignoring zero padding in each octet."""
+    parts = str(ip).strip().split('.')
+    if len(parts) != 4 or not all(re.fullmatch(r'[0-9]+', part) for part in parts):
+        return None
+    octets = tuple(int(part) for part in parts)
+    return octets if all(0 <= octet <= 255 for octet in octets) else None
+
+
+def is_ip_banned(blacklist_output, ip):
+    """Return whether an IP address appears in `nettool blacklist` output."""
+    target_ip = normalize_ipv4_address(ip)
+    if target_ip is None:
+        return False
+    banned_ips = re.findall(r'^\s*\[\s*\d+\]\s+\.\.\s+(\S+)\s*$', blacklist_output, re.MULTILINE)
+    return any(normalize_ipv4_address(banned_ip) == target_ip for banned_ip in banned_ips)
+
+
+def get_company_names():
+    """Return (companies, status) for the currently configured server."""
+    try:
+        result = subprocess.run(
+            [run_nettool(), '-p', str(nettool_pw), '-s', server_ip + str(config.port_number), 'companies'],
+            capture_output=True, text=True, encoding='utf-8', errors='replace',
+        )
+    except Exception:
+        return {}, 'failed'
+    if result.returncode != 0:
+        return {}, 'failed'
+    companies = parse_company_names(result.stdout)
+    return companies, 'ok' if companies else 'empty'
+
 class config_window:
     def __init__(self, master, first_run=False):
         self.master = master
@@ -353,11 +538,12 @@ class config_window:
         self.long_term_keep_days_entry = None
         self.secret_entries = {'token': [], 'passwords': []}
         self.secret_visibility = {'token': tk.IntVar(value=0), 'passwords': tk.IntVar(value=0)}
+        self.company_name_labels = {}
         data = config_data if config_data else default_config_data()
         notebook = ttk.Notebook(self.window)
         notebook.pack(fill='both', expand=True, padx=8, pady=8)
         language_frame = ttk.Frame(notebook)
-        notebook.add(language_frame, text=t('language_tab'))
+        notebook.add(language_frame, text=t('language_locale'))
         ttk.Label(language_frame, text=t('language_tab')).grid(row=0, column=0, sticky='w', padx=10, pady=12)
         # 言語名は選択中の言語で翻訳せず、各YAMLの固定表記を使う。
         languages = available_languages()
@@ -370,7 +556,15 @@ class config_window:
         language_box.set(next((f'{code} - {name}' for code, name in languages if code == self.language_var.get()), ''))
         language_box.grid(row=0, column=1, sticky='w', padx=10, pady=12)
         language_box.bind('<<ComboboxSelected>>', self.apply_language)
-        ttk.Label(language_frame, text=t('translation_accuracy_notice')).grid(row=1, column=0, columnspan=2, sticky='w', padx=10, pady=8)
+        ttk.Label(language_frame, text=t('date_format')).grid(row=1, column=0, sticky='w', padx=10, pady=12)
+        self.date_format_var = tk.StringVar(value=data.get('date_format', selected_date_format()))
+        if self.date_format_var.get() not in DATE_FORMATS:
+            self.date_format_var.set(selected_date_format())
+        ttk.Combobox(
+            language_frame, textvariable=self.date_format_var,
+            values=list(DATE_FORMATS), state='readonly', width=28,
+        ).grid(row=1, column=1, sticky='w', padx=10, pady=12)
+        ttk.Label(language_frame, text=t('translation_accuracy_notice')).grid(row=2, column=0, columnspan=2, sticky='w', padx=10, pady=8)
         server_values = data.get('server', {})
         if 'path' not in server_values:
             folder = server_values.get('folder_path', '')
@@ -399,7 +593,18 @@ class config_window:
             ['mode', 'backup_count', 'interval', 'long_term_keep_days', 'long_term_time'],
             save_data_values,
         )
-        self.add_tab(notebook, t('discord'), ['enabled', 'autosave_notice', 'token', 'channel'], data.get('discord', {}))
+        discord_values = dict(default_config_data()['discord'])
+        discord_values.update(data.get('discord', {}))
+        self.add_tab(
+            notebook, t('discord'),
+            ['enabled', 'autosave_notice', 'command_enabled', 'command_result_enabled',
+             'command_result_channel', 'token', 'channel'],
+            discord_values,
+        )
+        self.add_multiline_tab(
+            notebook, t('discord_command_users'), 'command_users',
+            data.get('discord', {}).get('command_users', {}),
+        )
         self.add_password_tab(notebook, data.get('players', {}).get('passwords', {}))
         self.add_multiline_tab(notebook, t('ban_ip'), 'ban_ips', data.get('network', {}).get('ban_ips', {}))
         button_frame = ttk.Frame(self.window)
@@ -408,36 +613,51 @@ class config_window:
         ttk.Button(button_frame, text=t('import_bat_settings'), command=self.import_setting_bat).pack(side='left', padx=(8, 0))
         ttk.Button(button_frame, text=t('save'), style='Accent.TButton', command=self.save).pack(side='right', padx=(8, 0))
         ttk.Button(button_frame, text=t('cancel'), command=self.close).pack(side='right')
+        if self.first_run:
+            self._set_company_names({}, 'initial')
+        else:
+            threading.Thread(target=self._load_company_names, daemon=True).start()
         self.window.transient(master)
         self.window.grab_set()
 
     def apply_language(self, event=None):
         """Apply a language selection immediately by rebuilding the settings UI."""
         selected = self.language_var.get().split(' - ', 1)[0]
+        try:
+            command_users = parse_discord_command_users(self.fields['command_users'].get('1.0', 'end'))
+        except ValueError as error:
+            self.language_var.set(config_data.get('language', 'en-US'))
+            messagebox.showerror(t('input_error'), str(error), parent=self.window)
+            return
         # 言語変更時は設定画面を作り直すため、入力途中の値を先に保持する。
         # これを行わないと、初回起動時に既定値で上書きされ、サーバーの
         # パスや名前が空のまま保存されてしまう。
         config_data['language'] = selected
         for key in ('server', 'autosave', 'backup', 'discord'):
             for name in config_data.get(key, {}):
+                if name == 'command_users':
+                    continue
                 field = self.fields.get(name)
                 if field is not None:
                     config_data[key][name] = field.get()
         for i, entry in self.fields.get('passwords', {}).items():
             config_data.setdefault('players', {}).setdefault('passwords', {})[i] = entry.get()
+        config_data.setdefault('discord', {})['command_users'] = command_users
         ban_ips = config_data.setdefault('network', {}).setdefault('ban_ips', {})
-        for line in self.fields.get('ban_ips').get('1.0', 'end').splitlines():
-            if '=' in line:
-                index, value = line.split('=', 1)
-                if index.strip().isdigit() and 0 <= int(index) < 63:
-                    ban_ips[int(index)] = value
+        ban_ips.update({i: '' for i in range(63)})
+        ban_values = [line.strip() for line in self.fields.get('ban_ips').get('1.0', 'end').splitlines() if line.strip()]
+        for index, value in enumerate(ban_values[:63]):
+            ban_ips[index] = value
         # 初回起動中は、言語変更だけで設定ファイルを作成しない。
         # ファイルが先に作られると、保存前でもメイン処理が初期設定済みと
         # 判断し、空の server.path を check_config() で検証してしまう。
+        load_language(selected)
+        # A language change uses the locale's documented date order. Users can
+        # still choose another order in the Locale field before saving.
+        config_data['date_format'] = locale_date_format
         if not self.first_run:
             with open(config_path, 'w', encoding='utf-8') as config_file:
                 yaml.safe_dump(config_data, config_file, allow_unicode=True, sort_keys=False)
-        load_language(selected)
         if 'app' in globals() and app is not None:
             app.apply_language()
         self.window.grab_release()
@@ -483,6 +703,31 @@ class config_window:
                     frame, text=t('help'), command=lambda k=key: self.show_help(k)
                 ).grid(row=row, column=5, padx=3, pady=6)
                 continue
+            if is_discord_tab and key in ('command_result_enabled', 'command_result_channel'):
+                if key == 'command_result_channel':
+                    continue
+                ttk.Label(frame, text=t(CONFIG_DISPLAY_NAMES[key])).grid(
+                    row=row, column=0, sticky='w', padx=10, pady=8
+                )
+                pair_frame = ttk.Frame(frame)
+                pair_frame.grid(row=row, column=1, columnspan=3, sticky='ew', padx=10, pady=8)
+                pair_frame.grid_columnconfigure(2, weight=1)
+                variable = tk.IntVar(value=1 if int(values.get(key, 1) or 0) in (1, 2) else 0)
+                ttk.Checkbutton(
+                    pair_frame, text=t('enable'), style='Switch.TCheckbutton', variable=variable,
+                ).grid(row=0, column=0, sticky='w', padx=(0, 16))
+                self.fields[key] = variable
+                ttk.Label(pair_frame, text=t(CONFIG_DISPLAY_NAMES['command_result_channel'])).grid(
+                    row=0, column=1, sticky='w', padx=(0, 8)
+                )
+                entry = ttk.Entry(pair_frame, width=24)
+                entry.insert(0, str(values.get('command_result_channel', '')))
+                entry.grid(row=0, column=2, sticky='ew')
+                self.fields['command_result_channel'] = entry
+                ttk.Button(frame, text=t('help'), command=lambda k=key: self.show_help(k)).grid(
+                    row=row, column=4, sticky='e', padx=5, pady=8
+                )
+                continue
             ttk.Label(frame, text=t(CONFIG_DISPLAY_NAMES[key])).grid(row=row, column=0, sticky='w', padx=10, pady=8)
             if key == 'mode':
                 try:
@@ -527,10 +772,12 @@ class config_window:
                 self.long_term_keep_mode = mode
                 self.long_term_keep_days_entry = days_entry
                 self.fields[key] = mode
-            elif key in ('enabled', 'autosave_notice', 'press_space_after_start', 'response_monitor_enabled', 'restart_enabled'):
+            elif key in ('enabled', 'autosave_notice', 'command_enabled', 'command_result_enabled', 'press_space_after_start', 'response_monitor_enabled', 'restart_enabled'):
                 variable = tk.IntVar(value=1 if int(values.get(key, 0) or 0) in (1, 2) else 0)
                 text = t('use') if key in ('enabled', 'response_monitor_enabled', 'restart_enabled') else t('enable')
-                entry = ttk.Checkbutton(frame, text=text, style='Switch.TCheckbutton', variable=variable)
+                entry = ttk.Checkbutton(
+                    frame, text=text, style='Switch.TCheckbutton', variable=variable,
+                )
                 entry.grid(row=row, column=1, sticky='w', padx=10, pady=8)
                 self.fields[key] = variable
             else:
@@ -540,7 +787,7 @@ class config_window:
                     row=row, column=1,
                     columnspan=3 if is_server_tab and key == 'path' else
                     4 if is_server_tab else
-                    2 if is_discord_tab and key != 'token' else 1,
+                    (2 if key == 'token' else 3) if is_discord_tab else 1,
                     sticky='ew', padx=10, pady=8
                 )
                 self.fields[key] = entry
@@ -554,9 +801,11 @@ class config_window:
                         frame, text=t('show'), variable=self.secret_visibility['token'],
                         style='Switch.TCheckbutton',
                         command=lambda: self.toggle_secret('token')
-                    ).grid(row=row, column=2 if is_discord_tab else 3, padx=5, pady=8)
-            help_column = 5 if is_server_tab else 3 if is_discord_tab else 2
-            ttk.Button(frame, text=t('help'), command=lambda k=key: self.show_help(k)).grid(row=row, column=help_column, padx=5, pady=8)
+                    ).grid(row=row, column=3, padx=5, pady=8)
+            help_column = 5 if is_server_tab else 4 if is_discord_tab else 2
+            ttk.Button(frame, text=t('help'), command=lambda k=key: self.show_help(k)).grid(
+                row=row, column=help_column, sticky='e', padx=5, pady=8
+            )
 
     def select_server_executable(self):
         """ファイル選択ダイアログでサーバー実行ファイルを指定する。"""
@@ -584,14 +833,15 @@ class config_window:
     def add_multiline_tab(self, notebook, title, key, values):
         frame = ttk.Frame(notebook)
         notebook.add(frame, text=title)
-        ttk.Label(frame, text=t('numbered_value_per_line')).pack(anchor='w', padx=10, pady=8)
+        notice_key = 'discord_command_users_notice' if key == 'command_users' else 'ip_address_per_line'
+        ttk.Label(frame, text=t(notice_key)).pack(anchor='w', padx=10, pady=8)
         ttk.Button(frame, text=t('help'), command=lambda k=key: self.show_help(k)).pack(anchor='e', padx=10)
         text = tk.Text(frame, width=65, height=25)
         text.pack(fill='both', expand=True, padx=10, pady=5)
         for i in range(63):
             value = values.get(i, values.get(str(i), ''))
             if value not in (None, ''):
-                text.insert('end', f'{i}={value}\n')
+                text.insert('end', f'{value}\n')
         self.fields[key] = text
 
     def add_password_tab(self, notebook, values):
@@ -629,20 +879,42 @@ class config_window:
         contents.bind('<Button-5>', lambda event: canvas.yview_scroll(1, 'units'))
         password_fields = {}
         for i in range(63):
-            column = (i // 21) * 2
-            row = (i % 21) + 1
-            ttk.Label(contents, text=t('company_number', i=i)).grid(row=row, column=column, sticky='w', padx=(10, 4), pady=3)
+            row = i
+            ttk.Label(contents, text=t('company_number', i=i)).grid(row=row, column=0, sticky='w', padx=(10, 4), pady=3)
+            company_name = ttk.Label(contents, foreground='gray')
+            company_name.grid(row=row, column=1, sticky='w', padx=(0, 12), pady=3)
             entry = ttk.Entry(contents, width=22, show='*')
             value = values.get(i, values.get(str(i), ''))
             entry.insert(0, str(value or ''))
-            entry.grid(row=row, column=column + 1, sticky='w', padx=(0, 18), pady=3)
+            entry.grid(row=row, column=2, sticky='w', padx=(0, 18), pady=3)
             entry.bind('<MouseWheel>', lambda event: canvas.yview_scroll(-int(event.delta / 120), 'units'))
             entry.bind('<Button-4>', lambda event: canvas.yview_scroll(-1, 'units'))
             entry.bind('<Button-5>', lambda event: canvas.yview_scroll(1, 'units'))
             password_fields[i] = entry
+            self.company_name_labels[i] = company_name
             self.secret_entries['passwords'].append(entry)
         ttk.Button(frame, text=t('help'), command=lambda: self.show_help('passwords')).grid(row=2, column=0, padx=10, pady=8, sticky='w')
         self.fields['passwords'] = password_fields
+
+    def _load_company_names(self):
+        companies, status = get_company_names()
+        try:
+            self.window.after(0, self._set_company_names, companies, status)
+        except (RuntimeError, tk.TclError):
+            pass
+
+    def _set_company_names(self, companies, status):
+        status_key = {
+            'initial': 'company_info_initial_setup',
+            'failed': 'company_info_fetch_failed',
+            'empty': 'company_not_found',
+        }.get(status, 'company_not_found')
+        for number, label in self.company_name_labels.items():
+            name = companies.get(number)
+            label.config(
+                text=name if name is not None else t(status_key),
+                foreground='black' if name is not None else 'gray',
+            )
 
     def toggle_secret(self, key):
         show = '' if self.secret_visibility[key].get() else '*'
@@ -658,9 +930,12 @@ class config_window:
             'mode': 'help_autosave_mode', 'backup_count': 'help_backup_count',
             'interval': 'help_autosave_interval', 'long_term_keep_days': 'help_long_term_keep_days',
             'long_term_time': 'help_long_term_time', 'enabled': 'help_discord_enabled',
-            'autosave_notice': 'help_autosave_notice', 'token': 'help_discord_token',
+            'autosave_notice': 'help_autosave_notice', 'command_enabled': 'help_discord_command_enabled',
+            'command_result_enabled': 'help_discord_command_result_enabled',
+            'command_result_channel': 'help_discord_command_result_channel',
+            'token': 'help_discord_token',
             'channel': 'help_discord_channel', 'passwords': 'help_player_passwords',
-            'ban_ips': 'help_ban_ips',
+            'ban_ips': 'help_ban_ips', 'command_users': 'help_discord_command_users',
         }
         messagebox.showinfo(t('setting_help_title'), t(descriptions.get(key, 'no_description')), parent=self.window)
 
@@ -739,7 +1014,7 @@ class config_window:
             for i in range(63):
                 value = getattr(legacy, f'banip_{i}', '')
                 if value not in ('', None):
-                    text.insert('end', f'{i}={value}\n')
+                    text.insert('end', f'{value}\n')
             messagebox.showinfo(t('import_complete'), t('legacy_import_complete'), parent=self.window)
         except Exception as error:
             messagebox.showerror(t('import_failed'), t('legacy_import_failed', error=error), parent=self.window)
@@ -803,14 +1078,27 @@ class config_window:
             for i in range(1, 64):
                 address = settings.get(f'ban_address_{i}', '')
                 if address:
-                    ban_text.insert('end', f'{i - 1}={address}\n')
+                    ban_text.insert('end', f'{address}\n')
             messagebox.showinfo(t('import_complete'), t('bat_import_complete'), parent=self.window)
         except Exception as error:
             messagebox.showerror(t('import_failed'), t('bat_import_failed', error=error), parent=self.window)
 
     def save(self):
         data = default_config_data()
+        previous_ban_ips = {
+            str(value).strip()
+            for value in config_data.get('network', {}).get('ban_ips', {}).values()
+            if str(value).strip()
+        }
+        try:
+            data['discord']['command_users'] = parse_discord_command_users(
+                self.fields['command_users'].get('1.0', 'end')
+            )
+        except ValueError as error:
+            messagebox.showerror(t('input_error'), str(error), parent=self.window)
+            return
         data['language'] = self.language_var.get().split(' - ', 1)[0]
+        data['date_format'] = self.date_format_var.get()
         # 設定画面にない内部状態を保持する。
         data['runtime'] = config_data.get('runtime', data['runtime'])
         try:
@@ -822,6 +1110,8 @@ class config_window:
         data['runtime']['auto_restart_enabled'] = self.fields['restart_enabled'].get()
         for key in ('server', 'autosave', 'backup', 'discord'):
             for name in data[key]:
+                if name == 'command_users':
+                    continue
                 if name == 'long_term_keep_days':
                     mode = self.long_term_keep_mode.get()
                     if mode == 'disabled':
@@ -834,11 +1124,9 @@ class config_window:
                     data[key][name] = self.fields[name].get()
         for i, entry in self.fields['passwords'].items():
             data['players']['passwords'][i] = entry.get()
-        for line in self.fields['ban_ips'].get('1.0', 'end').splitlines():
-            if '=' in line:
-                index, value = line.split('=', 1)
-                if index.strip().isdigit() and 0 <= int(index) < 63:
-                    data['network']['ban_ips'][int(index)] = value
+        ban_values = [line.strip() for line in self.fields['ban_ips'].get('1.0', 'end').splitlines() if line.strip()]
+        for index, value in enumerate(ban_values[:63]):
+            data['network']['ban_ips'][index] = value
         error = self.validate_config_data(data)
         if error:
             messagebox.showerror(t('input_error'), error, parent=self.window)
@@ -850,6 +1138,12 @@ class config_window:
         if not self.first_run:
             check_config(initialize_runtime=False)
             app.server_name_label.config(text=t('managed_server') + config.server_name)
+            request_discord_command_sync()
+            # 設定GUIで変更した会社パスワードとBAN IPを、保存直後にサーバーへ反映する。
+            # nettool 呼び出しでGUI操作が停止しないよう、バックグラウンドで実行する。
+            threading.Thread(
+                target=apply_server_access_settings, args=(previous_ban_ips,), daemon=True,
+            ).start()
         self.close()
 
     def validate_config_data(self, data):
@@ -872,6 +1166,8 @@ class config_window:
             ('backup.long_term_time', data['backup']['long_term_time'], 0, 24),
             ('discord.enabled', data['discord']['enabled'], 0, 2),
             ('discord.autosave_notice', data['discord']['autosave_notice'], 0, 1),
+            ('discord.command_enabled', data['discord']['command_enabled'], 0, 1),
+            ('discord.command_result_enabled', data['discord']['command_result_enabled'], 0, 1),
         )
         for name, value, minimum, maximum in integer_rules:
             display_name = t(CONFIG_DISPLAY_NAMES[name.split('.')[-1]])
@@ -888,6 +1184,19 @@ class config_window:
                 int(data['discord']['channel'])
             except (TypeError, ValueError):
                 return t('integer_required', field=t(CONFIG_DISPLAY_NAMES['channel']))
+        if int(data['discord']['command_enabled']) and int(data['discord']['command_result_enabled']):
+            try:
+                int(data['discord']['command_result_channel'])
+            except (TypeError, ValueError):
+                return t('integer_required', field=t(CONFIG_DISPLAY_NAMES['command_result_channel']))
+        for user_id in data['discord']['command_users'].values():
+            value = str(user_id).strip()
+            if value and (not value.isdigit() or not 17 <= len(value) <= 20):
+                return t('discord_user_id_required')
+        for ip in data['network']['ban_ips'].values():
+            value = str(ip).strip()
+            if value and normalize_ipv4_address(value) is None:
+                return t('invalid_ip_address', ip=value)
         return None
 
     def close(self):
@@ -1041,13 +1350,30 @@ class window_main(tk.Frame):
         self.newWindow.grab_set()
         rollback_window(self.newWindow, self)
 
-    def rollback_execute(self, save_path, timestamp):
+    def rollback_execute(self, save_path, timestamp, cached_save_path=None):
         self.rollback_button.config(state="disabled")
-        threading.Thread(
-            target=rollback_server,
-            args=(save_path, timestamp),
-            daemon=True,
-        ).start()
+        try:
+            threading.Thread(
+                target=self.rollback_threaded,
+                args=(save_path, timestamp, cached_save_path),
+                daemon=True,
+            ).start()
+        except Exception:
+            self.rollback_button.config(state="normal")
+            remove_rollback_cache(cached_save_path)
+            raise
+
+    def rollback_threaded(self, save_path, timestamp, cached_save_path=None):
+        try:
+            rollback_server(save_path, timestamp)
+        finally:
+            remove_rollback_cache(cached_save_path)
+            # Tk widgets must be updated on the GUI thread, even after a failure.
+            try:
+                self.after(0, lambda: self.rollback_button.config(state="normal"))
+            except (RuntimeError, tk.TclError):
+                # The application may have been closed during the operation.
+                pass
 
     def server_restart_check_start(self):
         # 確認ダイアログを開く
@@ -1187,10 +1513,10 @@ class window_main(tk.Frame):
 class nettool_window(tk.Frame):
     """nettoolの全管理コマンドを送信する画面。"""
     COMMAND_GROUPS = (
-        ('nettool_group_information', ('announce', 'clients', 'companies', 'info-company', 'blacklist')),
-        ('nettool_group_company', ('lock-company', 'unlock-company', 'remove-company')),
-        ('nettool_group_connection', ('kick-client', 'ban-client', 'ban-ip', 'unban-ip', 'say')),
-        ('nettool_group_server', ('force-sync', 'shutdown')),
+        ('nettool_group_information', ('announce',)),
+        ('nettool_group_company', ('companies', 'info-company', 'lock-company', 'unlock-company', 'remove-company')),
+        ('nettool_group_connection', ('clients', 'kick-client', 'ban-client', 'ban-ip', 'unban-ip', 'blacklist')),
+        ('nettool_group_server', ('say', 'force-sync', 'shutdown')),
     )
     ARGUMENT_LABELS = {
         'info-company': 'nettool_company_number', 'lock-company': 'nettool_company_number',
@@ -1203,16 +1529,20 @@ class nettool_window(tk.Frame):
         super().__init__(master)
         self.master = master
         self.master.title(t('nettool_commands'))
-        self.master.geometry('800x720')
-        self.master.minsize(720, 620)
+        self.master.geometry('1200x720')
+        self.master.minsize(900, 620)
         self.master.protocol('WM_DELETE_WINDOW', self.close_window)
         self.grid(row=0, column=0, sticky='nsew', padx=12, pady=12)
         self.master.grid_rowconfigure(0, weight=1)
         self.master.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
         self.inputs = {}
+        self.company_inputs = {}
         self.command_results = queue.Queue()
-        ttk.Label(self, text=t('nettool_description'), wraplength=760).grid(row=0, column=0, sticky='w', pady=(0, 8))
+        self.apply_ban_var = tk.BooleanVar(value=False)
+        self.apply_password_var = tk.BooleanVar(value=False)
+        self.lock_company_password_visible = tk.BooleanVar(value=False)
+        ttk.Label(self, text=t('nettool_description'), wraplength=1000).grid(row=0, column=0, sticky='w', pady=(0, 8))
         commands_area = ttk.Frame(self)
         commands_area.grid(row=1, column=0, sticky='nsew')
         commands_area.grid_columnconfigure(0, weight=1)
@@ -1234,13 +1564,28 @@ class nettool_window(tk.Frame):
             group.grid(row=row, column=0, sticky='ew', pady=4)
             group.grid_columnconfigure(1, weight=1)
             self._bind_command_scroll(group)
-            for command_row, command in enumerate(commands):
+            if group_key == 'nettool_group_company':
+                setting_toggle = ttk.Checkbutton(
+                    group, text=t('nettool_apply_password_setting'), variable=self.apply_password_var,
+                    style='Switch.TCheckbutton',
+                )
+                setting_toggle.grid(row=0, column=1, columnspan=5, sticky='w', pady=(0, 6))
+                self._bind_command_scroll(setting_toggle)
+                command_row_offset = 1
+            elif group_key == 'nettool_group_connection':
+                setting_toggle = ttk.Checkbutton(
+                    group, text=t('nettool_apply_ban_setting'), variable=self.apply_ban_var,
+                    style='Switch.TCheckbutton',
+                )
+                setting_toggle.grid(row=0, column=1, columnspan=5, sticky='w', pady=(0, 6))
+                self._bind_command_scroll(setting_toggle)
+                command_row_offset = 1
+            else:
+                command_row_offset = 0
+            for command_row, command in enumerate(commands, start=command_row_offset):
                 self._add_command_row(group, command_row, command)
-        self.apply_ban_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(self, text=t('nettool_apply_ban_setting'), variable=self.apply_ban_var,
-                        style='Switch.TCheckbutton').grid(row=2, column=0, sticky='w', pady=(8, 4))
         output_frame = ttk.LabelFrame(self, text=t('nettool_result'), padding=6)
-        output_frame.grid(row=3, column=0, sticky='nsew', pady=(4, 0))
+        output_frame.grid(row=2, column=0, sticky='nsew', pady=(4, 0))
         output_frame.grid_columnconfigure(0, weight=1)
         output_frame.grid_rowconfigure(0, weight=1)
         self.output = tk.Text(output_frame, height=10, wrap='word', state='disabled')
@@ -1250,8 +1595,9 @@ class nettool_window(tk.Frame):
         self.output.configure(yscrollcommand=scrollbar.set)
         self.grid_rowconfigure(1, weight=1)
         button_frame = ttk.Frame(self)
-        button_frame.grid(row=4, column=0, sticky='e', pady=(8, 0))
+        button_frame.grid(row=3, column=0, sticky='e', pady=(8, 0))
         ttk.Button(button_frame, text=t('nettool_close'), command=self.close_window).pack()
+        threading.Thread(target=self._load_company_names, daemon=True).start()
         self.after(GUI_LOG_FLUSH_INTERVAL_MS, self._flush_command_results)
 
     def _add_command_row(self, parent, row, command):
@@ -1259,10 +1605,15 @@ class nettool_window(tk.Frame):
         label.grid(row=row, column=0, sticky='w', pady=3)
         self._bind_command_scroll(label)
         if command in self.ARGUMENT_LABELS:
-            entry = ttk.Entry(parent)
+            if self.ARGUMENT_LABELS[command] == 'nettool_company_number':
+                entry = ttk.Combobox(parent, state='disabled', width=52)
+                entry.set(t('company_info_fetch_failed'))
+                self.company_inputs[command] = entry
+            else:
+                entry = ttk.Entry(parent)
+                entry.insert(0, t(self.ARGUMENT_LABELS[command]))
+                entry.bind('<FocusIn>', lambda event, e=entry, key=self.ARGUMENT_LABELS[command]: self._clear_hint(e, t(key)))
             entry.grid(row=row, column=1, sticky='ew', padx=(4, 6))
-            entry.insert(0, t(self.ARGUMENT_LABELS[command]))
-            entry.bind('<FocusIn>', lambda event, e=entry, key=self.ARGUMENT_LABELS[command]: self._clear_hint(e, t(key)))
             self._bind_command_scroll(entry)
             self.inputs[command] = entry
         else:
@@ -1274,19 +1625,30 @@ class nettool_window(tk.Frame):
             password_label.grid(row=row, column=2, sticky='e', padx=(0, 4))
             password = ttk.Entry(parent, width=16, show='*')
             password.grid(row=row, column=3, sticky='ew', padx=(0, 6))
+            password_visibility = ttk.Checkbutton(
+                parent, text=t('show_password'), variable=self.lock_company_password_visible,
+                style='Switch.TCheckbutton', command=self._toggle_lock_company_password,
+            )
+            password_visibility.grid(row=row, column=4, sticky='w', padx=(0, 6))
             self._bind_command_scroll(password_label)
             self._bind_command_scroll(password)
+            self._bind_command_scroll(password_visibility)
             self.inputs['lock-company_password'] = password
         else:
             spacer = ttk.Label(parent, text='')
             spacer.grid(row=row, column=2, sticky='ew')
             self._bind_command_scroll(spacer)
         send_button = ttk.Button(parent, text=t('send'), command=lambda c=command: self.send(c))
-        send_button.grid(row=row, column=4, padx=2)
+        send_button.grid(row=row, column=5, padx=2)
         help_button = ttk.Button(parent, text=t('help'), command=lambda c=command: self.show_command_help(c))
-        help_button.grid(row=row, column=5, padx=2)
+        help_button.grid(row=row, column=6, padx=2)
         self._bind_command_scroll(send_button)
         self._bind_command_scroll(help_button)
+
+    def _toggle_lock_company_password(self):
+        self.inputs['lock-company_password'].configure(
+            show='' if self.lock_company_password_visible.get() else '*'
+        )
 
     def _bind_command_scroll(self, widget):
         widget.bind('<MouseWheel>', self._scroll_commands, add='+')
@@ -1324,6 +1686,9 @@ class nettool_window(tk.Frame):
     def send(self, command):
         argument = self.inputs.get(command)
         value = argument.get().strip() if argument else ''
+        if command in self.company_inputs:
+            match = re.match(r'^(\d+):', value)
+            value = match.group(1) if match else ''
         if argument and value == t(self.ARGUMENT_LABELS[command]):
             value = ''
         if command == 'announce' and not messagebox.askyesno(t('confirm'), t('nettool_announce_warning'), parent=self.master):
@@ -1333,13 +1698,38 @@ class nettool_window(tk.Frame):
         if command in self.ARGUMENT_LABELS and not value:
             messagebox.showerror(t('input_error'), t('nettool_argument_required'), parent=self.master)
             return
+        if command in ('ban-ip', 'unban-ip') and normalize_ipv4_address(value) is None:
+            messagebox.showerror(t('input_error'), t('invalid_ip_address', ip=value), parent=self.master)
+            return
         if command == 'lock-company' and not self.inputs['lock-company_password'].get().strip():
             messagebox.showerror(t('input_error'), t('nettool_argument_required'), parent=self.master)
             return
         password = self.inputs['lock-company_password'].get().strip() if command == 'lock-company' else None
         apply_ban_setting = self.apply_ban_var.get()
-        sender = getattr(self, f'send_{command.replace("-", "_")}')
-        threading.Thread(target=sender, args=(value, password, apply_ban_setting), daemon=True).start()
+        apply_password_setting = self.apply_password_var.get()
+        threading.Thread(
+            target=self._send_command,
+            args=(command, value, password, apply_ban_setting, apply_password_setting),
+            daemon=True,
+        ).start()
+
+    def _load_company_names(self):
+        companies, status = get_company_names()
+        try:
+            self.after(0, self._set_company_names, companies, status)
+        except (RuntimeError, tk.TclError):
+            pass
+
+    def _set_company_names(self, companies, status):
+        values = [f'{number}: {name}' for number, name in sorted(companies.items())]
+        placeholder = t({
+            'failed': 'company_info_fetch_failed',
+            'empty': 'company_not_found',
+        }.get(status, 'company_not_found'))
+        for entry in self.company_inputs.values():
+            entry.configure(state='normal', values=values)
+            entry.set(t('nettool_company_number') if values else placeholder)
+            entry.configure(state='readonly' if values else 'disabled')
 
     def send_announce(self, value, password, apply): self._send_command('announce', value, apply=apply)
     def send_clients(self, value, password, apply): self._send_command('clients', value, apply=apply)
@@ -1357,8 +1747,24 @@ class nettool_window(tk.Frame):
     def send_force_sync(self, value, password, apply): self._send_command('force-sync', value, apply=apply)
     def send_shutdown(self, value, password, apply): self._send_command('shutdown', value, apply=apply)
 
-    def _send_command(self, command, value, extra=None, apply=False):
+    def _send_command(self, command, value, extra=None, apply=False, apply_password=False):
         try:
+            if command == 'ban-ip':
+                check = subprocess.run(
+                    [run_nettool(), '-p', str(nettool_pw), '-s', server_ip + str(config.port_number), 'blacklist'],
+                    capture_output=True, text=True, encoding='utf-8', errors='replace',
+                )
+                check_output = check.stdout or check.stderr
+                if check.returncode != 0:
+                    self._write_output(t(
+                        'nettool_command_failed', command='blacklist', code=check.returncode, output=check_output,
+                    ))
+                    return
+                if is_ip_banned(check.stdout, value):
+                    if apply:
+                        self._update_ban_setting(value, True)
+                    self._write_output(t('nettool_ip_already_banned', ip=value))
+                    return
             args = [run_nettool(), '-p', str(nettool_pw), '-s', server_ip + str(config.port_number), command]
             if value:
                 args.append(value)
@@ -1379,6 +1785,8 @@ class nettool_window(tk.Frame):
                 self._write_output(response or t('nettool_sent', command=command))
             if result.returncode == 0 and command in ('ban-ip', 'unban-ip') and apply:
                 self._update_ban_setting(value, command == 'ban-ip')
+            if result.returncode == 0 and command in ('lock-company', 'unlock-company') and apply_password:
+                self._update_company_password_setting(value, extra if command == 'lock-company' else '')
         except Exception as error:
             self._write_output(t('nettool_failed', error=error))
 
@@ -1400,6 +1808,18 @@ class nettool_window(tk.Frame):
             yaml.safe_dump(config_data, config_file, allow_unicode=True, sort_keys=False)
         load_config()
 
+    def _update_company_password_setting(self, company_number, password):
+        try:
+            company_index = int(company_number)
+        except (TypeError, ValueError):
+            return
+        if not 0 <= company_index < 63:
+            return
+        config_data.setdefault('players', {}).setdefault('passwords', {})[company_index] = password
+        with open(config_path, 'w', encoding='utf-8') as config_file:
+            yaml.safe_dump(config_data, config_file, allow_unicode=True, sort_keys=False)
+        load_config()
+
 
 class update_schedule_window(tk.Frame):
     def __init__(self, master):
@@ -1417,11 +1837,22 @@ class update_schedule_window(tk.Frame):
         self.body_var = tk.IntVar(value=0)
         self.pak_var = tk.IntVar(value=0)
         self.backup_var = tk.IntVar(value=1)
-        self.discord_notice_var = tk.IntVar(value=0)
+        self.discord_notice_var = tk.IntVar(value=1)
         self.restart_server_var = tk.IntVar(value=1)
         self.body_path = tk.StringVar()
         self.pak_path = tk.StringVar()
-        self.time_var = tk.StringVar(value=datetime.datetime.now().strftime('%Y/%m/%d %H:%M'))
+        self.time_var = tk.StringVar(value=format_datetime(datetime.datetime.now()))
+        with scheduled_updates_lock:
+            existing_schedule = dict(scheduled_updates) if scheduled_updates else None
+        if existing_schedule:
+            self.body_var.set(1 if existing_schedule.get('body') else 0)
+            self.pak_var.set(1 if existing_schedule.get('pak') else 0)
+            self.backup_var.set(existing_schedule.get('backup', 0))
+            self.discord_notice_var.set(existing_schedule.get('discord_notice', 0))
+            self.restart_server_var.set(existing_schedule.get('restart_server', 1))
+            self.body_path.set(existing_schedule.get('body') or '')
+            self.pak_path.set(existing_schedule.get('pak') or '')
+            self.time_var.set(format_datetime(existing_schedule['when']))
 
         ttk.Checkbutton(self.master, text=t('update_application'), style='Switch.TCheckbutton', variable=self.body_var).grid(row=0, column=0, padx=10, pady=8, sticky='w')
         ttk.Entry(self.master, textvariable=self.body_path, width=55).grid(row=1, column=0, padx=10, sticky='w')
@@ -1449,6 +1880,7 @@ class update_schedule_window(tk.Frame):
         path = filedialog.askopenfilename(title=t('select_update_application'))
         if path:
             self.body_path.set(path)
+            self.body_var.set(1)
 
     def choose_pak(self):
         path = filedialog.askdirectory(title=t('select_update_pakset'))
@@ -1457,16 +1889,14 @@ class update_schedule_window(tk.Frame):
                 messagebox.showerror(t('pakset_validation_title'), t('pakset_validation_message'), parent=self.master)
                 return
             self.pak_path.set(path)
+            self.pak_var.set(1)
 
     def register(self):
         update_data = self.validate_update_inputs()
         if update_data is None:
             return
         try:
-            raw = self.time_var.get().strip()
-            if re.fullmatch(r'\d{1,2}:\d{2}', raw):
-                raw = datetime.datetime.now().strftime('%Y/%m/%d ') + raw
-            when = datetime.datetime.strptime(raw, '%Y/%m/%d %H:%M')
+            when = parse_datetime(self.time_var.get())
         except ValueError:
             messagebox.showerror(t('input_confirmation'), t('invalid_update_datetime'), parent=self.master)
             return
@@ -1475,7 +1905,7 @@ class update_schedule_window(tk.Frame):
             return
         body, pak = update_data
         schedule_update(when, body, pak, self.backup_var.get(), self.discord_notice_var.get(), self.restart_server_var.get())
-        messagebox.showinfo(t('registration_complete'), t('update_registered', when=when.strftime('%Y/%m/%d %H:%M')), parent=self.master)
+        messagebox.showinfo(t('registration_complete'), t('update_registered', when=format_datetime(when)), parent=self.master)
         self.close_window()
 
     def validate_update_inputs(self):
@@ -1492,16 +1922,19 @@ class update_schedule_window(tk.Frame):
                 self.pak_path.get() if self.pak_var.get() else None)
 
     def update_now(self):
-        update_data = self.validate_update_inputs()
-        if update_data is None:
-            return
+        global scheduled_updates
+        with scheduled_updates_lock:
+            if scheduled_updates is None:
+                messagebox.showinfo(t('confirm'), t('no_update_schedule'), parent=self.master)
+                return
+            item = scheduled_updates
+            scheduled_updates = None
         if not messagebox.askyesno(t('confirm'), t('confirm_update_now'), parent=self.master):
+            with scheduled_updates_lock:
+                scheduled_updates = item
             return
-        body, pak = update_data
-        threading.Thread(target=execute_scheduled_update, args=({
-            'body': body, 'pak': pak, 'backup': self.backup_var.get(),
-            'restart_server': self.restart_server_var.get()
-        },), daemon=True).start()
+        persist_runtime_state()
+        threading.Thread(target=execute_scheduled_update, args=(item,), daemon=True).start()
         self.close_window()
 
     def cancel_schedule(self):
@@ -1787,28 +2220,44 @@ class manual_save_check(tk.Frame):
         self.close_window()
 
 class rollback_window(tk.Frame):
-    """ロールバック対象のセーブデータを選択する画面。"""
+    """時刻またはセーブファイルを指定してロールバックする画面。"""
     def __init__(self, master, app):
         super().__init__(master)
         self.master = master
         self.app = app
         self.master.title(t('rollback_data'))
         self.master.resizable(False, False)
-        self.master.geometry("610x150")
+        self.master.minsize(610, 0)
         self.master.protocol('WM_DELETE_WINDOW', self.close_window)
-        self.path_var = tk.StringVar()
+        self.mode_var = tk.StringVar(value='time')
+        self.time_var = tk.StringVar(value=format_datetime(datetime.datetime.now()))
+        self.file_var = tk.StringVar(value='')
 
-        ttk.Label(self.master, text=t('rollback_save_file')).pack(
+        mode_frame = ttk.Frame(self.master)
+        mode_frame.pack(fill='x', padx=10, pady=(10, 0))
+        ttk.Radiobutton(
+            mode_frame, text=t('rollback_by_time'), variable=self.mode_var,
+            value='time', command=self.update_mode,
+        ).pack(side='left', padx=(0, 20))
+        ttk.Radiobutton(
+            mode_frame, text=t('rollback_by_file'), variable=self.mode_var,
+            value='file', command=self.update_mode,
+        ).pack(side='left')
+
+        ttk.Label(self.master, text=t('rollback_datetime')).pack(
             padx=10, pady=(10, 4), anchor="w"
         )
-        path_frame = ttk.Frame(self.master)
-        path_frame.pack(fill="x", padx=10)
-        ttk.Entry(path_frame, textvariable=self.path_var, width=60).pack(
-            side="left", fill="x", expand=True
+        self.time_entry = ttk.Entry(self.master, textvariable=self.time_var, width=28)
+        self.time_entry.pack(padx=10, anchor='w')
+        ttk.Label(self.master, text=t('rollback_save_file')).pack(
+            padx=10, pady=(10, 4), anchor='w'
         )
-        ttk.Button(path_frame, text=t('browse'), command=self.choose_file).pack(
-            side="right", padx=(5, 0)
-        )
+        file_frame = ttk.Frame(self.master)
+        file_frame.pack(fill='x', padx=10)
+        self.file_entry = ttk.Entry(file_frame, textvariable=self.file_var, width=55)
+        self.file_entry.pack(side='left', fill='x', expand=True)
+        self.browse_button = ttk.Button(file_frame, text=t('browse'), command=self.choose_file)
+        self.browse_button.pack(side='right', padx=(8, 0))
         button_frame = ttk.Frame(self.master)
         button_frame.pack(fill="x", padx=10, pady=12)
         ttk.Button(
@@ -1818,39 +2267,118 @@ class rollback_window(tk.Frame):
         ttk.Button(button_frame, text=t('cancel'), command=self.close_window).pack(
             side="right", expand=True, padx=5
         )
+        self.update_mode()
+
+    def update_mode(self):
+        by_time = self.mode_var.get() == 'time'
+        self.time_entry.configure(state='normal' if by_time else 'disabled')
+        self.file_entry.configure(state='disabled' if by_time else 'normal')
+        self.browse_button.configure(state='disabled' if by_time else 'normal')
 
     def choose_file(self):
+        autosave_root = os.path.join(server_folder_path, 'autosave')
         path = filedialog.askopenfilename(
-            title=t('select_rollback_save_file'),
-            filetypes=[(t('simutrans_save_data'), "*.sve"), (t('all_files'), "*.*")],
-            initialdir=server_folder_path,
-            parent=self.master,
+            parent=self.master, title=t('select_rollback_save_file'),
+            initialdir=autosave_root if os.path.isdir(autosave_root) else server_folder_path,
+            filetypes=[(t('simutrans_save_data'), '*.sve')],
         )
         if path:
-            self.path_var.set(path)
+            self.file_var.set(path)
 
     def confirm(self):
-        path = self.path_var.get().strip()
-        if not path or not os.path.isfile(path) or not path.lower().endswith('.sve'):
-            messagebox.showerror(t('input_confirmation'), t('sve_file_required'), parent=self.master)
+        if self.mode_var.get() == 'time':
+            target_time = parse_rollback_time(self.time_var.get())
+            if target_time is None:
+                messagebox.showerror(t('input_confirmation'), t('invalid_update_datetime'), parent=self.master)
+                return
+            path = find_autosave_before(target_time)
+            if path is None:
+                messagebox.showerror(t('input_confirmation'), t('rollback_autosave_not_found'), parent=self.master)
+                return
+        else:
+            path = self.file_var.get().strip()
+            if not path.lower().endswith('.sve') or not os.path.isfile(path):
+                messagebox.showerror(t('input_confirmation'), t('sve_file_required'), parent=self.master)
+                return
+            path = os.path.abspath(path)
+        try:
+            cached_path, timestamp = cache_rollback_save(path)
+        except OSError as error:
+            messagebox.showerror(t('input_confirmation'), t('rollback_file_read_failed', error=error), parent=self.master)
             return
-        timestamp = datetime.datetime.fromtimestamp(os.path.getctime(path)).strftime('%Y/%m/%d %H:%M:%S')
-        message = t('confirm_rollback', timestamp=timestamp)
+        message = f"{t('rollback_save_file')}\n{path}\n\n{t('confirm_rollback', timestamp=timestamp)}"
         if messagebox.askyesno(t('confirm'), message, parent=self.master):
-            self.app.rollback_execute(path, timestamp)
+            self.app.rollback_execute(cached_path, timestamp, cached_path)
             self.close_window()
+        else:
+            remove_rollback_cache(cached_path)
 
     def close_window(self):
         self.master.destroy()
+
+def parse_rollback_time(value):
+    try:
+        return parse_datetime(value)
+    except ValueError:
+        return None
+
+def find_autosave_before(target_time):
+    """Find the newest .sve in autosave (including subfolders) at or before target_time."""
+    autosave_root = os.path.join(server_folder_path, 'autosave')
+    if not os.path.isdir(autosave_root):
+        return None
+    candidates = []
+    for root, _, filenames in os.walk(autosave_root):
+        for filename in filenames:
+            if not filename.lower().endswith('.sve'):
+                continue
+            path = os.path.join(root, filename)
+            try:
+                modified = datetime.datetime.fromtimestamp(os.path.getmtime(path))
+            except OSError:
+                continue
+            if modified <= target_time:
+                candidates.append((modified, path))
+    return max(candidates, default=(None, None), key=lambda item: item[0])[1]
+
+def get_rollback_save_state(save_path):
+    """Return the save timestamp for rollback messages, at minute precision."""
+    file_stat = os.stat(save_path)
+    timestamp = format_datetime(datetime.datetime.fromtimestamp(file_stat.st_mtime))
+    return timestamp, (file_stat.st_mtime_ns, file_stat.st_size)
+
+def cache_rollback_save(save_path):
+    """Copy the selected save before rollback maintenance can rotate autosaves."""
+    file_descriptor, cached_path = tempfile.mkstemp(prefix='rakuraku-rollback-', suffix='.sve')
+    os.close(file_descriptor)
+    try:
+        shutil.copy2(save_path, cached_path)
+        timestamp, _ = get_rollback_save_state(cached_path)
+        return cached_path, timestamp
+    except Exception:
+        remove_rollback_cache(cached_path)
+        raise
+
+def remove_rollback_cache(cached_path):
+    if not cached_path:
+        return
+    try:
+        os.remove(cached_path)
+    except FileNotFoundError:
+        pass
+    except OSError:
+        pass
 
 def rollback_server(save_path, timestamp):
     """通知、停止、現行データのバックアップ、置換、再起動を行う。"""
     global start_code
     try:
+        # Planned shutdowns must not be interpreted as crashes by monitoring().
+        start_code = 3
         nettool_say('Maintenance soon.')
         discord_post(
             t('discord_rollback_title'),
-            t('discord_rollback_description', timestamp=timestamp.rsplit(' ', 1)[-1]),
+            t('discord_rollback_description', timestamp=timestamp),
             0xff0000,
         )
         time.sleep(30)
@@ -1859,6 +2387,7 @@ def rollback_server(save_path, timestamp):
             [run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'shutdown'],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
+        invalidate_pid_cache(config.server_name)
         deadline = time.time() + 60
         while get_pid(config.server_name) is not None and time.time() < deadline:
             time.sleep(1)
@@ -1953,7 +2482,7 @@ def print_gui_log(content):
     # GUIのログに追記
     date_time = datetime.datetime.now()
     # WindowsのstrftimeへUnicode本文を渡さず、日時と本文を分けて連結する。
-    content = date_time.strftime('[%Y/%m/%d %H:%M:%S] ') + content
+    content = f'[{format_datetime(date_time, seconds=True)}] ' + content
     app.log_text_insert(content)
     return None
 
@@ -2065,6 +2594,8 @@ def run_discord_bot():
 
     if not discord_is_enabled():
         return
+    if not discord_bot_run_lock.acquire(blocking=False):
+        return
 
     try:
         bot.run(config.discord_token)
@@ -2080,11 +2611,43 @@ def run_discord_bot():
         print_gui_log(
             t('log_discord_bot_start_failed', error=e)
         )
+    finally:
+        discord_bot_run_lock.release()
+
+async def sync_discord_commands():
+    """Serialize startup and settings-save synchronization on the Bot's loop."""
+    global discord_command_sync_lock
+    if discord_command_sync_lock is None:
+        discord_command_sync_lock = asyncio.Lock()
+    async with discord_command_sync_lock:
+        try:
+            await discord_commands.set_translator(DiscordYamlTranslator())
+            set_discord_command_tree_enabled(discord_commands_enabled())
+            await discord_commands.sync()
+            print_gui_log(t('log_discord_commands_synced'))
+        except Exception as error:
+            print_gui_log(t('log_discord_command_sync_failed', error=error))
+
+def request_discord_command_sync():
+    """Submit saved settings to Discord without blocking the GUI thread."""
+    if bot.is_ready():
+        coroutine = sync_discord_commands()
+        try:
+            asyncio.run_coroutine_threadsafe(coroutine, bot.loop)
+        except RuntimeError as error:
+            coroutine.close()
+            print_gui_log(t('log_discord_command_sync_failed', error=error))
+    elif discord_is_enabled():
+        # 接続中ならon_readyで最新設定を同期する。未起動ならBotを開始する。
+        threading.Thread(target=run_discord_bot, daemon=True).start()
 
 @bot.event
 async def on_ready():
     if discord_is_enabled():
             print_with_date(t('log_discord_bot_started', user=bot.user))
+
+            # 初回設定の保存後・接続待ち中の保存は、接続完了時に同期する。
+            await sync_discord_commands()
 
             channel = bot.get_channel(
                 int(config.discord_channel)
@@ -2098,6 +2661,453 @@ async def on_ready():
                 pending_discord_notifications.clear()
             for title, description, color in pending:
                 await send_notification(title, description, color)
+
+def discord_commands_enabled():
+    try:
+        return discord_is_enabled() and int(getattr(config, 'discord_command_enabled', 0) or 0) == 1
+    except (TypeError, ValueError):
+        return False
+
+async def require_discord_command_permission(interaction):
+    """Allow registered users to invoke commands in any guild channel or DM."""
+    if not discord_commands_enabled():
+        await interaction.response.send_message(t('discord_command_disabled'), ephemeral=True)
+        return False
+    if str(interaction.user.id) not in getattr(config, 'discord_command_users', set()):
+        await interaction.response.send_message(t('discord_command_not_allowed'), ephemeral=True)
+        return False
+    return True
+
+async def discord_command_response(interaction, text, *, include_result=True):
+    if interaction.response.is_done():
+        await interaction.followup.send(str(text)[:1900], ephemeral=True)
+    else:
+        await interaction.response.send_message(str(text)[:1900], ephemeral=True)
+    await post_discord_command_result(interaction, text if include_result else None)
+
+def discord_command_invocation(interaction):
+    """Describe the submitted command, including subcommands and audit arguments."""
+    data = interaction.data or {}
+    command_names = [data.get('name') or interaction.command.qualified_name]
+    arguments = []
+
+    def collect_options(options):
+        for option in options:
+            name = option['name']
+            if option.get('type') in (1, 2):  # Subcommand or subcommand group.
+                command_names.append(name)
+                collect_options(option.get('options', []))
+            else:
+                value = '***' if name == 'token' else option.get('value')
+                arguments.append(f'{name}={json.dumps(value, ensure_ascii=False)}')
+
+    collect_options(data.get('options', []))
+    return '/' + ' '.join(command_names + arguments)
+
+async def post_discord_command_result(interaction, text=None):
+    """Post the actor and invocation, with actual output but never an acceptance notice."""
+    if not int(getattr(config, 'discord_command_result_enabled', 1) or 0):
+        return
+    try:
+        channel_id = int(getattr(config, 'discord_command_result_channel', '') or 0)
+        channel = bot.get_channel(channel_id)
+        if channel is None:
+            channel = await bot.fetch_channel(channel_id)
+        actor = discord.utils.escape_markdown(str(interaction.user))
+        command = discord.utils.escape_markdown(discord_command_invocation(interaction))
+        message = (
+            f"{t('discord_command_result_actor')}: {actor} (ID: {interaction.user.id})\n"
+            f"{t('discord_command_result_invocation')}: {command}"
+        )
+        if text is not None:
+            message += f"\n{t('discord_command_result_output')}:\n{text}"
+        # Keep all output, even when adding the audit header exceeds Discord's limit.
+        for offset in range(0, len(message), 1900):
+            await channel.send(message[offset:offset + 1900], allowed_mentions=discord.AllowedMentions.none())
+    except Exception as error:
+        print_gui_log(t('log_discord_command_result_post_failed', error=error))
+
+async def discord_run_nettool(command, value='', password='', apply_ban_setting=False, apply_password_setting=False):
+    """Run the same nettool operation as the GUI and return its textual result."""
+    def run():
+        if command in ('ban-ip', 'unban-ip') and normalize_ipv4_address(value) is None:
+            return t('invalid_ip_address', ip=value)
+        if command == 'ban-ip':
+            check = subprocess.run(
+                [run_nettool(), '-p', str(nettool_pw), '-s', server_ip + str(config.port_number), 'blacklist'],
+                capture_output=True, text=True, encoding='utf-8', errors='replace',
+            )
+            output = (check.stdout or check.stderr).strip()
+            if check.returncode != 0:
+                return t('nettool_command_failed', command='blacklist', code=check.returncode, output=output)
+            if is_ip_banned(check.stdout, value):
+                if apply_ban_setting:
+                    update_discord_ban_setting(value, True)
+                return t('nettool_ip_already_banned', ip=value)
+        if command in ('lock-company', 'unlock-company', 'remove-company'):
+            check = subprocess.run(
+                [run_nettool(), '-p', str(nettool_pw), '-s', server_ip + str(config.port_number),
+                 'info-company', value], capture_output=True, text=True, encoding='utf-8', errors='replace'
+            )
+            if check.stdout == 'Nothing received.\n':
+                return t('nettool_company_missing')
+        args = [run_nettool(), '-p', str(nettool_pw), '-s', server_ip + str(config.port_number), command]
+        if value:
+            args.append(value)
+        if password:
+            args.append(password)
+        result = subprocess.run(args, capture_output=True, text=True, encoding='utf-8', errors='replace')
+        output = (result.stdout or result.stderr).strip()
+        if result.returncode != 0:
+            return t('nettool_command_failed', command=command, code=result.returncode, output=output)
+        if apply_ban_setting and command in ('ban-ip', 'unban-ip'):
+            update_discord_ban_setting(value, command == 'ban-ip')
+        if apply_password_setting and command in ('lock-company', 'unlock-company'):
+            update_discord_company_password_setting(value, password if command == 'lock-company' else '')
+        return output or t('nettool_sent', command=command)
+    return await asyncio.to_thread(run)
+
+def update_discord_ban_setting(ip, enabled):
+    values = [getattr(config, f'banip_{i}', '') for i in range(63)]
+    if enabled and ip not in values:
+        try:
+            values[values.index('')] = ip
+        except ValueError:
+            return
+    elif not enabled:
+        values = ['' if item == ip else item for item in values]
+    config_data.setdefault('network', {}).setdefault('ban_ips', {}).update({i: values[i] for i in range(63)})
+    with open(config_path, 'w', encoding='utf-8') as config_file:
+        yaml.safe_dump(config_data, config_file, allow_unicode=True, sort_keys=False)
+    load_config()
+
+def update_discord_company_password_setting(company_number, password):
+    try:
+        company_index = int(company_number)
+    except (TypeError, ValueError):
+        return
+    if not 0 <= company_index < 63:
+        return
+    config_data.setdefault('players', {}).setdefault('passwords', {})[company_index] = password
+    with open(config_path, 'w', encoding='utf-8') as config_file:
+        yaml.safe_dump(config_data, config_file, allow_unicode=True, sort_keys=False)
+    load_config()
+
+admin_discord_group = app_commands.Group(
+    name='admin', description=discord_locale('discord_command_description_admin'),
+)
+
+@admin_discord_group.command(name='restart', description=discord_locale('discord_command_description_restart'))
+async def discord_restart(interaction):
+    if not await require_discord_command_permission(interaction): return
+    restart_server_threaded(2)
+    await discord_command_response(interaction, t('discord_command_accepted'), include_result=False)
+
+@admin_discord_group.command(name='manual-save', description=discord_locale('discord_command_description_manual_save'))
+async def discord_manual_save(interaction):
+    if not await require_discord_command_permission(interaction): return
+    threading.Thread(target=manual_save, daemon=True).start()
+    await discord_command_response(interaction, t('discord_command_accepted'), include_result=False)
+
+@admin_discord_group.command(name='maintenance', description=discord_locale('discord_command_description_maintenance'))
+@app_commands.describe(
+    backup=discord_locale('discord_command_argument_backup', append_admin_only=False),
+)
+async def discord_maintenance(interaction, backup: bool = False):
+    global start_code
+    if not await require_discord_command_permission(interaction): return
+    mode = app.maintenance_mode
+    if mode == 0:
+        threading.Thread(target=server_stop, args=(3, int(backup)), daemon=True).start()
+        app.maintenance_mode = 1
+    elif mode == 1:
+        start_code = 2
+        app.maintenance_mode = 0
+    else:
+        start_code = 7
+        app.maintenance_mode = 0
+    app.after(0, app.update_maintenance_button)
+    persist_runtime_state()
+    await discord_command_response(interaction, t('discord_command_accepted'), include_result=False)
+
+@admin_discord_group.command(name='force-stop', description=discord_locale('discord_command_description_force_stop'))
+async def discord_force_stop(interaction):
+    if not await require_discord_command_permission(interaction): return
+    threading.Thread(target=force_stop_server, daemon=True).start()
+    await discord_command_response(interaction, t('discord_command_accepted'), include_result=False)
+
+@admin_discord_group.command(name='close-session', description=discord_locale('discord_command_description_close_session'))
+async def discord_close_session(interaction):
+    if not await require_discord_command_permission(interaction): return
+    def close_session():
+        server_stop(5, 0)
+        app.after(0, app.master.destroy)
+    threading.Thread(target=close_session, daemon=True).start()
+    await discord_command_response(interaction, t('discord_command_accepted'), include_result=False)
+
+@admin_discord_group.command(name='exit-app', description=discord_locale('discord_command_description_exit_app'))
+async def discord_exit_app(interaction):
+    if not await require_discord_command_permission(interaction): return
+    await discord_command_response(interaction, t('discord_command_accepted'), include_result=False)
+    app.after(0, app.master.destroy)
+
+class DiscordRollbackConfirmation(discord.ui.View):
+    """A private, single-use rollback approval tied to the command's original user."""
+    def __init__(self, interaction, cached_save_path, timestamp):
+        super().__init__(timeout=120)
+        self.command_interaction = interaction
+        self.owner_id = interaction.user.id
+        self.cached_save_path = cached_save_path
+        self.timestamp = timestamp
+        self.cache_owned = True
+        self.finished = False
+        approve = discord.ui.Button(label=t('yes'), style=discord.ButtonStyle.danger)
+        approve.callback = self.approve
+        cancel = discord.ui.Button(label=t('no'), style=discord.ButtonStyle.secondary)
+        cancel.callback = self.cancel
+        self.add_item(approve)
+        self.add_item(cancel)
+
+    async def interaction_check(self, interaction):
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message(t('discord_rollback_confirmation_owner_only'), ephemeral=True)
+            return False
+        if self.finished:
+            await interaction.response.send_message(t('discord_rollback_confirmation_expired'), ephemeral=True)
+            return False
+        return await require_discord_command_permission(interaction)
+
+    async def finish(self, text, audit_text=None):
+        await self.command_interaction.edit_original_response(content=text, view=None)
+        await post_discord_command_result(self.command_interaction, text if audit_text is None else audit_text)
+
+    async def approve(self, interaction):
+        # interaction_check is called automatically by discord.py before this callback.
+        # Claim and acknowledge the request before starting any other work.
+        self.finished = True
+        await interaction.response.defer()
+        self.stop()
+        try:
+            # Run the GUI's entry point on Tk's thread, not on Discord's gateway loop.
+            await asyncio.to_thread(
+                app.after, 0, app.rollback_execute,
+                self.cached_save_path, self.timestamp, self.cached_save_path,
+            )
+            self.cache_owned = False
+        except Exception as error:
+            remove_rollback_cache(self.cached_save_path)
+            self.cache_owned = False
+            await self.finish(t('discord_rollback_start_failed', error=error))
+            return
+        await self.finish(
+            t('discord_command_accepted'),
+            audit_text=t('discord_rollback_started', timestamp=self.timestamp),
+        )
+
+    async def cancel(self, interaction):
+        self.finished = True
+        await interaction.response.defer()
+        self.stop()
+        remove_rollback_cache(self.cached_save_path)
+        self.cache_owned = False
+        await self.finish(t('cancellation_complete'))
+
+    async def on_timeout(self):
+        if self.finished:
+            return
+        self.finished = True
+        remove_rollback_cache(self.cached_save_path)
+        self.cache_owned = False
+        text = t('discord_rollback_confirmation_expired')
+        try:
+            await self.command_interaction.edit_original_response(content=text, view=None)
+        except discord.HTTPException as error:
+            print_gui_log(t('log_discord_command_result_post_failed', error=error))
+        await post_discord_command_result(self.command_interaction, text)
+
+    async def on_error(self, interaction, error, item):
+        if self.cache_owned:
+            remove_rollback_cache(self.cached_save_path)
+            self.cache_owned = False
+        self.finished = True
+        self.stop()
+        text = t('discord_rollback_start_failed', error=error)
+        print_gui_log(text)
+        try:
+            if interaction.response.is_done():
+                await interaction.followup.send(text, ephemeral=True)
+            else:
+                await interaction.response.send_message(text, ephemeral=True)
+        except discord.HTTPException as response_error:
+            print_gui_log(t('log_discord_command_result_post_failed', error=response_error))
+
+
+@admin_discord_group.command(name='rollback', description=discord_locale('discord_command_description_rollback'))
+@app_commands.describe(
+    when=discord_locale('discord_command_argument_rollback_when', append_admin_only=False),
+)
+async def discord_rollback(interaction, when: str):
+    if not await require_discord_command_permission(interaction): return
+    target_time = parse_rollback_time(when)
+    if target_time is None:
+        await discord_command_response(interaction, t('invalid_update_datetime'))
+        return
+    await interaction.response.defer(ephemeral=True, thinking=True)
+    save_path = await asyncio.to_thread(find_autosave_before, target_time)
+    if save_path is None:
+        await discord_command_response(interaction, t('rollback_autosave_not_found'))
+        return
+    try:
+        cached_path, timestamp = await asyncio.to_thread(cache_rollback_save, save_path)
+    except OSError as error:
+        await discord_command_response(interaction, t('rollback_file_read_failed', error=error))
+        return
+    view = DiscordRollbackConfirmation(interaction, cached_path, timestamp)
+    await interaction.edit_original_response(
+        content=t('discord_rollback_confirmation', timestamp=timestamp), view=view,
+    )
+
+@admin_discord_group.command(name='cancel-scheduled-update', description=discord_locale('discord_command_description_cancel_scheduled_update'))
+async def discord_cancel_scheduled_update(interaction):
+    if not await require_discord_command_permission(interaction): return
+    await discord_command_response(interaction, t('cancellation_complete') if cancel_scheduled_update() else t('no_update_schedule'))
+
+@admin_discord_group.command(name='schedule-update', description=discord_locale('discord_command_description_schedule_update'))
+@app_commands.describe(
+    when=discord_locale('discord_command_argument_schedule_when', append_admin_only=False),
+)
+async def discord_schedule_update(interaction, when: str):
+    if not await require_discord_command_permission(interaction): return
+    try:
+        scheduled_time = parse_datetime(when)
+        if scheduled_time <= datetime.datetime.now(): raise ValueError
+    except ValueError:
+        await discord_command_response(interaction, t('invalid_update_datetime'))
+        return
+    with scheduled_updates_lock:
+        if scheduled_updates is None:
+            has_schedule = False
+        else:
+            scheduled_updates['when'] = scheduled_time
+            has_schedule = True
+    if not has_schedule:
+        await discord_command_response(interaction, t('no_update_schedule'))
+        return
+    persist_runtime_state()
+    await discord_command_response(interaction, t('discord_command_accepted'), include_result=False)
+
+@admin_discord_group.command(name='update-now', description=discord_locale('discord_command_description_update_now'))
+async def discord_update_now(interaction):
+    if not await require_discord_command_permission(interaction): return
+    global scheduled_updates
+    with scheduled_updates_lock:
+        if scheduled_updates is None:
+            item = None
+        else:
+            item = scheduled_updates
+            scheduled_updates = None
+    if item is None:
+        await discord_command_response(interaction, t('no_update_schedule'))
+        return
+    persist_runtime_state()
+    threading.Thread(target=execute_scheduled_update, args=(item,), daemon=True).start()
+    await discord_command_response(interaction, t('discord_command_accepted'), include_result=False)
+
+nettool_discord_group = app_commands.Group(name='nettool', description=discord_locale('discord_command_description_nettool'))
+admin_discord_group.add_command(nettool_discord_group)
+
+def register_nettool_discord_command(name, argument_name=None, needs_password=False):
+    async def execute(interaction, value='', password='', apply_ban_setting=False, apply_password_setting=False):
+        if not await require_discord_command_permission(interaction): return
+        if argument_name and not value.strip():
+            await discord_command_response(interaction, t('nettool_argument_required'))
+            return
+        if needs_password and not password.strip():
+            await discord_command_response(interaction, t('nettool_argument_required'))
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        result = await discord_run_nettool(
+            name, value.strip(), password.strip(), apply_ban_setting, apply_password_setting,
+        )
+        await discord_command_response(interaction, result)
+
+    descriptions = {}
+    if not argument_name:
+        async def callback(interaction):
+            await execute(interaction)
+    elif needs_password:
+        async def callback(interaction, value: str, password: str, apply_password_setting: bool = False):
+            await execute(
+                interaction, value=value, password=password, apply_password_setting=apply_password_setting,
+            )
+        descriptions.update(
+            value=discord_locale(
+                f'discord_command_argument_nettool_{argument_name}', append_admin_only=False,
+            ),
+            password=discord_locale(
+                'discord_command_argument_nettool_password', append_admin_only=False,
+            ),
+            apply_password_setting=discord_locale(
+                'discord_command_argument_nettool_apply_password_setting', append_admin_only=False,
+            ),
+        )
+    elif name in ('ban-ip', 'unban-ip'):
+        async def callback(interaction, value: str, apply_ban_setting: bool = False):
+            await execute(interaction, value=value, apply_ban_setting=apply_ban_setting)
+        descriptions.update(
+            value=discord_locale(
+                f'discord_command_argument_nettool_{argument_name}', append_admin_only=False,
+            ),
+            apply_ban_setting=discord_locale(
+                'discord_command_argument_nettool_apply_ban_setting', append_admin_only=False,
+            ),
+        )
+    elif name == 'unlock-company':
+        async def callback(interaction, value: str, apply_password_setting: bool = False):
+            await execute(interaction, value=value, apply_password_setting=apply_password_setting)
+        descriptions.update(
+            value=discord_locale(
+                f'discord_command_argument_nettool_{argument_name}', append_admin_only=False,
+            ),
+            apply_password_setting=discord_locale(
+                'discord_command_argument_nettool_apply_password_setting', append_admin_only=False,
+            ),
+        )
+    else:
+        async def callback(interaction, value: str):
+            await execute(interaction, value=value)
+        descriptions['value'] = discord_locale(
+            f'discord_command_argument_nettool_{argument_name}', append_admin_only=False,
+        )
+
+    callback.__name__ = 'nettool_' + name.replace('-', '_')
+    callback.__doc__ = 'Run nettool ' + name
+    if descriptions:
+        callback = app_commands.describe(**descriptions)(callback)
+    nettool_discord_group.command(
+        name=name, description=discord_locale(f'discord_command_description_nettool_{name.replace("-", "_")}')
+    )(callback)
+
+for _name, _argument, _password in (
+    ('announce', None, False), ('clients', None, False), ('companies', None, False),
+    ('info-company', 'company_number', False), ('blacklist', None, False),
+    ('lock-company', 'company_number', True), ('unlock-company', 'company_number', False),
+    ('remove-company', 'company_number', False), ('kick-client', 'client_number', False),
+    ('ban-client', 'client_number', False), ('ban-ip', 'ip_address', False),
+    ('unban-ip', 'ip_address', False), ('say', 'message', False),
+    ('force-sync', None, False), ('shutdown', None, False),
+):
+    register_nettool_discord_command(_name, _argument, _password)
+
+discord_commands.add_command(admin_discord_group)
+discord_command_registry = tuple(discord_commands.get_commands())
+
+def set_discord_command_tree_enabled(enabled):
+    """Synchronize either every supported command or an explicitly empty command set."""
+    discord_commands.clear_commands(guild=None)
+    if enabled:
+        for command in discord_command_registry:
+            discord_commands.add_command(command)
 
 # 関数定義（一般）
 
@@ -2132,7 +3142,7 @@ def schedule_update(when, body_source, pak_source, long_backup_code, discord_not
             update_kind = t('update_kind_application')
         else:
             update_kind = t('update_kind_pak')
-        time_text = when.strftime('%H:%M') if when.date() == datetime.datetime.now().date() else when.strftime('%Y/%m/%d %H:%M')
+        time_text = when.strftime('%H:%M') if when.date() == datetime.datetime.now().date() else format_datetime(when)
         discord_post(t('discord_maintenance_schedule_title'), t('discord_maintenance_schedule_description', kind=update_kind, time=time_text), 0xffbf00)
     print_gui_log(t('log_update_scheduled'))
 
@@ -2153,20 +3163,30 @@ def scheduled_update_loop():
         now = datetime.datetime.now()
         global scheduled_updates
         with scheduled_updates_lock:
-            if scheduled_updates is not None and scheduled_updates['when'] <= now:
+            # Start the update workflow 30 seconds early so its maintenance
+            # warning is delivered 30 seconds before the registered time.
+            notice_time = scheduled_updates['when'] - datetime.timedelta(seconds=30) if scheduled_updates else None
+            if scheduled_updates is not None and notice_time <= now:
                 due.append(scheduled_updates)
                 scheduled_updates = None
                 persist_runtime_state()
         for item in due:
-            threading.Thread(target=execute_scheduled_update, args=(item,), daemon=True).start()
+            threading.Thread(
+                target=execute_scheduled_update, args=(item,),
+                kwargs={'start_at_scheduled_time': True}, daemon=True,
+            ).start()
         time.sleep(1)
 
-def execute_scheduled_update(item):
+def execute_scheduled_update(item, start_at_scheduled_time=False):
     global start_code
     try:
         print_gui_log(t('log_scheduled_update_started'))
         # 既存の停止処理で同期・バックアップ・サーバー停止を行う
-        server_stop(3, item['backup'])
+        if start_at_scheduled_time:
+            notice_wait_seconds = max(0, (item['when'] - datetime.datetime.now()).total_seconds())
+        else:
+            notice_wait_seconds = 30
+        server_stop(3, item['backup'], notice_wait_seconds=notice_wait_seconds)
         time.sleep(2)
         replace_update_files(item['body'], item['pak'])
         if item.get('restart_server', 1):
@@ -2822,7 +3842,7 @@ def print_with_date(content):
     date_time = datetime.datetime.now()
     # 本文をstrftimeの書式文字列に含めると、Windowsでは本文のUnicode文字を
     # ロケール依存のエンコーディングへ変換しようとして失敗することがある。
-    message = date_time.strftime('[%Y/%m/%d %H:%M:%S] ') + content
+    message = f'[{format_datetime(date_time, seconds=True)}] ' + content
     try:
         # Windowsの既定コードページでは、中国語などの翻訳ログを出力できない
         # 場合があるため、標準出力をUTF-8へ切り替える。
@@ -3036,15 +4056,45 @@ def nettool_forcesync():
 def nettool_banip(banip):
     # IPBANユーザーを設定する
     global nettool_pw
-    if banip != '':
-        subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'ban-ip', banip])
+    if banip != '' and normalize_ipv4_address(banip) is not None:
+        check = subprocess.run(
+            [run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'blacklist'],
+            capture_output=True, text=True, encoding='utf-8', errors='replace',
+        )
+        if check.returncode == 0 and not is_ip_banned(check.stdout, banip):
+            subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'ban-ip', banip])
 
-def set_ban_user():
+def nettool_unbanip(banip):
+    global nettool_pw
+    if banip != '' and normalize_ipv4_address(banip) is not None:
+        subprocess.run([run_nettool(), '-p', nettool_pw, '-s', server_ip + config.port_number, 'unban-ip', banip])
+
+def set_ban_user(previous_ban_ips=None):
     # IPBANユーザーを設定する
-    for i in range(63):
-        banip = getattr(config, f'banip_{i}', '')
+    current_ban_ips = {
+        str(getattr(config, f'banip_{i}', '')).strip()
+        for i in range(63)
+    }
+    current_ban_ips.discard('')
+    invalid_ban_ips = {banip for banip in current_ban_ips if normalize_ipv4_address(banip) is None}
+    for banip in invalid_ban_ips:
+        print_gui_log(t('invalid_ip_address', ip=banip))
+    current_ban_ips -= invalid_ban_ips
+    if previous_ban_ips is not None:
+        previous_ban_ips = {
+            banip for banip in previous_ban_ips
+            if normalize_ipv4_address(banip) is not None
+        }
+        for banip in previous_ban_ips - current_ban_ips:
+            nettool_unbanip(banip)
+    for banip in current_ban_ips:
         nettool_banip(banip)
     print_gui_log(t('log_ban_users_set'))
+
+def apply_server_access_settings(previous_ban_ips=None):
+    """Apply configured company passwords and BAN IPs to the running server."""
+    set_company_pw()
+    set_ban_user(previous_ban_ips)
 
 def delete_old_long_backup_files():
     # 指定日数を超えたファイルを削除する
@@ -3165,7 +4215,7 @@ def auto_long_backup():
             time.sleep(1)
     return None
 
-def server_stop(set_code, long_backup_code):
+def server_stop(set_code, long_backup_code, notice_wait_seconds=30):
     # サーバーを止める機能
     global nettool_pw
     global start_code
@@ -3176,6 +4226,10 @@ def server_stop(set_code, long_backup_code):
         print_gui_log(t('log_restart_notice_sent'))
         discord_post(t('discord_restart_soon_title'), t('discord_no_login_description'), 0xffbf00)
     elif set_code == 3:
+        # Stop monitoring before the planned-maintenance notices and shutdown.
+        # Otherwise monitoring() can observe the process exit in the small gap
+        # before the code below was assigned, and report a false server-down.
+        start_code = 3
         nettool_say('Maintenance soon.')
         print_gui_log(t('log_maintenance_notice_sent'))
         discord_post(t('discord_maintenance_soon_title'), t('discord_no_login_description'), 0xffbf00)
@@ -3183,7 +4237,7 @@ def server_stop(set_code, long_backup_code):
         nettool_say('Server close soon.')
         print_gui_log(t('log_server_close_notice_sent'))
         discord_post(t('discord_server_close_soon_title'), t('discord_no_login_description'), 0xffbf00)
-    time.sleep(30)
+    time.sleep(notice_wait_seconds)
     nettool_forcesync()
     if long_backup_code == 1:
         long_backup(1)
@@ -3297,7 +4351,7 @@ def monitoring():
                     set_company_pw()
                     set_ban_user()
                     print_gui_log(t('log_server_resumed'))
-                    discord_post(t('discord_server_resumed_title'), t('discord_server_resumed_description'), 0x00ff00)
+                    discord_post(t('discord_maintenance_completed_title'), t('discord_thanks_description'), 0x00ff00)
                     start_code = 1
                 elif start_code == 5:
                     app_start()

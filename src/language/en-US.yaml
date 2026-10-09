@@ -1,8 +1,11 @@
 # Rakuraku NS+ English UI language pack
 locale: en-US
 language_name: English (US)
+date_format: MM/DD/YYYY
 strings:
   language_tab: Language
+  language_locale: Language / Locale
+  date_format: Date format
   translation_accuracy_notice: "The translation may be incorrect.\nSome error messages may appear in Japanese."
   settings: Settings
   server: Server
@@ -21,10 +24,13 @@ strings:
   browse: Browse...
   show: Show
   help: Help
-  numbered_value_per_line: number=value (one entry per line)
+  ip_address_per_line: IP address (one per line)
   company_passwords_notice: Company passwords (company 15 and later require OTRP v59_0_2 or later)
   show_password: Show passwords
   company_number: Company {i}
+  company_info_initial_setup: Company information cannot be displayed during initial setup.
+  company_info_fetch_failed: Failed to retrieve company information.
+  company_not_found: No companies exist.
   save: Save
   cancel: Cancel
   import_legacy_config: Import a pre-v0.2.0 Rakuraku NS+ configuration
@@ -52,7 +58,8 @@ strings:
   schedule_update: Schedule Simutrans application/Pak update
   nettool_commands: nettool commands
   send: Send
-  nettool_apply_ban_setting: Apply to BAN IP settings and reload
+  nettool_apply_ban_setting: Apply to BAN IP settings
+  nettool_apply_password_setting: Apply to company password settings
   nettool_announce_warning: "This publishes the map thumbnail and connection information. Send this command?"
   nettool_argument_required: Enter an argument.
   nettool_company_missing: The specified company does not exist.
@@ -81,6 +88,8 @@ strings:
   nettool_ip_address: IP address
   nettool_message: Message
   nettool_new_password: New password
+  nettool_ip_already_banned: '{ip} is already banned.'
+  invalid_ip_address: '{ip} is not a valid IPv4 address.'
   nettool_close: Close
   nettool_no_output: There was no output.
   nettool_command_failed: '{command} failed (exit code: {code}). {output}'
@@ -94,7 +103,7 @@ strings:
   select_application: Select the Simutrans application
   update_pakset: Update the Pakset
   select_pakset: Select the Pakset folder
-  update_datetime: Update time (YYYY/MM/DD HH:MM; omit the date for today)
+  update_datetime: Update time ({date_format} HH:MM; omit the date for today)
   backup_before_update: Create a long-term backup before updating
   post_discord_notice: Post a notice to Discord
   update_after_action: Action after update
@@ -136,7 +145,7 @@ strings:
   update_kind_pak: Pak
   pakset_validation_title: Pakset validation
   pakset_validation_message: This is not a Pakset. Check whether ground.Outside.pak exists and is correctly named. File names are case-sensitive.
-  invalid_update_datetime: Enter the update time as YYYY/MM/DD HH:MM or HH:MM.
+  invalid_update_datetime: Enter the update time as {date_format} HH:MM or HH:MM.
   future_datetime_required: Specify a future date and time.
   update_registered: Update scheduled for {when}.
   update_target_required: Select either the Simutrans application or Pakset to update.
@@ -280,3 +289,74 @@ strings:
   help_discord_channel: Specify the channel ID where the Discord bot posts.
   help_player_passwords: Enter a password for each company; blank companies have no password.
   help_ban_ips: Enter one IP address per line. You can enter up to 63 addresses.
+  discord_command_users: Discord command users
+  config_discord_command_enabled: Accept commands from Discord
+  config_discord_command_users: Discord user IDs allowed to run commands
+  help_discord_command_enabled: When enabled, accept Discord slash commands from registered user IDs in every channel.
+  help_discord_command_users: Enter one Discord user ID per line, up to 63 entries. The legacy number=ID format (numbers 0 to 62) is also supported.
+  discord_command_users_notice: Discord user IDs (one per line, up to 63)
+  discord_command_user_line_invalid: 'Invalid format on line {line}. Enter a user ID or unique number=ID with a number from 0 to 62.'
+  discord_command_users_limit: At most 63 Discord command users can be configured.
+  discord_user_id_required: Enter a Discord user ID as a 17 to 20 digit number.
+  discord_command_disabled: Discord command input is disabled.
+  discord_command_not_allowed: You do not have permission to run this command.
+  discord_command_accepted: Command accepted.
+  discord_command_result_actor: Executed by
+  discord_command_result_invocation: Command
+  discord_command_result_output: Result
+  log_discord_commands_synced: Discord slash commands synchronized.
+  log_discord_command_sync_failed: 'Failed to synchronize Discord slash commands: {error}'
+  config_discord_command_result_enabled: Post command results to a dedicated channel
+  config_discord_command_result_channel: Channel ID
+  help_discord_command_result_enabled: When enabled, post command results to the configured dedicated channel.
+  help_discord_command_result_channel: Specify the Discord channel ID for command results.
+  log_discord_command_result_post_failed: 'Failed to post Discord command result: {error}'
+  rollback_datetime: Rollback time ({date_format} HH:MM; today if date is omitted)
+  rollback_by_time: Specify time
+  rollback_by_file: Specify file
+  rollback_file_read_failed: 'Cannot read the rollback save data: {error}'
+  rollback_autosave_not_found: No autosave data exists at or before the specified time.
+  discord_rollback_confirmation: 'The save will be rolled back to {timestamp}. Proceed?'
+  discord_rollback_confirmation_owner_only: Only the user who entered the command can respond to this confirmation.
+  discord_rollback_confirmation_expired: This confirmation has expired. Run the rollback command again.
+  discord_rollback_save_changed: The selected save was changed or deleted while awaiting confirmation. Run the rollback command again.
+  discord_rollback_started: 'Rollback to {timestamp} has started.'
+  discord_rollback_start_failed: 'Could not start rollback: {error}'
+  discord_command_admin_only: Only administrators can run this command.
+  discord_command_description_admin: Run an administrative command.
+  discord_command_argument_backup: Whether to create a long-term backup when maintenance starts.
+  discord_command_argument_rollback_when: Rollback time in {date_format} HH:MM or HH:MM format.
+  discord_command_argument_schedule_when: New update time in {date_format} HH:MM or HH:MM format.
+  discord_command_argument_nettool_company_number: Company number.
+  discord_command_argument_nettool_client_number: Client number.
+  discord_command_argument_nettool_ip_address: IP address.
+  discord_command_argument_nettool_message: Message to send in the server.
+  discord_command_argument_nettool_password: New company password.
+  discord_command_argument_nettool_apply_ban_setting: Whether to also update the BAN IP settings.
+  discord_command_argument_nettool_apply_password_setting: Whether to also update the company password settings.
+  discord_command_description_restart: Restart the server.
+  discord_command_description_manual_save: Save the server without stopping it.
+  discord_command_description_maintenance: Pause or resume the server.
+  discord_command_description_force_stop: Force-stop the server process.
+  discord_command_description_close_session: Stop the server and close this application.
+  discord_command_description_exit_app: Close this application without stopping the server.
+  discord_command_description_rollback: Roll back to the autosave immediately before a time.
+  discord_command_description_cancel_scheduled_update: Cancel the scheduled update.
+  discord_command_description_schedule_update: Change the time of the scheduled update.
+  discord_command_description_update_now: Immediately run the scheduled update.
+  discord_command_description_nettool: Run a nettool command.
+  discord_command_description_nettool_announce: Publish server information.
+  discord_command_description_nettool_clients: Show connected clients.
+  discord_command_description_nettool_companies: Show companies.
+  discord_command_description_nettool_info_company: Show company information.
+  discord_command_description_nettool_blacklist: Show the blacklist.
+  discord_command_description_nettool_lock_company: Lock a company.
+  discord_command_description_nettool_unlock_company: Unlock a company.
+  discord_command_description_nettool_remove_company: Remove a company.
+  discord_command_description_nettool_kick_client: Disconnect a client.
+  discord_command_description_nettool_ban_client: Ban a client.
+  discord_command_description_nettool_ban_ip: Ban an IP address.
+  discord_command_description_nettool_unban_ip: Remove an IP ban.
+  discord_command_description_nettool_say: Send a server message.
+  discord_command_description_nettool_force_sync: Request a save and reload.
+  discord_command_description_nettool_shutdown: Shut down the server.

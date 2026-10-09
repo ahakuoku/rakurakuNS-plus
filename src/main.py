@@ -2698,10 +2698,10 @@ def discord_commands_enabled():
 async def require_discord_command_permission(interaction):
     """Allow registered users to invoke commands in any guild channel or DM."""
     if not discord_commands_enabled():
-        await interaction.response.send_message(t('discord_command_disabled'), ephemeral=True)
+        await discord_command_response(interaction, t('discord_command_disabled'))
         return False
     if str(interaction.user.id) not in getattr(config, 'discord_command_users', set()):
-        await interaction.response.send_message(t('discord_command_not_allowed'), ephemeral=True)
+        await discord_command_response(interaction, t('discord_command_not_allowed'))
         return False
     return True
 

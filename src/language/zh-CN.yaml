@@ -62,6 +62,8 @@ strings:
   nettool_apply_password_setting: 应用到公司密码设置
   nettool_announce_warning: 将公开地图缩略图和连接信息。确定发送吗？
   nettool_argument_required: 请输入参数。
+  nettool_company_number_invalid: 请输入 0 到 62 之间的数字公司 ID。
+  nettool_client_number_invalid: 请输入 0 到 65535 之间的数字客户端 ID。
   nettool_company_missing: 指定的公司不存在。
   nettool_sent: 已发送 {command}。
   nettool_failed: '发送失败：{error}'
@@ -134,7 +136,7 @@ strings:
   config_discord_enabled: 使用 Discord 机器人
   config_autosave_notice: 在 Discord 上宣布自动保存
   config_discord_token: Discord 机器人令牌
-  config_discord_channel: 不和谐频道 ID
+  config_discord_channel: Discord 通知频道 ID
   config_player_passwords: 玩家密码
   select_update_application: 选择要更新的 Simutrans 应用程序
   select_update_pakset: 选择要更新的 Pakset 文件夹
@@ -308,6 +310,7 @@ strings:
   log_discord_command_sync_failed: '无法同步 Discord 斜杠命令: {error}'
   config_discord_command_result_enabled: 将命令结果发布到专用频道
   config_discord_command_result_channel: 频道 ID
+  discord_command_result_warning: "！注意！这是审计功能。参与者的 IP 地址和公司密码可能会被发布，建议使用仅管理员可查看的频道。"
   help_discord_command_result_enabled: 启用后，将命令结果发布到指定的专用频道。
   help_discord_command_result_channel: 指定用于发布命令结果的 Discord 频道 ID。
   log_discord_command_result_post_failed: '发布 Discord 命令结果失败: {error}'

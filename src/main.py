@@ -502,6 +502,19 @@ def normalize_ipv4_address(ip):
     return octets if all(0 <= octet <= 255 for octet in octets) else None
 
 
+def parse_nettool_id(value, minimum, maximum):
+    """Validate a decimal nettool ID and return its canonical representation."""
+    raw = str(value).strip()
+    # Check the length before calling int() so an oversized Discord string cannot
+    # cause Python's integer-conversion limit to be reached.
+    if not re.fullmatch(r'[0-9]+', raw) or len(raw) > 5:
+        return None
+    number = int(raw)
+    if not minimum <= number <= maximum:
+        return None
+    return str(number)
+
+
 def is_ip_banned(blacklist_output, ip):
     """Return whether an IP address appears in `nettool blacklist` output."""
     target_ip = normalize_ipv4_address(ip)
@@ -727,6 +740,10 @@ class config_window:
                 ttk.Button(frame, text=t('help'), command=lambda k=key: self.show_help(k)).grid(
                     row=row, column=4, sticky='e', padx=5, pady=8
                 )
+                ttk.Label(
+                    frame, text=t('discord_command_result_warning'), foreground='#d13438',
+                    justify='left', wraplength=680,
+                ).grid(row=row + 1, column=0, columnspan=5, sticky='w', padx=10, pady=(0, 8))
                 continue
             ttk.Label(frame, text=t(CONFIG_DISPLAY_NAMES[key])).grid(row=row, column=0, sticky='w', padx=10, pady=8)
             if key == 'mode':
@@ -1698,6 +1715,16 @@ class nettool_window(tk.Frame):
         if command in self.ARGUMENT_LABELS and not value:
             messagebox.showerror(t('input_error'), t('nettool_argument_required'), parent=self.master)
             return
+        if self.ARGUMENT_LABELS.get(command) == 'nettool_company_number':
+            value = parse_nettool_id(value, 0, 62)
+            if value is None:
+                messagebox.showerror(t('input_error'), t('nettool_company_number_invalid'), parent=self.master)
+                return
+        elif self.ARGUMENT_LABELS.get(command) == 'nettool_client_number':
+            value = parse_nettool_id(value, 0, 65535)
+            if value is None:
+                messagebox.showerror(t('input_error'), t('nettool_client_number_invalid'), parent=self.master)
+                return
         if command in ('ban-ip', 'unban-ip') and normalize_ipv4_address(value) is None:
             messagebox.showerror(t('input_error'), t('invalid_ip_address', ip=value), parent=self.master)
             return
@@ -2671,10 +2698,10 @@ def discord_commands_enabled():
 async def require_discord_command_permission(interaction):
     """Allow registered users to invoke commands in any guild channel or DM."""
     if not discord_commands_enabled():
-        await interaction.response.send_message(t('discord_command_disabled'), ephemeral=True)
+        await discord_command_response(interaction, t('discord_command_disabled'))
         return False
     if str(interaction.user.id) not in getattr(config, 'discord_command_users', set()):
-        await interaction.response.send_message(t('discord_command_not_allowed'), ephemeral=True)
+        await discord_command_response(interaction, t('discord_command_not_allowed'))
         return False
     return True
 
@@ -2704,6 +2731,14 @@ def discord_command_invocation(interaction):
     collect_options(data.get('options', []))
     return '/' + ' '.join(command_names + arguments)
 
+
+def discord_code_block_chunks(value, maximum_content_length=1800):
+    """Return Discord-safe code blocks without allowing a supplied fence to escape."""
+    content = str(value).replace('```', '``\u200b`')
+    return [f'```\n{content[offset:offset + maximum_content_length]}\n```'
+            for offset in range(0, max(len(content), 1), maximum_content_length)]
+
+
 async def post_discord_command_result(interaction, text=None):
     """Post the actor and invocation, with actual output but never an acceptance notice."""
     if not int(getattr(config, 'discord_command_result_enabled', 1) or 0):
@@ -2714,16 +2749,19 @@ async def post_discord_command_result(interaction, text=None):
         if channel is None:
             channel = await bot.fetch_channel(channel_id)
         actor = discord.utils.escape_markdown(str(interaction.user))
-        command = discord.utils.escape_markdown(discord_command_invocation(interaction))
-        message = (
+        header = (
             f"{t('discord_command_result_actor')}: {actor} (ID: {interaction.user.id})\n"
-            f"{t('discord_command_result_invocation')}: {command}"
+            f"{t('discord_command_result_invocation')}:\n"
         )
+        for index, block in enumerate(discord_code_block_chunks(discord_command_invocation(interaction))):
+            prefix = header if index == 0 else f"{t('discord_command_result_invocation')}:\n"
+            await channel.send(prefix + block, allowed_mentions=discord.AllowedMentions.none())
         if text is not None:
-            message += f"\n{t('discord_command_result_output')}:\n{text}"
-        # Keep all output, even when adding the audit header exceeds Discord's limit.
-        for offset in range(0, len(message), 1900):
-            await channel.send(message[offset:offset + 1900], allowed_mentions=discord.AllowedMentions.none())
+            for block in discord_code_block_chunks(text):
+                await channel.send(
+                    f"{t('discord_command_result_output')}:\n{block}",
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
     except Exception as error:
         print_gui_log(t('log_discord_command_result_post_failed', error=error))
 
@@ -3022,6 +3060,16 @@ def register_nettool_discord_command(name, argument_name=None, needs_password=Fa
         if argument_name and not value.strip():
             await discord_command_response(interaction, t('nettool_argument_required'))
             return
+        if argument_name == 'company_number':
+            value = parse_nettool_id(value, 0, 62)
+            if value is None:
+                await discord_command_response(interaction, t('nettool_company_number_invalid'))
+                return
+        elif argument_name == 'client_number':
+            value = parse_nettool_id(value, 0, 65535)
+            if value is None:
+                await discord_command_response(interaction, t('nettool_client_number_invalid'))
+                return
         if needs_password and not password.strip():
             await discord_command_response(interaction, t('nettool_argument_required'))
             return

@@ -62,6 +62,8 @@ strings:
   nettool_apply_password_setting: Auf Firmepasswort-Einstellungen anwenden
   nettool_announce_warning: Dies veröffentlicht Kartenminiatur und Verbindungsinformationen. Befehl senden?
   nettool_argument_required: Argument eingeben.
+  nettool_company_number_invalid: Geben Sie eine numerische Unternehmens-ID von 0 bis 62 ein.
+  nettool_client_number_invalid: Geben Sie eine numerische Client-ID von 0 bis 65535 ein.
   nettool_company_missing: Das Unternehmen existiert nicht.
   nettool_sent: '{command} gesendet.'
   nettool_failed: 'Senden fehlgeschlagen: {error}'
@@ -134,7 +136,7 @@ strings:
   config_discord_enabled: Verwenden Sie den Discord-Bot
   config_autosave_notice: Kündigen Sie Autosaves auf Discord an
   config_discord_token: Discord-Bot-Token
-  config_discord_channel: Discord-Kanal-ID
+  config_discord_channel: Discord-Benachrichtigungskanal-ID
   config_player_passwords: Spielerpasswörter
   select_update_application: Wählen Sie die zu aktualisierende Simutrans-Anwendung aus
   select_update_pakset: Wählen Sie den Pakset-Ordner aus, den Sie aktualisieren möchten
@@ -308,6 +310,7 @@ strings:
   log_discord_command_sync_failed: 'Discord-Slash-Befehle konnten nicht synchronisiert werden: {error}'
   config_discord_command_result_enabled: Befehlergebnisse in einem speziellen Kanal posten
   config_discord_command_result_channel: Kanal-ID
+  discord_command_result_warning: "! Achtung! Dies ist eine Audit-Funktion. IP-Adressen von Teilnehmern und Unternehmenspasswörter können gepostet werden. Verwenden Sie daher einen Kanal, den nur Administratoren sehen können."
   help_discord_command_result_enabled: Postet Befehlergebnisse in den konfigurierten speziellen Kanal.
   help_discord_command_result_channel: Geben Sie die Discord-Kanal-ID für Befehlergebnisse an.
   log_discord_command_result_post_failed: 'Discord-Befehlergebnis konnte nicht gepostet werden: {error}'

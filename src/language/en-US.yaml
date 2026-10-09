@@ -58,7 +58,7 @@ strings:
   schedule_update: Schedule Simutrans application/Pak update
   nettool_commands: nettool commands
   send: Send
-  nettool_apply_ban_setting: Apply to BAN IP settings and reload
+  nettool_apply_ban_setting: Apply to BAN IP settings
   nettool_apply_password_setting: Apply to company password settings
   nettool_announce_warning: "This publishes the map thumbnail and connection information. Send this command?"
   nettool_argument_required: Enter an argument.

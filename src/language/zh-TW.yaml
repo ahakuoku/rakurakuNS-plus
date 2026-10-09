@@ -58,7 +58,7 @@ strings:
   schedule_update: 安排 Simutrans 應用程式/Pak 更新
   nettool_commands: nettool 指令
   send: 傳送
-  nettool_apply_ban_setting: 套用至 BAN IP 設定並重新載入
+  nettool_apply_ban_setting: 套用至 BAN IP 設定
   nettool_apply_password_setting: 套用至公司密碼設定
   nettool_announce_warning: 將公開地圖縮圖及連線資訊。確定要傳送嗎？
   nettool_argument_required: 請輸入引數。

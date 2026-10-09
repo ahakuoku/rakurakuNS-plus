@@ -58,7 +58,7 @@ strings:
   schedule_update: Planen Sie ein Simutrans-Anwendungs-/Pak-Update
   nettool_commands: nettool-Befehle
   send: Senden
-  nettool_apply_ban_setting: Auf BAN-IP-Einstellungen anwenden und neu laden
+  nettool_apply_ban_setting: Auf BAN-IP-Einstellungen anwenden
   nettool_apply_password_setting: Auf Firmepasswort-Einstellungen anwenden
   nettool_announce_warning: Dies veröffentlicht Kartenminiatur und Verbindungsinformationen. Befehl senden?
   nettool_argument_required: Argument eingeben.

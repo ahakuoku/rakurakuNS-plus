@@ -62,6 +62,8 @@ strings:
   nettool_apply_password_setting: Apply to company password settings
   nettool_announce_warning: "This publishes the map thumbnail and connection information. Send this command?"
   nettool_argument_required: Enter an argument.
+  nettool_company_number_invalid: Enter a numeric company ID from 0 to 62.
+  nettool_client_number_invalid: Enter a numeric client ID from 0 to 65535.
   nettool_company_missing: The specified company does not exist.
   nettool_sent: 'Sent {command}.'
   nettool_failed: 'Send failed: {error}'
@@ -308,6 +310,7 @@ strings:
   log_discord_command_sync_failed: 'Failed to synchronize Discord slash commands: {error}'
   config_discord_command_result_enabled: Post command results to a dedicated channel
   config_discord_command_result_channel: Channel ID
+  discord_command_result_warning: "! Warning! This is an audit feature. Participant IP addresses and company passwords may be posted, so use a channel that only administrators can view."
   help_discord_command_result_enabled: When enabled, post command results to the configured dedicated channel.
   help_discord_command_result_channel: Specify the Discord channel ID for command results.
   log_discord_command_result_post_failed: 'Failed to post Discord command result: {error}'

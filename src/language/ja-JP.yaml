@@ -62,6 +62,8 @@ strings:
   nettool_apply_password_setting: 会社パスワード設定に反映
   nettool_announce_warning: "このコマンドを送信すると、マップのサムネイルや接続先情報などが公開されます。本当に送信しますか？"
   nettool_argument_required: 引数を入力してください。
+  nettool_company_number_invalid: 会社IDは0～62の数値で入力してください。
+  nettool_client_number_invalid: クライアントIDは0～65535の数値で入力してください。
   nettool_company_missing: 指定された会社は存在しません。
   nettool_sent: '{command} を送信しました。'
   nettool_failed: '送信に失敗しました: {error}'
@@ -308,6 +310,7 @@ strings:
   log_discord_command_sync_failed: 'Discordスラッシュコマンドの同期に失敗しました: {error}'
   config_discord_command_result_enabled: コマンド結果を専用チャンネルへ出力する
   config_discord_command_result_channel: チャンネルID
+  discord_command_result_warning: ！注意！　これは監査用の機能です。参加者のIPアドレスや会社のパスワードが書き込まれることがありますので、管理者のみ閲覧可能なチャンネルに設定することをおすすめします。
   help_discord_command_result_enabled: 有効にすると、コマンド結果を指定した専用チャンネルへ投稿します。
   help_discord_command_result_channel: コマンド結果を投稿するDiscordチャンネルIDを指定します。
   log_discord_command_result_post_failed: 'Discordコマンド結果の投稿に失敗しました: {error}'

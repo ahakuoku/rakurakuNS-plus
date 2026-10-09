@@ -62,6 +62,8 @@ strings:
   nettool_apply_password_setting: 套用至公司密碼設定
   nettool_announce_warning: 將公開地圖縮圖及連線資訊。確定要傳送嗎？
   nettool_argument_required: 請輸入引數。
+  nettool_company_number_invalid: 請輸入 0 到 62 之間的數字公司 ID。
+  nettool_client_number_invalid: 請輸入 0 到 65535 之間的數字用戶端 ID。
   nettool_company_missing: 指定的公司不存在。
   nettool_sent: 已傳送 {command}。
   nettool_failed: '傳送失敗：{error}'
@@ -308,6 +310,7 @@ strings:
   log_discord_command_sync_failed: '無法同步 Discord 斜線命令: {error}'
   config_discord_command_result_enabled: 將命令結果發佈到專用頻道
   config_discord_command_result_channel: 頻道 ID
+  discord_command_result_warning: "！注意！這是稽核功能。參與者的 IP 位址和公司密碼可能會被發佈，建議使用僅管理員可檢視的頻道。"
   help_discord_command_result_enabled: 啟用後，將命令結果發佈到指定的專用頻道。
   help_discord_command_result_channel: 指定用於發佈命令結果的 Discord 頻道 ID。
   log_discord_command_result_post_failed: '發佈 Discord 命令結果失敗: {error}'
